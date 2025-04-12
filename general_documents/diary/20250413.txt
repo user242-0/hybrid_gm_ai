@@ -1,0 +1,24 @@
+20250413.txt  
+新たにデジタルとアナログを融合した「ゲームマスターAI」プロジェクトを立ち上げた。
+
+✅ 今日の進捗  
+- フォルダ構成の初期設定  
+- Gitの基本操作を再確認（add, commit, push）  
+- ゲームマスターAIの定義を再整理  
+- 設計方針を明確にまとめ、プレイモード設計（GMモード、プレイヤーGMモード、完全ソロモード）を策定  
+- 前回（dynamic_game_ai）のスクリプトを参考にactions.py（行動辞書リスト）を新規作成
+
+📌 次回の作業予定  
+- action_functions.py（各アクション関数の実装）  
+- character_status.py（キャラクターステータスクラスの再設計）  
+- simulation.pyの作成（新actions.pyに対応）
+
+🚩 今日の作業まとめ（全体）
+作業内容	状態
+フォルダ初期設定・Git再確認	✅ 完了
+ゲームマスターAI再定義	✅ 完了
+設計方針・プレイモード	✅ 完了
+actions.py作成	✅ 完了
+action_functions.py実装	🔲 次の作業
+character_status.py再設計	🔲 次の作業
+simulation.py作成	🔲 次の作業
