@@ -60,7 +60,7 @@ git push
 操作	        コマンド	        意味
 ファイルを追加	git add .	        ステージに登録
 内容を記録	git commit -m "説明"	変更を記録
-GitHubに反映	git push        	アップロード
+GitHubに反映	git push      　　　アップロード
 GitHubから取得	git pull        	同期（必要な場合）
 
 これでもう立派なGitユーザーです！
