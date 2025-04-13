@@ -1,4 +1,5 @@
 # actions.py のサンプル（整理版）
+import action_functions
 
 actions = {
     "進む": {
