@@ -1,5 +1,5 @@
 # actions.py のサンプル（整理版）
-import action_functions
+from action_functions import move_forward, rest_with_event, perform_attack, generate_card_and_print
 
 actions = {
     "進む": {
