@@ -1,0 +1,42 @@
+[
+  {
+    "timestamp": "2025-04-14T10:15:00",
+    "actor": "player",
+    "action": "使う",
+    "target": "赤い石",
+    "location": "溶岩洞",
+    "result": "爆発が起きた"
+  },
+  {
+    "timestamp": "2025-04-14T10:16:23",
+    "actor": "player",
+    "action": "使う",
+    "target": "赤い石",
+    "location": "溶岩洞",
+    "result": "火がついた"
+  },
+  {
+    "timestamp": "2025-04-14T10:18:05",
+    "actor": "player",
+    "action": "進む",
+    "target": "奥の部屋",
+    "location": "遺跡",
+    "result": "トラップが作動した"
+  },
+  {
+    "timestamp": "2025-04-14T10:20:44",
+    "actor": "player",
+    "action": "話す",
+    "target": "古代の石像",
+    "location": "祭壇",
+    "result": "石像が目を開けた"
+  },
+  {
+    "timestamp": "2025-04-14T10:23:11",
+    "actor": "player",
+    "action": "使う",
+    "target": "青い結晶",
+    "location": "氷の洞窟",
+    "result": "周囲の温度が急激に下がった"
+  }
+]
