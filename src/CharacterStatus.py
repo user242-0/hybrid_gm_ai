@@ -6,7 +6,7 @@ class CharacterStatus:
         self.stamina = stamina
         self.max_stamina = stamina
         self.attack_power = attack_power
-        self.is_tired = False
+        self.is_tired = True
         self.inventory = inventory if inventory else []
         self.equipped_weapon = None
         self.is_npc = is_npc  # NPCかプレイヤーかを区別
