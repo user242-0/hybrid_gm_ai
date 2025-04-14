@@ -7,7 +7,10 @@ def main():
     player = CharacterStatus(name="プレイヤー")
     game_state = {
         "is_safe_zone": True,
-        "available_items": []
+        "available_items": [],
+        "events": {
+            "statue_trial_unlocked": False  # 初期状態では未解放
+        }
     }
 
     while True:

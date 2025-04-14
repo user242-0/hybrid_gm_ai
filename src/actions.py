@@ -1,5 +1,5 @@
 # actions.py のサンプル（整理版）
-from action_functions import move_forward, rest_with_event, perform_attack, generate_card_and_print
+from action_functions import move_forward, rest_with_event, perform_attack, generate_card_and_print, talk_to_statue
 
 actions = {
     "進む": {
@@ -19,6 +19,18 @@ actions = {
         "requirements": {"has_weapon": True},
         "effects": {"function": perform_attack, "args": ["target"]},
         "available_to": ["player", "npc"],
+    },
+    "石像に話す": {
+        "description": "古代の石像に語りかけることで何かが起こるかもしれない。",
+        "requirements": {
+            "location": "祭壇",
+            "target": "古代の石像"
+        },
+        "effects": {
+            "function": talk_to_statue,
+            "args": []
+        },
+        "available_to": ["player"]
     },
     "カード生成イベント": {
         "description": "新しいカードを生成し、印刷指示を出すイベントをトリガー。",
