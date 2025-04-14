@@ -1,5 +1,9 @@
-# simulation.py（仮構成）
-
+# simulation.py
+# ログ録り用モジュール
+import json
+from datetime import datetime
+import os
+# ゲーム用モジュール
 from CharacterStatus import CharacterStatus
 from actions import actions
 from requirements_checker import RequirementsChecker
@@ -47,12 +51,57 @@ def main():
             selected_action = available_actions[selected_action_key]
             effect = selected_action["effects"]["function"]
             args = selected_action["effects"].get("args", [])
+
+            # アクション実行
             effect(player, game_state, *args)
+
+            # ログを記録（成功時）
+            log_action(
+                actor=player.name,
+                action=selected_action_key,
+                target=game_state.get("current_target", "なし"),
+                location=game_state.get("current_location", "不明"),
+                result="成功"
+            )
 
         except ValueError:
             print("数値を入力してください。")
+            # ログを記録（数値以外入力で失敗）
+            log_action(
+                actor=player.name,
+                action="アクション選択",
+                target="なし",
+                location=game_state.get("current_location", "不明"),
+                result="数値入力エラーで失敗"
+            )
+
         except Exception as e:
             print(f"エラーが発生しました: {e}")
-            
+            # ログを記録（例外エラーで失敗）
+            log_action(
+                actor=player.name,
+                action=selected_action_key,
+                target=game_state.get("current_target", "なし"),
+                location=game_state.get("current_location", "不明"),
+                result=f"例外エラー: {str(e)}"
+            )
+
+def log_action(actor, action, target, location, result):
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "actor": actor,
+        "action": action,
+        "target": target,
+        "location": location,
+        "result": result
+    }
+    
+    # ログフォルダを用意する（無ければ作成）
+    os.makedirs("data/logs", exist_ok=True)
+    
+    with open("data/logs/gameplay_log.json", "a", encoding="utf-8") as logfile:
+        logfile.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+
 if __name__ == "__main__":
     main()
