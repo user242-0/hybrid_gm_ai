@@ -1,0 +1,37 @@
+[
+  {
+    "name": "休憩後のインタラクション制限",
+    "triggered_by": [
+      "休む @任意の場所"
+    ],
+    "requirements": {
+      "previous_action": "休む",
+      "cooldown_time": 5
+    },
+    "effects": {
+      "restrict_same_location_interaction": true
+    },
+    "available_to": [
+      "player"
+    ],
+    "confidence": 0.9
+  },
+  {
+    "name": "石像との対話クールダウン",
+    "triggered_by": [
+      "石像に話す @古代の石像"
+    ],
+    "requirements": {
+      "previous_action": "石像に話す",
+      "target": "古代の石像",
+      "cooldown_time": 10
+    },
+    "effects": {
+      "restrict_same_target_interaction": true
+    },
+    "available_to": [
+      "player"
+    ],
+    "confidence": 0.9
+  }
+]
