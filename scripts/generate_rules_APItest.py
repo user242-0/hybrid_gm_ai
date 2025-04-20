@@ -9,7 +9,7 @@ load_dotenv()
 # .env内にあるAPIキーを使う
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def load_logs(filename="data/logs/gameplay_log.json"):
+def load_logs(filename="data/logs/gameplay_log_v2.json"):
     with open(filename, "r", encoding="utf-8") as file:
         logs = [json.loads(line) for line in file]
     return logs

@@ -1,0 +1,2 @@
+(scripts\generate_rules_APItest.pyの中の読み取るログ名を良く確認してから)
+python scripts\generate_rules_APItest.py

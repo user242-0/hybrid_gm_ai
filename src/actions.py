@@ -1,5 +1,5 @@
 # actions.py のサンプル（整理版）
-from action_functions import move_forward, rest_with_event, perform_attack, generate_card_and_print, talk_to_statue
+from action_functions import move_forward, rest_with_event, perform_attack, generate_card_and_print, talk_to_statue, talk_to_statue_with_cooldown
 
 actions = {
     "進む": {
@@ -32,6 +32,20 @@ actions = {
         },
         "available_to": ["player"]
     },
+
+    "石像に話す（クールダウン）": {
+        "description": "古代の石像に語りかける。連続での使用にはクールダウンが必要。",
+        "requirements": {
+            "location": "祭壇",
+            "target": "古代の石像"
+        },
+        "effects": {
+            "function": talk_to_statue_with_cooldown,
+            "args": []
+        },
+        "available_to": ["player"],
+    },
+    
     "カード生成イベント": {
         "description": "新しいカードを生成し、印刷指示を出すイベントをトリガー。",
         "requirements": None,

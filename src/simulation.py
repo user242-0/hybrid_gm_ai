@@ -7,6 +7,7 @@ import os
 from CharacterStatus import CharacterStatus
 from actions import actions
 from requirements_checker import RequirementsChecker
+from logger import log_action  # simulation.pyでもloggerからインポートする
 
 # simulation.py の先頭に追加
 from colorama import Fore, Style, init
@@ -61,56 +62,25 @@ def main():
             args = selected_action["effects"].get("args", [])
 
             # アクション実行
-            effect(player, game_state, *args)
+            result = effect(player, game_state, *args)
 
             # 成功時の表示も青く
             print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
 
-            # ログ記録
             log_action(
                 actor=player.name,
                 action=selected_action_key,
                 target=game_state.get("current_target", "なし"),
                 location=game_state.get("current_location", "不明"),
-                result="成功"
+                result=result
             )
 
         except ValueError:
-            print(Fore.BLUE + "数値を入力してください。" + Style.RESET_ALL)
-            log_action(
-                actor=player.name,
-                action="アクション選択",
-                target="なし",
-                location=game_state.get("current_location", "不明"),
-                result="数値入力エラーで失敗"
-            )
+            print(Fore.GREEN + "数値を入力してください。" + Style.RESET_ALL)
 
         except Exception as e:
-            print(Fore.BLUE + f"エラーが発生しました: {e}" + Style.RESET_ALL)
-            log_action(
-                actor=player.name,
-                action=selected_action_key,
-                target=game_state.get("current_target", "なし"),
-                location=game_state.get("current_location", "不明"),
-                result=f"例外エラー: {str(e)}"
-            )
+            print(Fore.RED + f"エラーが発生しました: {e}" + Style.RESET_ALL)
 
-
-def log_action(actor, action, target, location, result):
-    log_entry = {
-        "timestamp": datetime.now().isoformat(),
-        "actor": actor,
-        "action": action,
-        "target": target,
-        "location": location,
-        "result": result
-    }
-    
-    # ログフォルダを用意する（無ければ作成）
-    os.makedirs("data/logs", exist_ok=True)
-    
-    with open("data/logs/gameplay_blue_log.json", "a", encoding="utf-8") as logfile:
-        logfile.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":
