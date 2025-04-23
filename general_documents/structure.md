@@ -4,13 +4,19 @@ hybrid_gm_ai/
     ├── action_functions.py(アクションの関数定義ファイル。AIの提案が採択された場合、人（GM_human）が記述)
     ├── CharacterStatus.py.py(キャラクターのステータス定義ファイル)
     ├── simulation.py(シミュレーション本体)
-    └── requirements_checker.py(行動が可能かチェックする機能)
+    ├── requirements_checker.py(行動が可能かチェックする機能)
+    └── logger.py(プレイヤーの行動を記録)
 └── scripts/
-    └──generate_rules_APItest.py（APIでログからルール作成するスクリプト。セッション2で作成）
+    ├──generate_rules_APItest.py（APIでログからルール作成するスクリプト）
+    └──parse_ai_response_to_json（LLMの生成したルールをパースして）
 └── data/
     └──logs
-        ├── example_log_01.json(セッション1でchatgptが作成したダミーログ)
-        └── gameplay_log.json（セッション2でサンプルとして録った実際のログ）
+        ├── gameplay_log_latest.json
+        ├── gameplay_log_previous.json
+        └── archive/
+            └── （古いログをここに退避）
     └──rules
-        └── example_rules_01.json(セッション1でchatgptがexample_log_01.jsonから作成したルール)
-        └── ai_generated_rules.json（セッション2で実際のログgameplay_log.jsonから作成したルール）
+        ├── ai_rules_raw_latest.txt
+        ├── ai_generated_rules_latest.json
+        └── archive/
+            └── （古いルールをここに退避）
