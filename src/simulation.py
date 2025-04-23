@@ -7,7 +7,10 @@ import os
 from CharacterStatus import CharacterStatus
 from actions import actions
 from requirements_checker import RequirementsChecker
-from logger import log_action  # simulation.pyでもloggerからインポートする
+from logger import log_action, classify_talk_situation # simulation.pyでもloggerからインポートする
+
+# デバッグ
+import traceback
 
 # simulation.py の先頭に追加
 from colorama import Fore, Style, init
@@ -17,7 +20,13 @@ init(autoreset=True)
 
 # 中略...
 
+# simulation.pyの冒頭部分
+conversation_history = {}
+
+
 def main():
+    global conversation_history  # これが必要
+
     player = CharacterStatus(name="プレイヤー")
     game_state = {
         "is_safe_zone": True,
@@ -28,7 +37,7 @@ def main():
         "current_location": "祭壇", 
         "current_target": "古代の石像"
     }
-
+    conversation_key = f"{player.name}_{game_state['current_target']}"
     checker = RequirementsChecker(game_state, player)
 
     while True:
@@ -61,11 +70,58 @@ def main():
             effect = selected_action["effects"]["function"]
             args = selected_action["effects"].get("args", [])
 
+            # 会話関連アクションの場合のみ履歴更新するよう修正
+            if selected_action_key in ["石像に話す", "石像に話す（クールダウン）"]:
+                conversation_key = f"{player.name}_{game_state['current_target']}"
+                last_talk_info = conversation_history.get(conversation_key)
+
+                if last_talk_info:
+                    last_talk_time_str, count = last_talk_info["last_talk_time"], last_talk_info["talk_count"]
+
+                    # 型チェックして変換（安全策）
+                    if isinstance(last_talk_time_str, str):
+                        last_talk_time = datetime.fromisoformat(last_talk_time_str)
+                    elif isinstance(last_talk_time_str, datetime):
+                        last_talk_time = last_talk_time_str
+                    else:
+                        raise ValueError(f"予期しない型です: {type(last_talk_time_str)}")
+
+                    interval = (datetime.now() - last_talk_time).total_seconds()
+                    talk_count = count + 1
+                else:
+                    interval = None
+                    talk_count = 1
+
+                # game_state更新
+                game_state["talk_count"] = talk_count
+                game_state["interval"] = interval
+                game_state["talk_situation"] = classify_talk_situation(talk_count, interval)
+
+                # 履歴を会話アクション時のみ更新
+                conversation_history[conversation_key] = {
+                    "last_talk_time": datetime.now().isoformat(),
+                    "talk_count": talk_count
+                }
+            else:
+                # 会話以外のアクションではtalk_count, intervalをリセットまたは設定しない
+                game_state["talk_count"] = None
+                game_state["interval"] = None
+                game_state["talk_situation"] = ["normal"]
+
+
+
             # アクション実行
             result = effect(player, game_state, *args)
 
             # 成功時の表示も青く
             print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
+
+            # ↓必ず履歴を更新する（これもwhileループ内）↓
+            # 更新処理（日時をISO文字列として保存）
+            conversation_history[conversation_key] = {
+                "last_talk_time": datetime.now().isoformat(),
+                "talk_count": talk_count
+            }
 
             log_action(
                 actor=player.name,
@@ -80,6 +136,7 @@ def main():
 
         except Exception as e:
             print(Fore.RED + f"エラーが発生しました: {e}" + Style.RESET_ALL)
+            traceback.print_exc()
 
 
 

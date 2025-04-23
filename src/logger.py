@@ -6,16 +6,20 @@ import os
 conversation_history = {}
 
 def classify_talk_situation(talk_count, interval):
+    situations = []
     hour = datetime.now().hour
 
     if talk_count == 1:
-        return "first_time"
-    elif interval is not None and interval < 30:
-        return "repeated_short_interval"
-    elif hour >= 23 or hour <= 4:
-        return "late_night"
-    else:
-        return "normal"
+        situations.append("first_time")
+    if interval is not None and interval < 30:
+        situations.append("repeated_short_interval")
+    if hour >= 23 or hour <= 4:
+        situations.append("late_night")
+
+    if not situations:
+        situations.append("normal")
+
+    return situations
 
 def log_action(actor, action, target, location, result):
     global conversation_history
@@ -55,5 +59,5 @@ def log_action(actor, action, target, location, result):
 
     os.makedirs("data/logs", exist_ok=True)
 
-    with open("data/logs/gameplay_log_blue_0425_latest.json", "a", encoding="utf-8") as logfile:
+    with open("data/logs/gameplay_log_latest.json", "a", encoding="utf-8") as logfile:
         logfile.write(json.dumps(log_entry, ensure_ascii=False) + "\n")

@@ -1,0 +1,8 @@
+{"timestamp": "2025-04-20T16:25:32.822593", "actor": "プレイヤー", "action": "進む", "target": "古代の石像", "location": "祭壇", "result": "成功"}
+{"timestamp": "2025-04-20T16:25:43.389181", "actor": "プレイヤー", "action": "進む", "target": "古代の石像", "location": "祭壇", "result": "成功"}
+{"timestamp": "2025-04-20T16:25:46.058554", "actor": "プレイヤー", "action": "休む", "target": "古代の石像", "location": "祭壇", "result": "成功"}
+{"timestamp": "2025-04-20T16:25:48.333520", "actor": "プレイヤー", "action": "石像に話す", "target": "古代の石像", "location": "祭壇", "result": null}
+{"timestamp": "2025-04-20T16:25:50.536478", "actor": "プレイヤー", "action": "石像に話す（クールダウン）", "target": "古代の石像", "location": "祭壇", "result": "成功"}
+{"timestamp": "2025-04-20T16:25:52.226754", "actor": "プレイヤー", "action": "石像に話す（クールダウン）", "target": "古代の石像", "location": "祭壇", "result": "クールダウン中（失敗）"}
+{"timestamp": "2025-04-20T16:25:57.805498", "actor": "プレイヤー", "action": "石像に話す（クールダウン）", "target": "古代の石像", "location": "祭壇", "result": "クールダウン中（失敗）"}
+{"timestamp": "2025-04-20T16:26:00.769547", "actor": "プレイヤー", "action": "石像に話す（クールダウン）", "target": "古代の石像", "location": "祭壇", "result": "成功"}

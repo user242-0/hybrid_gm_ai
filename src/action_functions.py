@@ -3,6 +3,7 @@ from logger import log_action  # ログ関数をインポートする例
 import openai
 import os
 from dotenv import load_dotenv
+import json
 
 # .envから環境変数を読み込む
 load_dotenv()
@@ -18,30 +19,44 @@ fixed_dialogue = {
 "石像に話す": "よくぞここまで来た。我が名はオムニ。この地に訪れし者よ、何を求めてここに来た？"
 }
 
+fixed_dialogue_2 = {
+"オムニ：「今は語るべきことがない。時を置いて訪れよ。」"
+}
+
 # フレーバーテキスト生成関数
-def generate_flavor_text(talk_situation):
+# 簡単なキャッシュ
+flavor_text_cache = {}
+
+def generate_flavor_text(talk_situation, location):
+    time_description = "深夜（夜間・真夜中）" if "late_night" in talk_situation else "昼間（通常時間帯）"
+    
+    # 「朝」「昼」など深夜に不適切な言葉を禁止
     prompt = f"""
     あなたはゲーム内の短めのフレーバーテキストを生成するAIです。
-    プレイヤーは『古代の石像・オムニ』に話しかけました。
 
-    状況：{talk_situation}
+    場所：{location}（例：祭壇、洞窟など）
+    時間帯：{time_description}
+    状況：「{', '.join(talk_situation)}」（例：深夜、短時間の連続会話など）
 
-    特に夜間（late_night）の場合、神秘的で少し不気味な情景描写を生成してください。
-    キャラクターのセリフやストーリー要素は含めないでください。100文字以内で。
+    深夜の描写の場合、「朝」「昼」「陽光」「小鳥のさえずり」など、夜間には存在しない要素は絶対に含めず、月光や暗闇など、夜にふさわしい要素のみを使用してください。
+    100文字以内の簡潔で矛盾のない描写を生成してください。
+    セリフやストーリー要素は一切含めないでください。
     """
 
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "あなたは短く簡潔な情景描写を生成するAIです。キャラクターのセリフは含めないでください。"},
+            {"role": "system", "content": "あなたは指定された場所・時間帯・状況に矛盾のない短い情景描写を生成するAIです。"},
             {"role": "user", "content": prompt}
         ],
         temperature=0.7
     )
 
-    flavor_text = response.choices[0].message.content
-    return flavor_text
+    return response.choices[0].message.content
 
+
+
+##　実際のアクションリスト
 
 def move_forward(character_status, game_state):
     print(f"{character_status.name}が奥に進みました。")
@@ -95,11 +110,23 @@ def talk_to_statue_with_cooldown(character_status, game_state):
         print(f"{statue_name}は沈黙しています。あと{int(remaining_time)}秒待つ必要があります。")
         return "クールダウン中（失敗）"  # 戻り値で結果を返すだけ（ログは書かない）
 
+    
+    talk_situation = game_state.get('talk_situation', [])
+    talk_count = game_state.get('talk_count')
+    interval = game_state.get('interval')
+
+    # print(f"[デバッグ] talk_count: {talk_count}, interval: {interval}")
+    if talk_count is not None and talk_count >= 3 and interval is not None and interval < 60:
+        print(fixed_dialogue_2)
+        return "時間をかけて再訪することをプレイヤーに促す"
+
+
     print(f"{character_status.name}は{statue_name}に話しかけました。")
 
-    talk_situation = game_state.get('talk_situation', 'normal')
+    
     dialogue = fixed_dialogue["石像に話す"] #セリフの中身
-    flavor_text = generate_flavor_text(talk_situation)
+    talk_situation = game_state.get('talk_situation', 'normal')
+    flavor_text = generate_flavor_text(talk_situation,  game_state.get('location', '祭壇'))
 
 
     # 正しく表示
