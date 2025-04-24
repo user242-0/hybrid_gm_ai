@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 import os
 
-# 会話履歴を保持する辞書を追加
+# 会話履歴を保持する辞書をグローバルで管理
 conversation_history = {}
 
 def classify_talk_situation(talk_count, interval):
@@ -26,6 +26,7 @@ def log_action(actor, action, target, location, result):
 
     current_time = datetime.now()
 
+    # 明示的に初期化
     talk_count = None
     interval = None
     talk_situation = None
@@ -39,11 +40,13 @@ def log_action(actor, action, target, location, result):
             talk_count = count + 1
         else:
             talk_count = 1
+            interval = None
 
-        # 状況分類を行う
         talk_situation = classify_talk_situation(talk_count, interval)
-
         conversation_history[key] = (current_time, talk_count)
+
+    # 以下デバッグ用プリント追加
+    # print(f"[DEBUG] action: {action}, talk_count: {talk_count}, interval: {interval}, talk_situation: {talk_situation}")
 
     log_entry = {
         "timestamp": current_time.isoformat(),
@@ -54,7 +57,7 @@ def log_action(actor, action, target, location, result):
         "result": result,
         "talk_count": talk_count,
         "interval": interval,
-        "talk_situation": talk_situation  # ← 追加
+        "talk_situation": talk_situation
     }
 
     os.makedirs("data/logs", exist_ok=True)

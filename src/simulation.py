@@ -70,21 +70,26 @@ def main():
             effect = selected_action["effects"]["function"]
             args = selected_action["effects"].get("args", [])
 
+
+            # アクション実行
+            result = effect(player, game_state, *args)
+
+            # 成功時の表示も青く
+            print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
+
             # 会話関連アクションの場合のみ履歴更新するよう修正
             if selected_action_key in ["石像に話す", "石像に話す（クールダウン）"]:
                 conversation_key = f"{player.name}_{game_state['current_target']}"
-                last_talk_info = conversation_history.get(conversation_key)
 
-                if last_talk_info:
-                    last_talk_time_str, count = last_talk_info["last_talk_time"], last_talk_info["talk_count"]
+                if conversation_key in conversation_history:
+                    last_talk_time_str = conversation_history[conversation_key]["last_talk_time"]
+                    count = conversation_history[conversation_key]["talk_count"]
 
-                    # 型チェックして変換（安全策）
+                    # 安全な型変換処理
                     if isinstance(last_talk_time_str, str):
                         last_talk_time = datetime.fromisoformat(last_talk_time_str)
-                    elif isinstance(last_talk_time_str, datetime):
-                        last_talk_time = last_talk_time_str
                     else:
-                        raise ValueError(f"予期しない型です: {type(last_talk_time_str)}")
+                        last_talk_time = last_talk_time_str
 
                     interval = (datetime.now() - last_talk_time).total_seconds()
                     talk_count = count + 1
@@ -97,32 +102,20 @@ def main():
                 game_state["interval"] = interval
                 game_state["talk_situation"] = classify_talk_situation(talk_count, interval)
 
-                # 履歴を会話アクション時のみ更新
+                # 履歴を更新
                 conversation_history[conversation_key] = {
                     "last_talk_time": datetime.now().isoformat(),
                     "talk_count": talk_count
                 }
+
             else:
-                # 会話以外のアクションではtalk_count, intervalをリセットまたは設定しない
+                # 会話以外のアクションでは履歴の更新をしない、またはデフォルトを明確に設定
                 game_state["talk_count"] = None
                 game_state["interval"] = None
                 game_state["talk_situation"] = ["normal"]
+                talk_count = 0  # 会話以外のアクションでは明示的に初期化
 
-
-
-            # アクション実行
-            result = effect(player, game_state, *args)
-
-            # 成功時の表示も青く
-            print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
-
-            # ↓必ず履歴を更新する（これもwhileループ内）↓
-            # 更新処理（日時をISO文字列として保存）
-            conversation_history[conversation_key] = {
-                "last_talk_time": datetime.now().isoformat(),
-                "talk_count": talk_count
-            }
-
+            # log_actionはすべてのアクションで実行
             log_action(
                 actor=player.name,
                 action=selected_action_key,
@@ -130,6 +123,7 @@ def main():
                 location=game_state.get("current_location", "不明"),
                 result=result
             )
+
 
         except ValueError:
             print(Fore.GREEN + "数値を入力してください。" + Style.RESET_ALL)

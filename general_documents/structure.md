@@ -1,14 +1,14 @@
 hybrid_gm_ai/
 └── src/
-    ├── actions.py（アクションリスト。AI(GM_AI)が登録していく）
-    ├── action_functions.py(アクションの関数定義ファイル。AIの提案が採択された場合、人（GM_human）が記述)
+    ├── actions.py（アクションリスト。AI(GM_AI)が登録していく方針）
+    ├── action_functions.py(アクションの関数定義ファイル。AIの提案が採択された場合、人（GM_human）が記述する方針)
     ├── CharacterStatus.py.py(キャラクターのステータス定義ファイル)
     ├── simulation.py(シミュレーション本体)
     ├── requirements_checker.py(行動が可能かチェックする機能)
-    └── logger.py(プレイヤーの行動を記録)
+    └── logger.py(プレイヤーの行動を記録、状況判定（classify_talk_situation）もここ)
 └── scripts/
     ├──generate_rules_APItest.py（APIでログからルール作成するスクリプト）
-    └──parse_ai_response_to_json（LLMの生成したルールをパースして）
+    └──parse_ai_response_to_json（LLMの生成したルールをパースしてjsonに使いやすくまとめる）
 └── data/
     └──logs
         ├── gameplay_log_latest.json
