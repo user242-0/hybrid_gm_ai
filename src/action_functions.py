@@ -1,5 +1,6 @@
 import time
 from logger import log_action  # ログ関数をインポートする例
+
 import openai
 import os
 from dotenv import load_dotenv

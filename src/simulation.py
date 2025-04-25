@@ -8,6 +8,7 @@ from CharacterStatus import CharacterStatus
 from actions import actions
 from requirements_checker import RequirementsChecker
 from logger import log_action, classify_talk_situation # simulation.pyでもloggerからインポートする
+from conversation_manager import ConversationManager
 
 # デバッグ
 import traceback
@@ -21,12 +22,10 @@ init(autoreset=True)
 # 中略...
 
 # simulation.pyの冒頭部分
-conversation_history = {}
+conversation_manager = ConversationManager()
 
 
 def main():
-    global conversation_history  # これが必要
-
     player = CharacterStatus(name="プレイヤー")
     game_state = {
         "is_safe_zone": True,
@@ -79,34 +78,17 @@ def main():
 
             # 会話関連アクションの場合のみ履歴更新するよう修正
             if selected_action_key in ["石像に話す", "石像に話す（クールダウン）"]:
-                conversation_key = f"{player.name}_{game_state['current_target']}"
-
-                if conversation_key in conversation_history:
-                    last_talk_time_str = conversation_history[conversation_key]["last_talk_time"]
-                    count = conversation_history[conversation_key]["talk_count"]
-
-                    # 安全な型変換処理
-                    if isinstance(last_talk_time_str, str):
-                        last_talk_time = datetime.fromisoformat(last_talk_time_str)
-                    else:
-                        last_talk_time = last_talk_time_str
-
-                    interval = (datetime.now() - last_talk_time).total_seconds()
-                    talk_count = count + 1
-                else:
-                    interval = None
-                    talk_count = 1
+                actor = player.name
+                target = game_state.get('current_target', 'なし')
+                
 
                 # game_state更新
-                game_state["talk_count"] = talk_count
-                game_state["interval"] = interval
-                game_state["talk_situation"] = classify_talk_situation(talk_count, interval)
+                game_state["talk_count"] = conversation_manager.get_talk_count(actor, target)
+                game_state["talk_situation"] = conversation_manager.get_talk_situation(actor, target)
+                game_state["interval"] = conversation_manager.get_interval(actor, target)
 
-                # 履歴を更新
-                conversation_history[conversation_key] = {
-                    "last_talk_time": datetime.now().isoformat(),
-                    "talk_count": talk_count
-                }
+                # 会話履歴を更新
+                conversation_manager.update_conversation(actor, target)
 
             else:
                 # 会話以外のアクションでは履歴の更新をしない、またはデフォルトを明確に設定
