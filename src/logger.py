@@ -2,27 +2,8 @@ import json
 from datetime import datetime
 import os
 
-# 会話履歴を保持する辞書をグローバルで管理
-conversation_history = {}
 
-def classify_talk_situation(talk_count, interval):
-    situations = []
-    hour = datetime.now().hour
-
-    if talk_count == 1:
-        situations.append("first_time")
-    if interval is not None and interval < 30:
-        situations.append("repeated_short_interval")
-    if hour >= 23 or hour <= 4:
-        situations.append("late_night")
-
-    if not situations:
-        situations.append("normal")
-
-    return situations
-
-def log_action(actor, action, target, location, result):
-    global conversation_history
+def log_action(actor, action, target, location, result, game_state):
 
     current_time = datetime.now()
 
@@ -32,18 +13,13 @@ def log_action(actor, action, target, location, result):
     talk_situation = None
 
     if action in ["石像に話す", "石像に話す（クールダウン）"]:
-        key = f"{actor}_{target}"
 
-        if key in conversation_history:
-            last_talk_time, count = conversation_history[key]
-            interval = (current_time - last_talk_time).total_seconds()
-            talk_count = count + 1
-        else:
-            talk_count = 1
-            interval = None
+        # game_state経由で安全に値を取得（推奨）
+        talk_count = game_state.get("talk_count")
+        interval = game_state.get("interval")
+        talk_situation = game_state.get("talk_situation", ["normal"])
 
-        talk_situation = classify_talk_situation(talk_count, interval)
-        conversation_history[key] = (current_time, talk_count)
+        
 
     # 以下デバッグ用プリント追加
     # print(f"[DEBUG] action: {action}, talk_count: {talk_count}, interval: {interval}, talk_situation: {talk_situation}")

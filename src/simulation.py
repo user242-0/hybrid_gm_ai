@@ -7,7 +7,7 @@ import os
 from CharacterStatus import CharacterStatus
 from actions import actions
 from requirements_checker import RequirementsChecker
-from logger import log_action, classify_talk_situation # simulation.pyでもloggerからインポートする
+from logger import log_action
 from conversation_manager import ConversationManager
 
 # デバッグ
@@ -70,25 +70,18 @@ def main():
             args = selected_action["effects"].get("args", [])
 
 
-            # アクション実行
-            result = effect(player, game_state, *args)
-
-            # 成功時の表示も青く
-            print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
 
             # 会話関連アクションの場合のみ履歴更新するよう修正
             if selected_action_key in ["石像に話す", "石像に話す（クールダウン）"]:
                 actor = player.name
                 target = game_state.get('current_target', 'なし')
                 
-
+                # 会話履歴を更新
+                conversation_manager.update_conversation(actor, target)
                 # game_state更新
                 game_state["talk_count"] = conversation_manager.get_talk_count(actor, target)
                 game_state["talk_situation"] = conversation_manager.get_talk_situation(actor, target)
                 game_state["interval"] = conversation_manager.get_interval(actor, target)
-
-                # 会話履歴を更新
-                conversation_manager.update_conversation(actor, target)
 
             else:
                 # 会話以外のアクションでは履歴の更新をしない、またはデフォルトを明確に設定
@@ -97,13 +90,23 @@ def main():
                 game_state["talk_situation"] = ["normal"]
                 talk_count = 0  # 会話以外のアクションでは明示的に初期化
 
+
+            # アクション実行
+            result = effect(player, game_state, *args)
+
+            # 成功時の表示も青く
+            print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
+
+
+
             # log_actionはすべてのアクションで実行
             log_action(
                 actor=player.name,
                 action=selected_action_key,
                 target=game_state.get("current_target", "なし"),
                 location=game_state.get("current_location", "不明"),
-                result=result
+                result=result,
+                game_state=game_state
             )
 
 

@@ -15,6 +15,8 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # クールダウン管理の状態保持（グローバル変数かクラス内の属性が理想）
 cooldown_status = {}
 
+
+
 # 石像の固定セリフ
 fixed_dialogue = {
 "石像に話す": "よくぞここまで来た。我が名はオムニ。この地に訪れし者よ、何を求めてここに来た？"
@@ -127,8 +129,9 @@ def talk_to_statue_with_cooldown(character_status, game_state):
         print(f"{statue_name}は沈黙しています。あと{int(remaining_time)}秒待つ必要があります。")
         return "クールダウン中（失敗）"
 
-    talk_count = game_state.get('talk_count')
-    interval = game_state.get('interval')
+    # game_state経由で安全に値を取得
+    talk_count = game_state.get("talk_count", 0)
+    interval = game_state.get("interval", None)
 
     if talk_count is not None and talk_count >= 3 and interval is not None and interval < 60:
         print("オムニ：「今は語るべきことがない。時を置いて訪れよ。」")
@@ -140,7 +143,8 @@ def talk_to_statue_with_cooldown(character_status, game_state):
     talk_situation = game_state.get('talk_situation', ['normal'])
     location = game_state.get('location', '祭壇')
 
-    # ↓↓ ここが重要な修正箇所 ↓↓
+    print(f"[DEBUG] talk_count: {talk_count}, interval: {interval}, talk_situation: {talk_situation}")
+
     action = "石像に話す（クールダウン）"
     flavor_text = generate_flavor_text(action, talk_situation, location)
 
@@ -150,6 +154,7 @@ def talk_to_statue_with_cooldown(character_status, game_state):
     cooldown_status[statue_name] = current_time + 10
 
     return {"dialogue": dialogue, "flavor_text": flavor_text}
+
 
 
 def generate_card_and_print(character_status, game_state, card_name):
