@@ -29,12 +29,14 @@ conversation_manager = ConversationManager()
 def main():
     player = CharacterStatus(name="プレイヤー")
     game_state = {
+        "has_enemy": True,
+        "enemy": {"name": "洞窟のゴブリン", "hp": 20, "attack_power": 4},
         "is_safe_zone": True,
         "available_items": [],
         "events": {
             "statue_trial_unlocked": False
         },
-        "current_location": "祭壇", 
+        "current_location": "力の洞窟", 
         "current_target": "古代の石像"
     }
     conversation_key = f"{player.name}_{game_state['current_target']}"
@@ -156,6 +158,82 @@ def main():
             traceback.print_exc()
 
 
+def run_simulation_step(character, global_game_state, controlled_by_ai=False):
+    current_location = character.location
+    current_state = global_game_state[current_location]
+
+    available_actions = []
+    checker = RequirementsChecker(current_state, character)
+
+    for action_name, details in actions.items():
+        if checker.check_all(details["requirements"]):
+            available_actions.append(action_name)
+
+    # AI制御の場合は表示をOFF
+    if not controlled_by_ai:
+        print(f"\n{character.name}（現在地：{current_location}）の行動可能リスト:")
+        for idx, act in enumerate(available_actions, 1):
+            print(f"{idx}. {act}：{actions[act]['description']}")
+
+        selected_idx = input("\n番号を選択してください: ")
+        try:
+            selected_action_name = available_actions[int(selected_idx)-1]
+        except (IndexError, ValueError):
+            print("無効な入力です。")
+            return
+    else:
+        # AIの場合は自動選択（ランダム・もしくは戦略的に）
+        selected_action_name = available_actions[0]  # 例として最初の行動を選択
+
+    action_details = actions[selected_action_name]
+    function_to_execute = action_details["effects"]["function"]
+    args = action_details["effects"]["args"]
+
+    result = function_to_execute(character, current_state, *args)
+
+    if not controlled_by_ai:
+        # プレイヤー操作の場合のみ結果表示
+        print(f"行動結果：{result}")
+
+    log_action(
+        actor=character.name,
+        action=selected_action_name,
+        target=args[0] if args else None,
+        location=current_location,
+        result=result,
+        game_state=current_state
+    )
 
 if __name__ == "__main__":
-    main()
+    # 敵対的NPC設定
+    enemy_npc = CharacterStatus("敵対的NPC", hp=80, attack_power=10)
+    enemy_npc.location = "力の洞窟"
+
+
+    # 世界全体の状態（場所ごと）
+    global_game_state = {
+        "力の洞窟": {
+            "has_enemy": True,
+            "enemy": {"name": "洞窟のゴーレム", "hp": 50, "attack_power": 8}
+        },
+        "祭壇": {
+            "has_enemy": False,
+            "enemy": None
+        }
+    }
+
+    # プレイヤーの初期位置
+    player = CharacterStatus("プレイヤー")
+    player.location = "力の洞窟"
+    global_game_state["力の洞窟"]["has_enemy"] = True
+    global_game_state["力の洞窟"]["enemy"] = {
+        "name": player.name,
+        "hp": player.hp,
+        "attack_power": player.attack_power
+    }
+
+    # プレイヤー（手動操作）
+    run_simulation_step(player, global_game_state)
+
+    # 敵対的NPC（AI制御）
+    run_simulation_step(enemy_npc, global_game_state, controlled_by_ai=True)

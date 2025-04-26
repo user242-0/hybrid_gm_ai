@@ -1,7 +1,13 @@
 # actions.py のサンプル（整理版）
-from action_functions import move_forward, rest_with_event, perform_attack, generate_card_and_print, talk_to_statue, talk_to_statue_with_cooldown
+from action_functions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, generate_card_and_print, talk_to_statue, talk_to_statue_with_cooldown
 
 actions = {
+    "探索する": {
+        "description": "現在のロケーションを探索する。",
+        "requirements": None,
+        "effects": {"function": explore_location, "args": []},
+        "available_to": ["player", "npc"]
+    },
     "進む": {
         "description": "洞窟やダンジョンの奥に進む。",
         "requirements": None,
@@ -19,6 +25,12 @@ actions = {
         "requirements": {"has_weapon": True},
         "effects": {"function": perform_attack, "args": ["target"]},
         "available_to": ["player", "npc"],
+    },
+    "戦闘を行う": {
+        "description": "敵との戦闘に突入する。",
+        "requirements": {"has_enemy": True},  # has_weaponを削除
+        "effects": {"function": engage_combat, "args": []},
+        "available_to": ["player", "npc"]
     },
     "石像に話す": {
         "description": "古代の石像に語りかけることで何かが起こるかもしれない。",

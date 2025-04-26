@@ -67,6 +67,18 @@ def generate_flavor_text(action, talk_situation, location):
 
 
 ##　実際のアクションリスト
+def explore_location(character_status, game_state):
+    action = "探索する"
+    location = game_state.get('location', '未知の場所')
+    talk_situation = game_state.get('talk_situation', ['normal']) 
+    
+    flavor_text = generate_flavor_text(action, talk_situation, location)
+    print(flavor_text)
+
+    return "成功"
+
+
+
 def move_forward(character_status, game_state):
     action = "進む"
     location = game_state.get('location', '未知の場所')
@@ -90,6 +102,45 @@ def rest_with_event(character_status, game_state):
     print(flavor_text)
 
     return "成功"
+
+def engage_combat(character_status, game_state, enemy_character_status=None):
+    print(f"{character_status.name}が敵との戦闘を開始します……")
+
+    if enemy_character_status:
+        enemy_hp = enemy_character_status.hp
+        enemy_attack_power = enemy_character_status.attack_power
+        enemy_name = enemy_character_status.name
+    else:
+        enemy = game_state.get("enemy", {"name": "謎の敵", "hp": 30, "attack_power": 5})
+        enemy_hp = enemy["hp"]
+        enemy_attack_power = enemy["attack_power"]
+        enemy_name = enemy["name"]
+
+    attack_power = character_status.attack_power if character_status.equipped_weapon else 1
+
+    while character_status.hp > 0 and enemy_hp > 0:
+        enemy_hp -= attack_power
+        print(f"{enemy_name}に{attack_power}のダメージを与えた！ (敵HP: {enemy_hp})")
+
+        if enemy_hp <= 0:
+            print(f"{enemy_name}を倒しました！")
+            game_state["has_enemy"] = False
+            if enemy_character_status:
+                enemy_character_status.hp = 0  # 敵のキャラクターを死亡状態にする
+            return "勝利"
+
+        character_status.hp -= enemy_attack_power
+        print(f"{enemy_name}から{enemy_attack_power}のダメージを受けた！ (HP: {character_status.hp})")
+
+        if character_status.hp <= 0:
+            print(f"{character_status.name}は敗北しました……")
+            return "敗北"
+
+    # 戦闘後、敵のHPを更新
+    if enemy_character_status:
+        enemy_character_status.hp = enemy_hp
+
+    return "戦闘終了"
 
 
 

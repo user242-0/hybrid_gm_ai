@@ -14,6 +14,8 @@ class RequirementsChecker:
             "has_weapon_in_inventory": lambda: any(
                 item for item in self.player_status.inventory if item["type"] == "weapon"
             ),
+            "has_weapon": lambda: self.player_status.equipped_weapon is not None,  # この行を追加
+            "has_enemy": lambda: self.game_state.get("has_enemy"),   # この行を追加
             "location": lambda loc: self.game_state.get("current_location") == loc,
             "has_item": lambda item_name: any(
                 item["name"] == item_name for item in self.player_status.inventory
