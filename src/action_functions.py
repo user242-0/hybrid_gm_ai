@@ -129,34 +129,91 @@ def talk_to_statue_with_cooldown(character_status, game_state):
         print(f"{statue_name}は沈黙しています。あと{int(remaining_time)}秒待つ必要があります。")
         return "クールダウン中（失敗）"
 
-    # game_state経由で安全に値を取得
-    talk_count = game_state.get("talk_count", 0)
-    interval = game_state.get("interval", None)
-
-    if talk_count is not None and talk_count >= 3 and interval is not None and interval < 60:
-        print("オムニ：「今は語るべきことがない。時を置いて訪れよ。」")
-        return "時間をかけて再訪することをプレイヤーに促す"
-
-    print(f"{character_status.name}は{statue_name}に話しかけました。")
-
     dialogue = "よくぞここまで来た。我が名はオムニ。この地に訪れし者よ、何を求めてここに来た？"
-    talk_situation = game_state.get('talk_situation', ['normal'])
-    location = game_state.get('location', '祭壇')
-
-    print(f"[DEBUG] talk_count: {talk_count}, interval: {interval}, talk_situation: {talk_situation}")
-
-    action = "石像に話す（クールダウン）"
-    flavor_text = generate_flavor_text(action, talk_situation, location)
-
     print(dialogue)
-    print(flavor_text)
+
+    # 選択肢を表示
+    print("\n選択肢を選んでください:")
+    choices = [
+        "① 誰よりも強くなりたい",
+        "② 自分の生きる意味を知りたい",
+        "③ 誰かを助けたい",
+        "④ 自由に入力する"
+    ]
+    for choice in choices:
+        print(choice)
+
+    choice = input("\n番号を選択してください（1～4）: ")
+
+    if choice == "1":
+        desire = "誰よりも強くなりたい"
+    elif choice == "2":
+        desire = "自分の生きる意味を知りたい"
+    elif choice == "3":
+        desire = "誰かを助けたい"
+    elif choice == "4":
+        desire = input("あなたの願いを自由に入力してください：")
+    else:
+        print("無効な入力です。")
+        return "無効な入力（失敗）"
+
+    # 選択肢①と③の場合は追加の問いかけ
+    if choice in ["1", "3"]:
+        name = input("オムニ：「ほう。その名は？」名前を入力（空白の場合は「名もなき者」になります）：")
+        if not name.strip():
+            name = "名もなき者"
+    else:
+        name = None
+
+    # AIに反応を生成させる
+    omni_response = generate_omni_controlled_response(choice, desire, name)
+
+    print(f"\nオムニ：「{omni_response}」")
 
     cooldown_status[statue_name] = current_time + 10
 
-    return {"dialogue": dialogue, "flavor_text": flavor_text}
+    return {
+        "dialogue": dialogue,
+        "player_choice": desire,
+        "player_target_name": name,
+        "omni_response": omni_response
+    }
 
 
 
 def generate_card_and_print(character_status, game_state, card_name):
     print(f"新カード「{card_name}」を生成しました。印刷指示を出します。")
     # カード生成と印刷処理のロジック
+
+
+##オムニの応答
+
+def generate_omni_controlled_response(choice, desire, name=None):
+    base_prompt = "あなたは古代の石像「オムニ」です。以下のプレイヤーの願望に対して、哲学的・神秘的な口調で短く回答してください。"
+
+    if choice == "1":
+        prompt = f"{base_prompt}\n\nプレイヤーの願望：「{desire}」、その対象の名前：「{name}」"
+        response_template = f"強さを求めるか。その道は険しく、{name}の名がどこまで響くかはお前次第だ。"
+    elif choice == "2":
+        prompt = f"{base_prompt}\n\nプレイヤーの願望：「{desire}」"
+        response_template = "生きる意味は己の内に宿る。問い続けることこそがお前の道だ。"
+    elif choice == "3":
+        prompt = f"{base_prompt}\n\nプレイヤーの願望：「{desire}」、助けたい対象：「{name}」"
+        response_template = f"{name}を助ける道は容易くない。覚悟があれば道は開けよう。"
+    else:  # 自由入力時
+        prompt = f"{base_prompt}\n\nプレイヤーの自由な願望：「{desire}」"
+        response_template = None  # AI自由生成に任せる
+
+    # 自由入力の場合のみAIが自由生成。それ以外は制御されたテンプレート
+    if response_template:
+        return response_template
+    else:
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": base_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        return response.choices[0].message.content

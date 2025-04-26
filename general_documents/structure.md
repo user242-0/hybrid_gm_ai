@@ -5,7 +5,8 @@ hybrid_gm_ai/
     ├── CharacterStatus.py.py(キャラクターのステータス定義ファイル)
     ├── simulation.py(シミュレーション本体)
     ├── requirements_checker.py(行動が可能かチェックする機能)
-    └── logger.py(プレイヤーの行動を記録、状況判定（classify_talk_situation）もここ)
+    ├── logger.py(プレイヤーの行動を記録)
+    └── conversation_manager.py(会話の状況・状態の管理。会話の中身は扱わない)
 └── scripts/
     ├──generate_rules_APItest.py（APIでログからルール作成するスクリプト）
     └──parse_ai_response_to_json（LLMの生成したルールをパースしてjsonに使いやすくまとめる）
