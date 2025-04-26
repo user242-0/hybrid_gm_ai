@@ -10,6 +10,14 @@ class CharacterStatus:
         self.inventory = inventory if inventory else []
         self.equipped_weapon = None
         self.is_npc = is_npc  # NPCかプレイヤーかを区別
+        
+    def change_status(self, hp_change=0, stamina_change=0, attack_power_change=0):
+        self.hp = max(0, min(self.max_hp, self.hp + hp_change))
+        self.stamina = max(0, min(self.max_stamina, self.stamina + stamina_change))
+        self.attack_power = max(0, self.attack_power + attack_power_change)
+
+        print(f"\n{self.name}の現在のステータス: HP={self.hp}/{self.max_hp}, スタミナ={self.stamina}/{self.max_stamina}, 攻撃力={self.attack_power}")
+        
     
     def equip_weapon(self, weapon):
         # 武器装備ロジック

@@ -6,6 +6,7 @@ import os
 # ゲーム用モジュール
 from CharacterStatus import CharacterStatus
 from actions import actions
+from action_functions import determine_next_location, generate_dynamic_event, generate_location_event, choose_event_parameters, present_event_choices
 from requirements_checker import RequirementsChecker
 from logger import log_action
 from conversation_manager import ConversationManager
@@ -93,6 +94,43 @@ def main():
 
             # アクション実行
             result = effect(player, game_state, *args)
+
+            if selected_action_key in ["石像に話す（クールダウン）"]:
+                game_state["player_choice"] = result["player_choice"]
+                # 次のロケーションを決定
+                determine_next_location(game_state)
+
+                # 動的イベントを生成
+                generate_dynamic_event(game_state["player_choice"], game_state)
+
+                event_type, difficulty = choose_event_parameters()
+
+                event_description = generate_location_event(
+                    location=game_state["location"],
+                    event_type=event_type,
+                    player_choice=game_state["player_choice"],
+                    difficulty=difficulty
+                )
+
+                print(f"\n【イベントタイプ】：{event_type}（難易度：{difficulty}）")
+                print(f"イベント内容：{event_description}")
+
+                choice_result = present_event_choices(event_type)
+
+                if choice_result:
+                    # 選択肢に応じてステータス変動
+                    player.change_status(
+                        hp_change=choice_result["hp"],
+                        stamina_change=choice_result["stamina"],
+                        attack_power_change=choice_result["attack"]
+                    )
+
+                    print(f"\nあなたは「{choice_result['description']}」を選択しました。")
+                    # 結果の描写や追加ロジックも可能
+                else:
+                    print("\n無効な選択がされました。行動をスキップします。")
+
+
 
             # 成功時の表示も青く
             print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)

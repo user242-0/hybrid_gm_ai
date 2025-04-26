@@ -1,6 +1,6 @@
 import time
 from logger import log_action  # ログ関数をインポートする例
-
+import random 
 import openai
 import os
 from dotenv import load_dotenv
@@ -186,7 +186,7 @@ def generate_card_and_print(character_status, game_state, card_name):
     # カード生成と印刷処理のロジック
 
 
-##オムニの応答
+##オムニの応答とその後の反応
 
 def generate_omni_controlled_response(choice, desire, name=None):
     base_prompt = "あなたは古代の石像「オムニ」です。以下のプレイヤーの願望に対して、哲学的・神秘的な口調で短く回答してください。"
@@ -217,3 +217,107 @@ def generate_omni_controlled_response(choice, desire, name=None):
             temperature=0.7
         )
         return response.choices[0].message.content
+
+def determine_next_location(game_state):
+    choice = game_state.get("player_choice")
+
+    locations_by_choice = {
+        "誰よりも強くなりたい": ["試練の闘技場", "力の洞窟"],
+        "自分の生きる意味を知りたい": ["賢者の塔", "運命の泉"],
+        "誰かを助けたい": ["囚われの者の遺跡", "救済の森"]
+    }
+
+    if choice in locations_by_choice:
+        next_locations = locations_by_choice[choice]
+    else:
+        next_locations = ["未知の世界", "放浪者の草原"]
+
+    selected_location = random.choice(next_locations)
+    print(f"次に訪れるべき場所は「{selected_location}」です。")
+
+    game_state["location"] = selected_location
+
+def generate_dynamic_event(player_choice, game_state):
+    prompt = f"""
+    プレイヤーは現在、「{game_state['location']}」という場所にいます。
+    プレイヤーの旅の目的は「{player_choice}」です。
+
+    これらの情報を基に、このロケーションで起こりうる短いイベントを生成してください。
+    イベントはプレイヤーの目的に関連し、没入感のある短い描写（100文字以内）で提供してください。
+    """
+
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "プレイヤーの目的とロケーションに関連した短いイベントを生成します。"},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7
+    )
+
+    event_description = response.choices[0].message.content
+    print(event_description)
+
+    return event_description
+
+def generate_location_event(location, event_type, player_choice, difficulty):
+    prompt = f"""
+    プレイヤーは現在「{location}」におり、目的は「{player_choice}」です。
+    イベントタイプは「{event_type}」、難易度は「{difficulty}」です。
+
+    上記を踏まえ、プレイヤーにとって没入感があり、プレイヤーの目的に関連した100文字以内の短いイベント描写を生成してください。
+    描写は具体的で、場所とイベントタイプに矛盾しないようにしてください。
+    """
+
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "場所、イベントタイプ、難易度、プレイヤーの目的を元にした汎用的イベント描写を生成します。"},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7
+    )
+
+    event_description = response.choices[0].message.content
+    return event_description
+
+def choose_event_parameters():
+    event_types = ["戦闘", "探索", "会話", "謎解き"]
+    difficulties = ["Easy", "Normal", "Hard"]
+
+    selected_event_type = random.choice(event_types)
+    selected_difficulty = random.choices(difficulties, weights=[0.4, 0.4, 0.2])[0]
+
+    return selected_event_type, selected_difficulty
+
+def present_event_choices(event_type):
+    print("\n行動を選択してください:")
+
+    if event_type == "戦闘":
+        choices = {
+            "1": {"description": "積極的に攻撃する（リスク大、リターン大）", "hp": -20, "stamina": -15, "attack": +5},
+            "2": {"description": "慎重に防御する（リスク小、リターン小）", "hp": -5, "stamina": -5, "attack": 0},
+            "3": {"description": "逃げる（イベント終了）", "hp": 0, "stamina": -10, "attack": 0}
+        }
+    elif event_type == "探索":
+        choices = {
+            "1": {"description": "隅々まで探索（時間をかける）", "hp": -5, "stamina": -20, "attack": 0},
+            "2": {"description": "軽く探索する（短時間）", "hp": 0, "stamina": -5, "attack": 0},
+            "3": {"description": "探索をやめる", "hp": 0, "stamina": 0, "attack": 0}
+        }
+    elif event_type == "謎解き":
+        choices = {
+            "1": {"description": "積極的に謎を解く（スタミナ消費）", "hp": 0, "stamina": -15, "attack": 0},
+            "2": {"description": "謎解きを諦める", "hp": 0, "stamina": 0, "attack": 0}
+        }
+    else:  # 会話
+        choices = {
+            "1": {"description": "積極的に話を聞く（スタミナ消費）", "hp": 0, "stamina": -10, "attack": 0},
+            "2": {"description": "会話を終える", "hp": 0, "stamina": 0, "attack": 0}
+        }
+
+    for key, choice in choices.items():
+        print(f"{key}. {choice['description']}")
+
+    selected = input("\n番号を選択してください: ")
+    return choices.get(selected, None)
