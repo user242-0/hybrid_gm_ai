@@ -35,3 +35,10 @@
 {"timestamp": "2025-04-27T04:33:17.236719", "actor": "NPC戦士", "action": "探索する", "target": null, "location": "祭壇", "result": "成功", "talk_count": null, "interval": null, "talk_situation": null}
 {"timestamp": "2025-04-27T04:40:07.761187", "actor": "プレイヤー", "action": "探索する", "target": null, "location": "力の洞窟", "result": "成功", "talk_count": null, "interval": null, "talk_situation": null}
 {"timestamp": "2025-04-27T04:40:08.608812", "actor": "敵対的NPC", "action": "探索する", "target": null, "location": "力の洞窟", "result": "成功", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-04-27T20:26:23.040872", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "敵対的NPC", "location": "力の洞窟", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-04-27T20:46:43.791613", "actor": "敵対的NPC", "action": "セリフ：combat_start", "target": null, "location": "力の洞窟", "result": "覚悟しろ、ここがお前の墓場だ！", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-04-27T20:46:49.450120", "actor": "プレイヤー", "action": "戦う", "target": "敵対的NPC", "location": "力の洞窟", "result": "敗北", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-04-27T20:47:25.168095", "actor": "敵対的NPC", "action": "セリフ：combat_start", "target": null, "location": "力の洞窟", "result": "覚悟しろ、ここがお前の墓場だ！", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-04-27T20:47:27.218328", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "敵対的NPC", "location": "力の洞窟", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-04-27T20:47:56.945981", "actor": "敵対的NPC", "action": "セリフ：combat_start", "target": null, "location": "力の洞窟", "result": "覚悟しろ、ここがお前の墓場だ！", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-04-27T20:47:59.770639", "actor": "プレイヤー", "action": "戦わない", "target": "敵対的NPC", "location": "力の洞窟", "result": "逃走成功", "talk_count": null, "interval": null, "talk_situation": null}

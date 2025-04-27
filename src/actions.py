@@ -1,5 +1,5 @@
 # actions.py のサンプル（整理版）
-from action_functions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, generate_card_and_print, talk_to_statue, talk_to_statue_with_cooldown
+from action_functions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack ,generate_card_and_print, talk_to_statue, talk_to_statue_with_cooldown
 
 actions = {
     "探索する": {
@@ -26,11 +26,23 @@ actions = {
         "effects": {"function": perform_attack, "args": ["target"]},
         "available_to": ["player", "npc"],
     },
-    "戦闘を行う": {
+    "戦う": {
         "description": "敵との戦闘に突入する。",
         "requirements": {"has_enemy": True},  # has_weaponを削除
         "effects": {"function": engage_combat, "args": []},
         "available_to": ["player", "npc"]
+    },
+    "戦わない": {
+        "description": "戦闘を避けて逃げる。",
+        "requirements": None,
+        "effects": {"function": avoid_combat, "args": []},
+        "available_to": ["player"]
+    },
+    "ただ、受け入れる": {
+        "description": "無抵抗で相手の攻撃を受け止める。",
+        "requirements": {"has_enemy": True},
+        "effects": {"function": accept_attack, "args": []},
+        "available_to": ["player"]
     },
     "石像に話す": {
         "description": "古代の石像に語りかけることで何かが起こるかもしれない。",

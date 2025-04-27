@@ -18,12 +18,24 @@ cooldown_status = {}
 
 
 # 石像の固定セリフ
-fixed_dialogue = {
+fixed_dialogue_omni = {
 "石像に話す": "よくぞここまで来た。我が名はオムニ。この地に訪れし者よ、何を求めてここに来た？"
 }
 
-fixed_dialogue_2 = {
+fixed_dialogue_omni_2 = {
 "オムニ：「今は語るべきことがない。時を置いて訪れよ。」"
+}
+
+fixed_dialogue = {
+    "敵対的NPC": {
+        "combat_start": "覚悟しろ、ここがお前の墓場だ！",
+        "combat_win": "たったそれだけか？",
+        "combat_lose": "くっ、この私が……！"
+    },
+    "NPC戦士": {
+        "greeting": "共に戦えることを光栄に思う。",
+        "farewell": "次の戦いでまた会おう。"
+    }
 }
 
 # フレーバーテキスト生成関数
@@ -141,6 +153,20 @@ def engage_combat(character_status, game_state, enemy_character_status=None):
         enemy_character_status.hp = enemy_hp
 
     return "戦闘終了"
+
+def avoid_combat(character_status, game_state):
+    print(f"{character_status.name}は戦闘を避けました。")
+    character_status.change_status(hp_change=-5, stamina_change=-10)
+    print("体力とスタミナが少し減りました。")
+    return "逃走成功"
+
+def accept_attack(character_status, game_state):
+    enemy = game_state.get("enemy", {"name": "謎の敵", "attack_power": 5})
+    damage = enemy["attack_power"]
+    print(f"{character_status.name}は無抵抗で{enemy['name']}の攻撃を受けました！")
+    character_status.change_status(hp_change=-damage)
+    print(f"{damage}のダメージを受けました。(HP残り：{character_status.hp})")
+    return f"{damage}ダメージを受けた"
 
 
 
@@ -372,3 +398,65 @@ def present_event_choices(event_type):
 
     selected = input("\n番号を選択してください: ")
     return choices.get(selected, None)
+
+# NPCモーメント
+
+def pre_combat_moment(player, enemy_npc, game_state):
+    moment_actions = ["戦う", "戦わない", "ただ、受け入れる"]
+
+    print(f"\n【緊迫のモーメント】{enemy_npc.name}があなたに敵意を向けています……")
+    print("あなたはどうしますか？")
+    for idx, act in enumerate(moment_actions, 1):
+        print(f"{idx}. {act}：{actions[act]['description']}")
+
+    choice = input("番号を選択してください（1～3）: ")
+
+    try:
+        selected_action_name = moment_actions[int(choice)-1]
+    except (IndexError, ValueError):
+        print("無効な入力です。何もしませんでした。")
+        return
+
+    # アクション実行
+    action_details = actions[selected_action_name]
+    function_to_execute = action_details["effects"]["function"]
+    args = action_details["effects"]["args"]
+
+    result = function_to_execute(player, game_state, enemy_character_status=enemy_npc) if selected_action_name == "戦う" else function_to_execute(player, game_state)
+
+    print(f"行動結果：{result}")
+
+    # ログに記録
+    log_action(
+        actor=player.name,
+        action=selected_action_name,
+        target=enemy_npc.name,
+        location=player.location,
+        result=result,
+        game_state=game_state
+    )
+
+def npc_speak(npc_name, dialogue_key):
+    dialogue = fixed_dialogue.get(npc_name, {}).get(dialogue_key, "")
+    if dialogue:
+        print(f"{npc_name}：「{dialogue}」")
+    else:
+        print(f"{npc_name}は何も言わなかった。")
+
+    return dialogue  # ログ記録のため返す
+
+# NPCがセリフを発した後、ログ記録
+def npc_speak_and_log(npc_name, dialogue_key, location, game_state):
+    dialogue = npc_speak(npc_name, dialogue_key)
+    
+    # ログに記録
+    log_action(
+        actor=npc_name,
+        action=f"セリフ：{dialogue_key}",
+        target=None,
+        location=location,
+        result=dialogue,
+        game_state=game_state
+    )
+
+
