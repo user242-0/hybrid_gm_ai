@@ -1,7 +1,13 @@
 hybrid_gm_ai/
 └── src/
+    └── actions/(アクションの定義)
+        ├── __init__.py（各関数をまとめてimport）
+        ├── exploration.py（探索関連の関数）
+        ├── combat.py（戦闘関連の関数）
+        ├── npc_interactions.py（NPC関連の関数）
+        └── utility.py（共通ユーティリティ関数）
     ├── actions.py（アクションリスト。AI(GM_AI)が登録していく方針）
-    ├── action_functions.py(アクションの関数定義ファイル。AIの提案が採択された場合、人（GM_human）が記述する方針)
+    ├── (action_functions.py(アクションの関数定義ファイル。AIの提案が採択された場合、人（GM_human）が記述する方針))
     ├── CharacterStatus.py.py(キャラクターのステータス定義ファイル)
     ├── simulation.py(シミュレーション本体)
     ├── requirements_checker.py(行動が可能かチェックする機能)

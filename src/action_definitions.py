@@ -1,5 +1,6 @@
 # actions.py のサンプル（整理版）
-from action_functions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack ,generate_card_and_print, talk_to_statue, talk_to_statue_with_cooldown
+from actions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack,\
+ talk_to_statue, talk_to_statue_with_cooldown, generate_card_and_print, npc_speak_and_log
 
 actions = {
     "探索する": {
@@ -34,7 +35,7 @@ actions = {
     },
     "戦わない": {
         "description": "戦闘を避けて逃げる。",
-        "requirements": None,
+        "requirements": {"has_enemy": True},
         "effects": {"function": avoid_combat, "args": []},
         "available_to": ["player"]
     },
@@ -69,7 +70,12 @@ actions = {
         },
         "available_to": ["player"],
     },
-    
+    "NPCが話す": {
+        "description": "NPCが固定セリフを喋る。",
+        "requirements": None,
+        "effects": {"function": npc_speak_and_log, "args": ["NPC戦士", "greeting"]},
+        "available_to": ["npc"]
+    },
     "カード生成イベント": {
         "description": "新しいカードを生成し、印刷指示を出すイベントをトリガー。",
         "requirements": None,

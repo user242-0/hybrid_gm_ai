@@ -5,8 +5,11 @@ from datetime import datetime
 import os
 # ゲーム用モジュール
 from CharacterStatus import CharacterStatus
-from actions import actions
-from action_functions import determine_next_location, generate_dynamic_event, generate_location_event, choose_event_parameters, present_event_choices, pre_combat_moment, npc_speak, npc_speak_and_log
+
+# functions import
+from actions import determine_next_location, generate_dynamic_event, generate_location_event, choose_event_parameters, present_event_choices, pre_combat_moment, npc_speak, npc_speak_and_log
+# dictionary import
+from action_definitions import actions
 from requirements_checker import RequirementsChecker
 from logger import log_action
 from conversation_manager import ConversationManager
@@ -36,7 +39,7 @@ def main():
         "events": {
             "statue_trial_unlocked": False
         },
-        "current_location": "力の洞窟", 
+        "current_location": "祭壇", 
         "current_target": "古代の石像"
     }
     conversation_key = f"{player.name}_{game_state['current_target']}"
@@ -248,7 +251,6 @@ def pre_combat_moment(player, enemy_npc, game_state):
 
 
 if __name__ == "__main__":
-    # プレイヤーと敵対NPCの定義
     player = CharacterStatus("プレイヤー", hp=100, stamina=100)
     player.equip_weapon({"name": "鉄の剣", "attack_bonus": 5})
     player.location = "力の洞窟"
@@ -263,6 +265,5 @@ if __name__ == "__main__":
             "enemy": {"name": enemy_npc.name, "hp": enemy_npc.hp, "attack_power": enemy_npc.attack_power}
         }
     }
-
     # 敵対的NPCのターン（攻撃モーメントが発生）
     run_simulation_step(enemy_npc, global_game_state, controlled_by_ai=True, opponent_character=player)

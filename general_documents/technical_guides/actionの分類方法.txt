@@ -1,0 +1,114 @@
+とても良い疑問点ですね！
+
+整理する際は、各関数の役割や目的に基づいて分類すると分かりやすくなります。  
+以下に各関数を分類し、理由もあわせて解説します。
+
+---
+
+## 📌 各関数の役割を再確認（簡単な説明）
+
+まず、それぞれの関数の役割を再整理しましょう：
+
+| 関数名 | 機能・役割 |
+|-------|-----------|
+| generate_flavor_text | フレーバーテキスト（情景描写）を生成 |
+| generate_card_and_print | ゲームの新カードを生成し印刷指示 |
+| generate_omni_controlled_response | 石像NPC（オムニ）のプレイヤー回答への反応生成 |
+| determine_next_location | プレイヤーの選択に応じて次のロケーションを決定 |
+| generate_dynamic_event | 動的なイベント描写を生成（プレイヤー選択に応じる） |
+| generate_location_event | ロケーションに応じたイベントを生成 |
+| choose_event_parameters | イベントタイプ・難易度を決定する（ランダム生成） |
+| present_event_choices | イベント発生後のプレイヤー行動の選択肢を提示 |
+| pre_combat_moment | 戦闘直前の緊迫した選択モーメント |
+
+---
+
+## 🚩 おすすめの分類方法（結論）
+
+これらを各モジュールごとに分類すると以下のようになります。
+
+### 🟢 ① exploration.py（探索に関する関数）
+- **determine_next_location**（探索により次の行き先を決めるため）
+- **generate_location_event**（探索先で起こるイベントを生成するため）
+
+### 🔴 ② combat.py（戦闘に関する関数）
+- **pre_combat_moment**（戦闘開始前の選択モーメント）
+- **present_event_choices**（戦闘後のプレイヤーの行動選択に利用される）
+
+※ `present_event_choices` は探索イベントでも使う可能性がある場合、「④utility.py」に入れる選択肢もあります。ただ、現状では戦闘で使うケースが中心なのでcombat.pyに分類しました。
+
+### 🔵 ③ npc_interactions.py（NPCとの会話・交流関連）
+- **generate_omni_controlled_response**（オムニの会話応答生成）
+
+### 🟣 ④ utility.py（複数箇所で共通に使われる一般的な関数）
+- **generate_flavor_text**（汎用的で様々な場所で使われる）
+- **generate_card_and_print**（ゲーム全体に関わるカード生成で汎用性が高い）
+- **generate_dynamic_event**（動的イベント生成の共通処理）
+- **choose_event_parameters**（イベントパラメータのランダム決定）
+
+---
+
+## 🎯 分類結果（まとめ）
+
+| モジュール | 含まれる関数 |
+|-----------|-------------|
+| exploration.py | determine_next_location, generate_location_event |
+| combat.py | pre_combat_moment, present_event_choices |
+| npc_interactions.py | generate_omni_controlled_response |
+| utility.py | generate_flavor_text, generate_card_and_print, generate_dynamic_event, choose_event_parameters |
+
+---
+
+## 🚩 理由（なぜこの分類なのか？）
+
+- **exploration.py**
+  - 場所の探索や次の場所選択に直接関連しているため。
+
+- **combat.py**
+  - 戦闘開始や戦闘後に直接関連するため。
+
+- **npc_interactions.py**
+  - NPCとの会話に特化しているため、会話関連の関数をまとめる。
+
+- **utility.py**
+  - 特定のイベントや場所、NPCに限定されず、広く汎用的に使われるものを収めるため。
+
+---
+
+## 📌 もし迷ったらどうするか？
+
+『とりあえず全部utility.pyに』というお気持ちはよく分かります。  
+しかし、あまりに何でもutilityに入れてしまうと、後で管理が難しくなります。
+
+以下の基準で判断すると良いです：
+
+- **utility.py**は汎用的で複数モジュールから頻繁に使われる関数を入れる
+- 特定のテーマ（探索、戦闘、NPC）に強く関連しているなら、該当モジュールに入れる
+
+---
+
+## 🚀 次にやるべきこと（作業チェックリスト）
+
+以下を実際に作業として行ってください。
+
+- [ ] **各ファイルを作成して上記の分類を反映する**
+- [ ] `actions/__init__.py`にそれらをまとめてimportするよう修正
+- [ ] 実際のsimulation.pyなどのコード内で、各関数を正しくimportできることを確認する
+- [ ] テストして問題なく動くことを確認する
+
+---
+
+## 🚨 注意点（再整理）
+
+- 分類はあくまでプロジェクトのメンテナンス性や見やすさが目的です。  
+  迷ったら無理に細分化せず、後から再整理可能なので気軽に進めてOKです。
+
+- もし`present_event_choices`が探索など複数用途で使われることが明確になれば、  
+  utility.pyに移動しても構いません。
+
+---
+
+以上で作業を進めていただければ、  
+コードの構造が非常にすっきりして、今後の開発が大幅に楽になります。
+
+また迷うことや確認したいことがあれば、いつでもお知らせくださいね😊
