@@ -1,4 +1,5 @@
 from .utility import generate_flavor_text  # この行を追加する
+from .combat import engage_combat  # この行を追加する
 import random
 #openaiインポートセット
 import openai
@@ -9,15 +10,39 @@ load_dotenv()
 
 # .env内にあるAPIキーを使う
 openai.api_key = os.getenv("OPENAI_API_KEY")
-def explore_location(character_status, game_state):
-    action = "探索する"
-    location = game_state.get('location', '未知の場所')
-    talk_situation = game_state.get('talk_situation', ['normal']) 
-    
-    flavor_text = generate_flavor_text(action, talk_situation, location)
-    print(flavor_text)
+import random
 
-    return "成功"
+def explore_location(character_status, game_state):
+    location = game_state.get('location', '未知の場所')
+    has_enemy = game_state.get('has_enemy', False)
+
+    print(f"{character_status.name}が{location}を探索しています……")
+
+    if has_enemy:
+        encounter_chance = random.random()
+        if encounter_chance < 0.5:  # 50%の確率で敵に気付かれる
+            print("探索中に敵に気付かれた！戦闘が始まる！")
+            engage_combat(character_status, game_state)
+            return "敵に襲われ戦闘開始"
+        else:
+            # 敵に気付かれず探索成功
+            print("敵に気付かれず、慎重に探索した……")
+            # 解決策やアイテムが見つかる可能性を追加
+            if random.random() < 0.5:  # さらに50%の確率でヒントを発見
+                print("探索中に有利なヒントを見つけた！")
+                # ゲームステートにヒントを追加
+                game_state["hint"] = "敵の弱点が判明した！攻撃力が一時的に上昇する。"
+                return "探索成功（ヒント発見）"
+            else:
+                print("特に役立つものは見つからなかった……")
+                return "探索成功（収穫なし）"
+    else:
+        print("安全に探索を完了した。")
+        # 通常の探索報酬やフレーバーテキスト
+        flavor_text = generate_flavor_text("探索", ["normal"], location)
+        print(flavor_text)
+        return "探索成功（安全）"
+
 
 
 

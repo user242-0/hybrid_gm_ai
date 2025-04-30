@@ -59,8 +59,17 @@ def main():
             print(Fore.BLUE + "現在実行可能なアクションがありません。" + Style.RESET_ALL)
             break
 
-        for i, (action_key, action) in enumerate(available_actions.items(), start=1):
-            print(Fore.BLUE + f"{i}. {action_key} - {action['description']}" + Style.RESET_ALL)
+
+        # 正しいコード例
+        for i, action_key in enumerate(available_actions, start=1):
+            if action_key in ["戦う", "戦わない", "ただ、受け入れる"]:
+                color = Fore.RED
+            else:
+                color = Fore.BLUE
+
+            print(color + f"{i}. {action_key} - {actions[action_key]['description']}" + Style.RESET_ALL)
+
+
 
         try:
             choice = int(input(Fore.BLUE + "行動番号を選んでください（0で終了）: " + Style.RESET_ALL)) - 1
@@ -251,19 +260,4 @@ def pre_combat_moment(player, enemy_npc, game_state):
 
 
 if __name__ == "__main__":
-    player = CharacterStatus("プレイヤー", hp=100, stamina=100)
-    player.equip_weapon({"name": "鉄の剣", "attack_bonus": 5})
-    player.location = "力の洞窟"
-
-    enemy_npc = CharacterStatus("敵対的NPC", hp=80, attack_power=10)
-    enemy_npc.location = "力の洞窟"
-
-    # ゲーム世界の状態
-    global_game_state = {
-        "力の洞窟": {
-            "has_enemy": True,
-            "enemy": {"name": enemy_npc.name, "hp": enemy_npc.hp, "attack_power": enemy_npc.attack_power}
-        }
-    }
-    # 敵対的NPCのターン（攻撃モーメントが発生）
-    run_simulation_step(enemy_npc, global_game_state, controlled_by_ai=True, opponent_character=player)
+    main()
