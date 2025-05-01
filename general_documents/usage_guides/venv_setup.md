@@ -7,6 +7,11 @@ Windowsの場合:
 
 E:
 cd E:\hybrid_gm_ai
+set PYTHONPATH=.
+
+set PYTHONPATH=. は「カレント（.）= E:\hybrid_gm_ai を検索パスに追加せよ」の意味。
+この set は そのターミナル セッションだけ 有効で、PC の設定を汚しません。
+
 
 仮想環境を有効化します:
 .\venv\Scripts\activate

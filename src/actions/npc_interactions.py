@@ -1,5 +1,5 @@
 import time
-from logger import log_action
+from src.logger import log_action
 
 
 # 石像の固定セリフ

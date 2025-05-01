@@ -4,15 +4,17 @@ import json
 from datetime import datetime
 import os
 # ゲーム用モジュール
-from CharacterStatus import CharacterStatus
+from src.character_status import CharacterStatus
+from src.control_manager   import switch_control
 
 # functions import
-from actions import determine_next_location, generate_dynamic_event, generate_location_event, choose_event_parameters, present_event_choices, pre_combat_moment, npc_speak, npc_speak_and_log
+from src.actions import determine_next_location, generate_dynamic_event, generate_location_event, choose_event_parameters, present_event_choices, pre_combat_moment, npc_speak, npc_speak_and_log
 # dictionary import
-from action_definitions import actions
-from requirements_checker import RequirementsChecker
-from logger import log_action
-from conversation_manager import ConversationManager
+from src.action_definitions import actions
+
+from src.requirements_checker import RequirementsChecker
+from src.logger import log_action
+from src.conversation_manager import ConversationManager
 
 # デバッグ
 import traceback
@@ -28,10 +30,29 @@ init(autoreset=True)
 # simulation.pyの冒頭部分
 conversation_manager = ConversationManager()
 
+def init_game_state():
+    hero = CharacterStatus("Hero", is_rc=True)      # 主人公自身も RC 扱いにすると後々ラク
+    npc  = CharacterStatus("Luna", is_rc=True)
+
+    party = {c.name: c for c in (hero, npc)}
+    hero.is_active = True        # 初期操作キャラ
+
+    return {
+        "party": party,
+        "active_char": hero,
+        # 既存キー(game_turn 等)はそのまま
+    }
 
 def main():
+    player = CharacterStatus(name="プレイヤー", is_rc=True)
+    npc    = CharacterStatus(name="ルナ",     is_rc=True)
+
+    party = {c.name: c for c in (player, npc)}
+    player.is_active = True        # 操作キャラ
+
     player = CharacterStatus(name="プレイヤー")
     game_state = {
+        "party": party,
         "has_enemy": True,
         "enemy": {"name": "洞窟のゴブリン", "hp": 20, "attack_power": 4},
         "is_safe_zone": True,

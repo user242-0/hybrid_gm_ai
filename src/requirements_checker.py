@@ -20,13 +20,29 @@ class RequirementsChecker:
             "has_item": lambda item_name: any(
                 item["name"] == item_name for item in self.player_status.inventory
             ),
-            "target": lambda target_name: self.game_state.get("current_target") == target_name
+            "target": lambda target_name: self.game_state.get("current_target") == target_name,
+            #"has_rc_in_party": lambda: any(member.is_rc and not member.is_active for member in self.game_state["party"].values()),
+            "has_rc_in_party": lambda: any(
+                member.is_rc and not member.is_active
+                for member in self.game_state["party"].values()
+            )
         }
 
     def check_all(self, requirements):
+        """
+        requirements が
+        ① None           → 制約なし
+        ② list[str]      → 各関数を True/False で評価
+        ③ dict[str, Any] → 既存ロジック（値を引数に渡す）
+        """
+
         # requirementsがNoneまたは空の場合、常にTrue
         if not requirements:
             return True
+        
+        if isinstance(requirements, list):
+            # NG: getattr(self, key)()
+            return all(self.checks[key]() for key in requirements)   # ← ここを修正
 
         for key, value in requirements.items():
             check = self.checks.get(key)

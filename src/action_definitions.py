@@ -1,6 +1,7 @@
 # actions.py のサンプル（整理版）
-from actions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack,\
+from src.actions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack,\
  talk_to_statue, talk_to_statue_with_cooldown, generate_card_and_print, npc_speak_and_log
+from src.control_manager import switch_control
 
 actions = {
     "探索する": {
@@ -81,5 +82,11 @@ actions = {
         "requirements": None,
         "effects": {"function": generate_card_and_print, "args": ["カード名"]},
         "available_to": ["GM_AI"],
+    },
+    "switch_character": {
+        "description": "操作キャラクターを切り替える",
+        "requirements": ["has_rc_in_party"],  # 任意の簡易チェッカー
+        "effects": {"function": switch_control, "args": ["<target_name>"]},
+        "available_to": ["player"]            # プレイヤー操作時のみ
     }
 }
