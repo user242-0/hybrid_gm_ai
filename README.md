@@ -1,7 +1,7 @@
 ## これは？
 ゲームマスターAIです。
 AIと人間が協調してゲーム作りをするシステムを目指しています。
-
+詳しくはgeneral_documents/gm_ai_definition.mdを
 
 ## 環境構築
 
