@@ -5,8 +5,9 @@ class Relationship:
         self.trust    = trust      #    0 ~ 100
 
 class CharacterStatus:
-    def __init__(self, name:str, is_rc: bool = False, hp=100, stamina=100, attack_power=10, inventory=None, is_npc=False):
+    def __init__(self, name:str,faction: str = "player", is_rc: bool = False, hp=100, stamina=100, attack_power=10, inventory=None, is_npc=False):
         self.name = name
+        self.faction = faction,        # ← デフォルトは 'player' # 'player' / 'enemy' / 'neutral'
         self.is_rc = is_rc # Reversible Character か？
         self.is_active = False  # 現在操作中？
         self.hp = hp

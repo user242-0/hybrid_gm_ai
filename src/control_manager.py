@@ -1,19 +1,29 @@
-def switch_control(game_state: dict, target_name: str) -> bool:
+# src/control_manager.py
+from src.utility.targeting import prompt_target_rc
+
+def switch_control(actor, game_state: dict, target_name:str)-> bool:
+    #print(f"[DEBUG] target_name={target_name!r}")
+    #print(f"[DEBUG] party keys={list(game_state['party'].keys())}")
     """
-    主人公 <-> 任意 RC の操作権を入れ替える。
-    成功時 True, 失敗時 False
+    actor = 現在操作しているキャラクター（不要でも受け取る）
+    game_state["party"] などはそのまま利用
     """
-    current = game_state["active_char"]
-    party   = game_state["party"]
+    party = game_state["party"]
+    current = actor
 
     if target_name not in party:
-        return False                       # そもそも存在しない
+        return False
     target = party[target_name]
 
     if not target.is_rc or target is current:
-        return False                       # RCでない／同一キャラ
+        return False
 
     current.is_active = False
     target.is_active  = True
     game_state["active_char"] = target
-    return True
+    return True, f"操作キャラクターを {target.name} に切り替えた"
+
+
+def switch_character_action(actor, game_state, *unused):
+    target = prompt_target_rc(game_state)
+    return switch_control(actor, game_state, target)

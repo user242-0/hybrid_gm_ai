@@ -54,3 +54,4 @@ def choose_event_parameters():
     selected_difficulty = random.choices(difficulties, weights=[0.4, 0.4, 0.2])[0]
 
     return selected_event_type, selected_difficulty
+
