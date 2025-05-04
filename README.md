@@ -1,8 +1,8 @@
 ## これは？
 ゲームマスターAIです。
 AI(OPENAI ChatGPT)と人間が協調してゲーム作りをするシステムを目指しています。
-詳しくはgeneral_documents/gm_ai_definition.mdを。
-まだ、構成が初期段階で随時更新中。
+詳しくはgeneral_documents/gm_ai_definition.md
+随時更新中。
 
 ## 環境構築
 
