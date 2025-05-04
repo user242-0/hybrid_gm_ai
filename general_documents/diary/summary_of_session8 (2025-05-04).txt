@@ -1,0 +1,28 @@
+# Session 8 Summary — May 4 2025
+
+**1 ️⃣ Core features completed**
+• Reversible Character (RC) system → `switch_control()` implemented; player can swap to any RC (party or enemy)
+• Relationship model (`affinity`, `trust`, `faction`) added to `CharacterStatus`
+• Party/game state re‑structured (`party`, `active_char`, `enemy`)
+• Action definitions flattened → keys `function` + `args_template` used everywhere
+• `parse_args()` + `prompt_target_rc()` handle dynamic argument / UI selection
+• Logging overhauled: accurate `actor`, `target`, contextual target resolver
+• Combat now works with `CharacterStatus` objects (no dict subscripting)
+
+**2 ️⃣ Quality‑of‑life fixes**
+• Editable‑install + absolute imports → reliable `python src/simulation.py`
+• Single prompt for RC switch (duplicate input removed)
+• Debug helpers added (`[DEBUG] target_name` etc.)
+
+**3 ️⃣ Next‑step design decisions**
+• Real‑time scheduler: heap‑based tick queue, RC AI every 0.2 s
+• Emotion‑driven dialogue: tag generator → YAML template bank → optional LLM spice
+• Shortcut actions: `switch_back`, `switch_to_player`
+
+**4 ️⃣ TODO kickoff for Session 9**
+1. Implement Scheduler skeleton (`scheduler.py`)
+2. Draft YAML for basic emotion templates
+3. Hook relationship updates into combat / conversation effects
+4. Create automated tests for real‑time tick + RC AI handoff
+
+— End of Session 8 —

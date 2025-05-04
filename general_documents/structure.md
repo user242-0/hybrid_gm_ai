@@ -1,4 +1,5 @@
 hybrid_gm_ai/
+└── general_documents/(プロジェクト方針や日記、作業中に知ったことのメモも)
 └── src/
     └── actions/(アクションの定義)
         ├── __init__.py（各関数をまとめてimport）
@@ -14,7 +15,7 @@ hybrid_gm_ai/
     ├── logger.py(プレイヤーの行動を記録)
     ├── conversation_manager.py(会話の状況・状態の管理。会話の中身は扱わない)
     └── utility/
-        ├── __init__.py（各関数をまとめてimport）
+        ├── __init__.py
         └── targeting.py（探索関連の関数）       
 └── scripts/
     ├──generate_rules_APItest.py（APIでログからルール作成するスクリプト）

@@ -182,3 +182,5 @@
 {"timestamp": "2025-05-04T23:06:59.448789", "actor": "プレイヤー", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "敗北", "talk_count": null, "interval": null, "talk_situation": null}
 {"timestamp": "2025-05-04T23:07:12.172060", "actor": "プレイヤー", "action": "switch_character", "target": "古代の石像", "location": "祭壇", "result": [true, "操作キャラクターを ゴブリン に切り替えた"], "talk_count": null, "interval": null, "talk_situation": null}
 {"timestamp": "2025-05-04T23:07:15.776643", "actor": "ゴブリン", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "敗北", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-05T00:54:59.010468", "actor": "プレイヤー", "action": "switch_character", "target": "古代の石像", "location": "祭壇", "result": [true, "操作キャラクターを 仲間NPC に切り替えた"], "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-05T00:55:02.610657", "actor": "仲間NPC", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "敗北", "talk_count": null, "interval": null, "talk_situation": null}
