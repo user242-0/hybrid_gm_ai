@@ -1,7 +1,8 @@
 ## ゲームマスターAI
-AI(OpenAI ChatGPT)と人間が協調してゲーム作りをするAIを一緒に作りましょう。
-詳しくはgeneral_documents/gm_ai_definition.md
-随時更新中。
+AI(主にOpenAI ChatGPT)と人間が協調してゲーム作りをするAIを一緒に作りましょう。
+詳しくはgeneral_documents/gm_ai_definition.mdにて。
+
+
 
 ## 環境構築
 
