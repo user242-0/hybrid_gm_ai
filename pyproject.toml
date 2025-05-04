@@ -9,6 +9,9 @@ build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=7.0",
-  "pytest-cov",        # ← カバレッジが欲しければ
+  "pytest",
+  "python-dotenv"
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]          # ← 追加、src 配下をパッケージとして認識
