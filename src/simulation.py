@@ -13,6 +13,7 @@ from src.actions import determine_next_location, generate_dynamic_event, generat
 from src.action_definitions import actions
 
 from src.requirements_checker import RequirementsChecker
+from src.utility.targeting import get_contextual_target, prompt_target_rc
 from src.logger import log_action
 from src.conversation_manager import ConversationManager
 
@@ -44,30 +45,36 @@ def init_game_state():
     }
 
 def main():
-    player = CharacterStatus(name="プレイヤー", is_rc=True)
-    npc    = CharacterStatus(name="ルナ",     is_rc=True)
+    # ① 二重生成をやめる
+    player   = CharacterStatus("プレイヤー", faction="player", is_rc=True)
+    luna     = CharacterStatus("ルナ",       faction="player", is_rc=True)
+    ally     = CharacterStatus("仲間NPC",    faction="player", is_rc=True)
+    goblin   = CharacterStatus("ゴブリン",   faction="enemy",  is_rc=True)
+    merchant = CharacterStatus("旅の商人",   faction="neutral", is_rc=False)
 
-    party = {c.name: c for c in (player, npc)}
-    player.is_active = True        # 操作キャラ
+    party = {c.name: c for c in (player, luna, ally, goblin)}   # ← goblin も入れると切替可
+    player.is_active = True
 
-    player = CharacterStatus(name="プレイヤー")
     game_state = {
+        "active_char": player,            # ← ここは上で作った player の参照を使う
         "party": party,
         "has_enemy": True,
-        "enemy": {"name": "洞窟のゴブリン", "hp": 20, "attack_power": 4},
+        "enemy": goblin,                  # そのままオブジェクトを保持
         "is_safe_zone": True,
         "available_items": [],
         "events": {
             "statue_trial_unlocked": False
         },
-        "current_location": "祭壇", 
+        "current_location": "祭壇",
         "current_target": "古代の石像"
     }
+
     conversation_key = f"{player.name}_{game_state['current_target']}"
     checker = RequirementsChecker(game_state, player)
 
     while True:
         # UIを青く表示
+        player = game_state["active_char"]
         print(Fore.BLUE + "\n=== 選択可能なアクション ===" + Style.RESET_ALL)
 
         available_actions = {
@@ -85,6 +92,8 @@ def main():
         for i, action_key in enumerate(available_actions, start=1):
             if action_key in ["戦う", "戦わない", "ただ、受け入れる"]:
                 color = Fore.RED
+            elif action_key in ["switch_character"]:
+                color = Fore.GREEN         
             else:
                 color = Fore.BLUE
 
@@ -100,10 +109,16 @@ def main():
                 print(Fore.BLUE + "無効な選択です。再度選択してください。" + Style.RESET_ALL)
                 continue
 
+            actor=game_state["active_char"].name
             selected_action_key = list(available_actions.keys())[choice]
             selected_action = available_actions[selected_action_key]
-            effect = selected_action["effects"]["function"]
-            args = selected_action["effects"].get("args", [])
+            # ① effect の取り出し
+            # (旧) effect = selected_action["effects"]["function"]
+            effect = selected_action["function"]
+            
+            # ❷ ＜トークン＞入りの args_template を実値に展開
+            args = parse_args(selected_action, actor, game_state)
+            #   例: ["<target_name>"]  → ["ルナ"]
 
 
 
@@ -169,14 +184,14 @@ def main():
 
             # 成功時の表示も青く
             print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
+            #print("[DEBUG] candidates:", list_switch_candidates(game_state))
 
-
-
+            target_for_log = get_contextual_target(selected_action_key, actor, game_state, *args)
             # log_actionはすべてのアクションで実行
             log_action(
-                actor=player.name,
+                actor= actor,   # 実際に動いたキャラ,
                 action=selected_action_key,
-                target=game_state.get("current_target", "なし"),
+                target=target_for_log,
                 location=game_state.get("current_location", "不明"),
                 result=result,
                 game_state=game_state
@@ -190,6 +205,22 @@ def main():
             print(Fore.RED + f"エラーが発生しました: {e}" + Style.RESET_ALL)
             traceback.print_exc()
 
+def list_switch_candidates(game_state, allow_enemy=False):
+    return [
+        m.name for m in game_state["party"].values()
+        if m.is_rc and not m.is_active and
+           (allow_enemy or m.faction == "player")
+    ]
+
+       
+def parse_args(action_def, player, game_state):
+    resolved = []
+    for token in action_def.get("args_template", []):
+        if token == "<target_name>":
+            resolved.append(prompt_target_rc(game_state))
+        else:
+            resolved.append(token)
+    return resolved
 
 def run_simulation_step(character, global_game_state, controlled_by_ai=False, opponent_character=None):
     current_location = character.location

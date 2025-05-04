@@ -1,7 +1,7 @@
 # actions.py のサンプル（整理版）
 from src.actions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack,\
  talk_to_statue, talk_to_statue_with_cooldown, generate_card_and_print, npc_speak_and_log
-from src.control_manager import switch_control
+from src.control_manager import switch_character_action
 
 actions = {
     "探索する": {
@@ -85,8 +85,10 @@ actions = {
     },
     "switch_character": {
         "description": "操作キャラクターを切り替える",
-        "requirements": ["has_rc_in_party"],  # 任意の簡易チェッカー
-        "effects": {"function": switch_control, "args": ["<target_name>"]},
-        "available_to": ["player"]            # プレイヤー操作時のみ
+        "function": switch_character_action,       # ← ルート直下に置く
+        "args_template": ["<target_name>"],        # ← parse_args() が読むキー名
+        "requirements": ["has_rc_in_party"],
+        "available_to": ["player"]
     }
 }
+
