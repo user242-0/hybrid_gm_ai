@@ -15,7 +15,7 @@ dev = [
 ]
 
 [tool.setuptools]
-package-dir = {"" = "src"}     # ルート名前空間は src/
+package-dir = {"" = "src"}      # ★ 追加: ルート名前空間は src/
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src"]                 # ★ 追加: src を探索対象に
