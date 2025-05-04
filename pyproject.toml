@@ -10,8 +10,12 @@ build-backend = "setuptools.build_meta"
 [project.optional-dependencies]
 dev = [
   "pytest",
-  "python-dotenv"
+  "python-dotenv",
+  "openai>=1.0" 
 ]
 
+[tool.setuptools]
+package-dir = {"" = "src"}     # ルート名前空間は src/
+
 [tool.setuptools.packages.find]
-where = ["src"]          # ← 追加、src 配下をパッケージとして認識
+where = ["src"]
