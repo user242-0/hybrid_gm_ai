@@ -2,6 +2,7 @@
 from src.actions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack,\
  talk_to_statue, talk_to_statue_with_cooldown, generate_card_and_print, npc_speak_and_log
 from src.control_manager import switch_character_action
+from src.emotion_manager import set_emotion_color_action
 
 actions = {
     "探索する": {
@@ -84,8 +85,15 @@ actions = {
     "switch_character": {
         "description": "操作キャラクターを切り替える",
         "function": switch_character_action,       # ← ルート直下に置く
-        "args_template": [],        # ← parse_args() が読むキー名
+        "args_template": ["<target_name>"],        # ← parse_args() が読むキー名
         "requirements": ["has_rc_in_party"],
+        "available_to": ["player"]
+    },
+    "感情を設定する": {
+        "description": "RGB値でプレイヤーの心の色を設定する",
+        "function": set_emotion_color_action,       
+        "args_template": [],        
+        "requirements": None,
         "available_to": ["player"]
     }
 }

@@ -24,6 +24,5 @@ def switch_control(actor, game_state: dict, target_name:str)-> bool:
     return True, f"操作キャラクターを {target.name} に切り替えた"
 
 
-def switch_character_action(actor, game_state, *unused):
-    target = prompt_target_rc(game_state)
-    return switch_control(actor, game_state, target)
+def switch_character_action(actor, game_state, target_name):
+    return switch_control(actor, game_state, target_name)

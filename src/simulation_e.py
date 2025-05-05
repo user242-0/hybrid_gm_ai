@@ -18,7 +18,8 @@ from src.logger import log_action
 from src.conversation_manager import ConversationManager
 
 # emotion color import
-from choice_model import Choice
+from choice_definitions import choice_definitions
+from src.choice_model import Choice
 
 # デバッグ
 import traceback
@@ -47,20 +48,27 @@ def init_game_state():
         # 既存キー(game_turn 等)はそのまま
     }
 
-# 選択肢の定義
-choices = [
-    Choice("戦う", "戦う", "red"),
-    Choice("戦わない", "戦わない", "red"),
-    Choice("ただ、受け入れる", "ただ、受け入れる", "red"),
-    Choice("攻撃を仕掛ける", "攻撃する", "blue"),
-    Choice("キャラを切り替える", "switch_character", "green"),
-]
+choices = []
 
+for label, meta in choice_definitions.items():
+    if label in actions:
+        axis = meta["axis"]
+        value = meta.get("value", 255)
+        choices.append(Choice(label, label, axis, value))
 
+def rgb_to_ansi(r, g, b):
+    return f"\033[38;2;{r};{g};{b}m"  # 文字色をRGBで指定
+
+def display_choices_with_emotion(choices, player_emotion_color):
+    for i, choice in enumerate(choices, start=1):
+        r, g, b = choice.get_emotion_x_player_scaled_color(player_emotion_color)
+        color_code = rgb_to_ansi(r, g, b)
+        print(f"{color_code}{i}. {choice.label}{Style.RESET_ALL}")
 
 def main():
     # ① 二重生成をやめる
     player   = CharacterStatus("プレイヤー", faction="player", is_rc=True)
+    player.equip_weapon({"name": "鉄の剣", "attack_bonus": 5})
     luna     = CharacterStatus("ルナ",       faction="player", is_rc=True)
     ally     = CharacterStatus("仲間NPC",    faction="player", is_rc=True)
     goblin   = CharacterStatus("ゴブリン",   faction="enemy",  is_rc=True)
@@ -84,60 +92,38 @@ def main():
     }
 
     conversation_key = f"{player.name}_{game_state['current_target']}"
-    checker = RequirementsChecker(game_state, player)
-
+    
     while True:
         # UIを青く表示
         player = game_state["active_char"]
+        checker = RequirementsChecker(game_state, player)
         print(Fore.BLUE + "\n=== 選択可能なアクション ===" + Style.RESET_ALL)
 
-        available_actions = {
-            key: action for key, action in actions.items()
-            if "player" in action.get("available_to", [])
-            and checker.check_all(action.get("requirements"))
-        }
 
-        if not available_actions:
-            print(Fore.BLUE + "現在実行可能なアクションがありません。" + Style.RESET_ALL)
-            break
+        # 利用可能な選択肢の抽出
+        available_choices = []
+        for choice in choices:
+            action = actions.get(choice.action_key)
+            if action and "player" in action.get("available_to", []) and checker.check_all(action.get("requirements", {})):
+                available_choices.append(choice)
 
+        # 選択肢の表示
+        display_choices_with_emotion(available_choices, player.emotion_color)
 
-        # 正しいコード例
-        for i, action_key in enumerate(available_actions, start=1):
-            if action_key in ["戦う", "戦わない", "ただ、受け入れる"]:
-                color = Fore.RED
-            elif action_key in ["switch_character"]:
-                color = Fore.GREEN         
-            else:
-                color = Fore.BLUE
-
-            print(color + f"{i}. {action_key} - {actions[action_key]['description']}" + Style.RESET_ALL)
-
-
-
-        try:
-            choice = int(input(Fore.BLUE + "行動番号を選んでください（0で終了）: " + Style.RESET_ALL)) - 1
-            if choice == -1:
+        # ユーザーの選択
+        choice_index = int(input(Fore.BLUE + "行動番号を選んでください（0で終了）: " + Style.RESET_ALL)) - 1
+        if choice_index == -1:
                 break
-            if choice < 0 or choice >= len(available_actions):
-                print(Fore.BLUE + "無効な選択です。再度選択してください。" + Style.RESET_ALL)
-                continue
-
+        if 0 <= choice_index < len(available_choices):
+            selected_choice = available_choices[choice_index]
+            selected_action = actions[selected_choice.action_key]
             actor=game_state["active_char"].name
-            selected_action_key = list(available_actions.keys())[choice]
-            selected_action = available_actions[selected_action_key]
-            # ① effect の取り出し
-            # (旧) effect = selected_action["effects"]["function"]
             effect = selected_action["function"]
-            
-            # ❷ ＜トークン＞入りの args_template を実値に展開
-            args = parse_args(selected_action, actor, game_state)
-            #   例: ["<target_name>"]  → ["ルナ"]
-
-
-
+            args = parse_args(selected_action, player.name, game_state)
+            result = effect(player, game_state, *args)
+            # 必要に応じて結果の処理を追加
             # 会話関連アクションの場合のみ履歴更新するよう修正
-            if selected_action_key in ["石像に話す", "石像に話す（クールダウン）"]:
+            if selected_choice.action_key in ["石像に話す", "石像に話す（クールダウン）"]:
                 actor = player.name
                 target = game_state.get('current_target', 'なし')
                 
@@ -156,10 +142,8 @@ def main():
                 talk_count = 0  # 会話以外のアクションでは明示的に初期化
 
 
-            # アクション実行
-            result = effect(player, game_state, *args)
 
-            if selected_action_key in ["石像に話す（クールダウン）"]:
+            if selected_choice.action_key in ["石像に話す（クールダウン）"]:
                 game_state["player_choice"] = result["player_choice"]
                 # 次のロケーションを決定
                 determine_next_location(game_state)
@@ -193,18 +177,15 @@ def main():
                     # 結果の描写や追加ロジックも可能
                 else:
                     print("\n無効な選択がされました。行動をスキップします。")
-
-
-
             # 成功時の表示も青く
             print(Fore.BLUE + "アクションが正常に実行されました。" + Style.RESET_ALL)
             #print("[DEBUG] candidates:", list_switch_candidates(game_state))
 
-            target_for_log = get_contextual_target(selected_action_key, actor, game_state, *args)
+            target_for_log = get_contextual_target(selected_choice.action_key, actor, game_state, *args)
             # log_actionはすべてのアクションで実行
             log_action(
                 actor= actor,   # 実際に動いたキャラ,
-                action=selected_action_key,
+                action=selected_choice.action_key,
                 target=target_for_log,
                 location=game_state.get("current_location", "不明"),
                 result=result,
@@ -212,12 +193,16 @@ def main():
             )
 
 
-        except ValueError:
-            print(Fore.GREEN + "数値を入力してください。" + Style.RESET_ALL)
+        else:
+            print(Fore.BLUE + "無効な選択です。再度選択してください。" + Style.RESET_ALL)
 
-        except Exception as e:
-            print(Fore.RED + f"エラーが発生しました: {e}" + Style.RESET_ALL)
-            traceback.print_exc()
+
+
+
+
+
+
+
 
 def list_switch_candidates(game_state, allow_enemy=False):
     return [
