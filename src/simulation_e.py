@@ -21,6 +21,12 @@ from src.conversation_manager import ConversationManager
 from choice_definitions import choice_definitions
 from src.choice_model import Choice
 
+# 追加import
+from src.scheduler import Scheduler
+from src.rc_ai import select_action
+from src.choice_definitions import get_available_choices
+from src.utility.args_parser import parse_args
+
 # デバッグ
 import traceback
 
@@ -34,6 +40,29 @@ init(autoreset=True)
 
 # simulation.pyの冒頭部分
 conversation_manager = ConversationManager()
+
+# --- 起動時に Scheduler 用意 ---
+scheduler = Scheduler()
+
+# ---------------- RC Tick コールバック ----------------
+def rc_tick(rc_char, game_state):
+    # ❶ 現時点で実行可能な choice 一覧を取得
+    choices = get_available_choices(rc_char, game_state)
+
+    # ❷ AI に選択させる
+    choice = select_action(rc_char, game_state, choices)
+    if not choice:
+        return                                    # 該当なしなら終了
+
+    # ❸ アクション実行
+    act_info = actions[choice.action_key]
+    args = parse_args(act_info, rc_char.name, game_state)
+    act_info["function"](rc_char, game_state, *args)
+
+    # ❹ 次の RC Tick を再登録（0.2 s 後）
+    scheduler.register(rc_tick, 0.2, rc_char, game_state)
+
+# -------------------------------
 
 def init_game_state():
     hero = CharacterStatus("Hero", is_rc=True)      # 主人公自身も RC 扱いにすると後々ラク
@@ -74,7 +103,7 @@ def main():
     goblin   = CharacterStatus("ゴブリン",   faction="enemy",  is_rc=True)
     merchant = CharacterStatus("旅の商人",   faction="neutral", is_rc=False)
 
-    party = {c.name: c for c in (player, luna, ally, goblin)}   # ← goblin も入れると切替可
+    party = {c.name: c for c in (player, luna)}   # ← goblin も入れると切替可
     player.is_active = True
 
     game_state = {
@@ -92,7 +121,8 @@ def main():
     }
 
     conversation_key = f"{player.name}_{game_state['current_target']}"
-    
+    scheduler.register(rc_tick, 0.2, luna, game_state)
+
     while True:
         # UIを青く表示
         player = game_state["active_char"]
@@ -192,10 +222,10 @@ def main():
                 game_state=game_state
             )
 
-
         else:
             print(Fore.BLUE + "無効な選択です。再度選択してください。" + Style.RESET_ALL)
 
+        scheduler.run_once() 
 
 
 
@@ -212,14 +242,6 @@ def list_switch_candidates(game_state, allow_enemy=False):
     ]
 
        
-def parse_args(action_def, player, game_state):
-    resolved = []
-    for token in action_def.get("args_template", []):
-        if token == "<target_name>":
-            resolved.append(prompt_target_rc(game_state))
-        else:
-            resolved.append(token)
-    return resolved
 
 def run_simulation_step(character, global_game_state, controlled_by_ai=False, opponent_character=None):
     current_location = character.location

@@ -14,11 +14,12 @@ def lift_brightness(value: int) -> int:
     return max(value, MIN_BRIGHTNESS)
 
 class Choice:
-    def __init__(self, label, action_key, emotion_axis, emotion_value=255):
+    def __init__(self, label, action_key, emotion_axis, emotion_value=255, requirement_keys=None):
         self.label = label
         self.action_key = action_key
         self.emotion_axis = emotion_axis  # "red", "green", "blue"
         self.emotion_value = emotion_value  # 0–255（強さ）
+        self.requirement_keys = requirement_keys or []
 
     def get_emotion_color(self):
         """emotion_axis と emotion_value を使って RGB 色を返す（明度底上げ）"""

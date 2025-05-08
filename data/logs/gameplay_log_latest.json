@@ -218,3 +218,20 @@
 {"timestamp": "2025-05-06T05:04:19.483408", "actor": "プレイヤー", "action": "感情を設定する", "target": "古代の石像", "location": "祭壇", "result": null, "talk_count": null, "interval": null, "talk_situation": null}
 {"timestamp": "2025-05-06T05:04:50.707335", "actor": "プレイヤー", "action": "感情を設定する", "target": "古代の石像", "location": "祭壇", "result": null, "talk_count": null, "interval": null, "talk_situation": null}
 {"timestamp": "2025-05-06T05:06:11.988435", "actor": "プレイヤー", "action": "感情を設定する", "target": "古代の石像", "location": "祭壇", "result": null, "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-07T21:39:14.035560", "actor": "プレイヤー", "action": "攻撃する", "target": "古代の石像", "location": "祭壇", "result": "成功", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T22:45:39.784371", "actor": "プレイヤー", "action": "感情を設定する", "target": "古代の石像", "location": "祭壇", "result": null, "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:07:12.487283", "actor": "プレイヤー", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "勝利", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:17:06.585187", "actor": "プレイヤー", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "勝利", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:32:03.226599", "actor": "プレイヤー", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "勝利", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:36:53.567143", "actor": "プレイヤー", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "勝利", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:37:32.655155", "actor": "プレイヤー", "action": "戦う", "target": "ゴブリン", "location": "祭壇", "result": "勝利", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:38:06.439907", "actor": "プレイヤー", "action": "攻撃する", "target": "古代の石像", "location": "祭壇", "result": "成功", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:38:37.682068", "actor": "プレイヤー", "action": "石像に話す", "target": "古代の石像", "location": "祭壇", "result": null, "talk_count": 1, "interval": null, "talk_situation": ["first_time", "late_night"]}
+{"timestamp": "2025-05-08T23:39:00.463272", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "ゴブリン", "location": "祭壇", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:39:10.055737", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "ゴブリン", "location": "祭壇", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:39:16.602362", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "ゴブリン", "location": "祭壇", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:39:31.295806", "actor": "プレイヤー", "action": "switch_character", "target": "ルナ", "location": "祭壇", "result": [true, "操作キャラクターを ルナ に切り替えた"], "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:39:50.941772", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "ゴブリン", "location": "祭壇", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:39:57.324549", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "ゴブリン", "location": "祭壇", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:39:59.358086", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "ゴブリン", "location": "祭壇", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
+{"timestamp": "2025-05-08T23:40:00.161666", "actor": "プレイヤー", "action": "ただ、受け入れる", "target": "ゴブリン", "location": "祭壇", "result": "10ダメージを受けた", "talk_count": null, "interval": null, "talk_situation": null}
