@@ -67,3 +67,21 @@ python -m src.simulation
 ---
 
 今後の発展に向けて、**AIによるルール提案・実装の全自動化と、意味のある色／関係性の付与**を軸に進化させていきます。
+
+
+## 💡 Emotion-Based Simulation: simulation_e.py
+
+This version implements an emotion-driven action selection system.
+
+- Each choice is assigned an RGB axis and intensity.
+- The player's emotional color (心の色) affects which actions stand out.
+- Visual feedback is provided via ANSI terminal coloring.
+
+⚠️ Note:
+Currently, simulation_e.py defaults to auto-selecting "green" actions.
+This is a placeholder behavior and not yet dynamically controlled.
+
+### Run emotion-based version:
+
+```bash
+python -m src.simulation_e
