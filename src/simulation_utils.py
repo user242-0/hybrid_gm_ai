@@ -33,13 +33,12 @@ def execute_player_choice(player, cmd: str, game_state):
         return
 
     choice_meta = choice_definitions[key]
+    action_info = actions[key]
     checker = RequirementsChecker(game_state, player)
-    if not checker.check_all(choice_meta.get("requirements", [])):
+    if not checker.check_all(action_info.get("requirements")):
         log_q.put(f"[ERR] Requirements not met: {key}")
         return
 
-    # ---- (2) Action 呼び出し ----
-    action_info = actions[key]
     # 固定で 1 つだけ追加引数がある例（switch_character）
     args = rest or parse_args(action_info, player.name, game_state)
     result = action_info["function"](player, game_state, *args)
