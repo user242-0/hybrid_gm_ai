@@ -114,17 +114,22 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         actor = gs["active_char"]
         # ▼ CLI で直接 input() する場合（GUI を使わないモード）
         if USE_CLI:
+            gs["input_pending"] = True
             raw = input(">> ").strip()
+            gs["input_pending"] = False
             handle_quit(raw, gs)          # ★ ここで判定
             cmd = raw                     # → 後続処理へ
 
         # ▼ GUI モード：Entry から event_q を受信
         else:
+            gs["input_pending"] = True
             try:
                 num_choice_map = present_choices(actor, gs)     # ← dict を受け取る
                 cmd = event_q.get(timeout=0.05)
             except Empty:
                 continue
+            finally:
+                gs["input_pending"] = False
             handle_quit(cmd, gs)          # ★ ここでも同じ
         
 
@@ -140,11 +145,9 @@ def player_loop(gs):              # ← 引数で参照を受け取る
                     others = [c for c in gs["party"].values() if c is not actor]
                     cmd += f" {others[0].name}"
         
-        
-        gs["input_pending"] = True          # ← ロック ON
+
         # ★ プレイヤーが操作する瞬間に必ず手動フラグを立て直す
         actor.is_npc = False                   # ← これを追加
-        gs["input_pending"] = False         # ← ロック OFF
         result = execute_player_choice(actor, cmd, gs)
 
 

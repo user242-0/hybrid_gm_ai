@@ -12,7 +12,7 @@ choice_definitions = {
     "石像に話す（クールダウン）":{"axis": "blue",  "value": 100},
     "進む":             {"axis": "blue",  "value": 100},
     "休む":             {"axis": "blue",  "value": 100},
-    "感情を設定する":   {"axis": "green", "value": 200},  # 新規追加：プレイヤーの心を設定する緑コマンド
+    "感情を設定する":   {"axis": "green", "value": 150},  # 新規追加：プレイヤーの心を設定する緑コマンド
 }
 
 def get_available_choices(actor, game_state):

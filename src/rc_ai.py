@@ -6,8 +6,13 @@ def select_action(rc_char, game_state, choices):
 
     # ❶ フィルタリング段階で switch_character を除外
     green = [c for c in choices
-             if c.emotion_axis == "green"
-             and c.is_available(checker)
-             and not (game_state["input_pending"] and c.action_key == "switch_character")]
+               if c.emotion_axis == "green"
+               and c.is_available(checker)
+               and not (game_state["input_pending"] and c.action_key == "switch_character")]
 
-    return rnd(green) if green else None
+    if not green:
+        return None
+
+    max_val = max(c.emotion_value for c in green)
+    top = [c for c in green if c.emotion_value == max_val]
+    return rnd(top)

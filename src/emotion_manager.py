@@ -1,7 +1,14 @@
+from random import randint
 from src.quit_helper import handle_quit                # ← 追加
 from src.event_bus import event_q, log_q
 
 def set_emotion_color_action(player, game_state):
+    # NPC はランダム値を即時セットして終了
+    if player.is_npc:
+        r, g, b = randint(0, 255), randint(0, 255), randint(0, 255)
+        player.emotion_color = (r, g, b)
+        return
+    
     if game_state["use_gui"]:
         log_q.put(("❓ 感情値入力は GUI の Entry で `rgb 0 0 0` の形式で入れてください", "YELLOW"))
         cmd = event_q.get()       # ブロックは GUI 側だけ
