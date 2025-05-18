@@ -58,11 +58,10 @@ python -m src.simulation
 
 ### ② AIによるルール提案～実装の自動化
 
-* プレイログは `data/log/` に保存されます。
-* `scripts/generate_rules_APItest.py` を使って、ログからルール草案（txt）を生成（→ `data/rules/`）。
-* 草案を `.json` に変換。
-* `src/action_definition.py` に行動を定義。
-* 実装は `src/actions/` 内の関数として具体化。
++ * プレイログは `data/logs/*.jsonl` に保存されます（※ `.jsonl` = JSON Lines）。
++ * **現在はルール自動生成ロジックは未着手**。  
++   将来的に `scripts/generate_rules.py` でログ → `rules_draft.jsonl` を生成 →  
++   人間レビュー → `src/action_definitions.py` へ反映、というワークフローを予定しています。
 
 ---
 
@@ -85,3 +84,7 @@ This is a placeholder behavior and not yet dynamically controlled.
 
 ```bash
 python -m src.simulation_e
+```
+---
+### Quit / Exit
+ゲーム中いつでも `q`, `quit`, `exit` を入力 (または `Ctrl-C`) すると、安全にシャットダウンします。

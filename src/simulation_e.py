@@ -3,9 +3,13 @@
 import json
 from datetime import datetime
 import os
+# ターゲット選択時に使う
+import random
+
 # ゲーム用モジュール
 from src.character_status import CharacterStatus
 from src.control_manager   import switch_control
+from src.init_state  import init_game_state
 
 # functions import
 from src.actions import determine_next_location, generate_dynamic_event, generate_location_event, choose_event_parameters, present_event_choices, pre_combat_moment, npc_speak, npc_speak_and_log
@@ -21,11 +25,21 @@ from src.conversation_manager import ConversationManager
 from choice_definitions import choice_definitions
 from src.choice_model import Choice
 
+#gui import
+from src.event_bus import event_q, log_q
+import threading, time
+from gui          import start_gui
+from queue import Empty        # ← 追加
+
 # 追加import
 from src.scheduler import Scheduler
 from src.rc_ai import select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
+
+# execute_player_choice import
+from src.simulation_utils import execute_player_choice
+from src.choice_ui import present_choices
 
 # デバッグ
 import traceback
@@ -36,16 +50,31 @@ from colorama import Fore, Style, init
 # coloramaを初期化（最初に一度）
 init(autoreset=True)
 
+# 安全に終了したい
+from src.quit_helper import handle_quit
+
 # 中略...
+USE_CLI = False     # True にすると黒い端末だけでプレイ
 
 # simulation.pyの冒頭部分
 conversation_manager = ConversationManager()
 
+
 # --- 起動時に Scheduler 用意 ---
 scheduler = Scheduler()
+game_state = init_game_state()    # ★ ここで一度だけ生成
+
+def record(msg):
+    log_q.put(msg)          # ← 旧 logger と二重にしても OK
 
 # ---------------- RC Tick コールバック ----------------
 def rc_tick(rc_char, game_state):
+    #[DEBUG]
+    print('[TICK]', rc_char.name, rc_char.is_npc)
+    #END[DEBUG]
+    if not rc_char.is_npc:       # ← 手動キャラなら
+        return                   #    AI ロジックを完全スキップ
+
     # ❶ 現時点で実行可能な choice 一覧を取得
     choices = get_available_choices(rc_char, game_state)
 
@@ -56,26 +85,78 @@ def rc_tick(rc_char, game_state):
 
     # ❸ アクション実行
     act_info = actions[choice.action_key]
-    args = parse_args(act_info, rc_char.name, game_state)
-    act_info["function"](rc_char, game_state, *args)
+    args = parse_args(act_info, rc_char, game_state)
+    if choice.action_key == "switch_character":
+        target_name = choose_target_for_switch(rc_char, game_state)
+        act_info["function"](rc_char, game_state, target_name)
+    else:
+        act_info["function"](rc_char, game_state, *args)
+
+    record(f"[AI] {rc_char.name} ▶ {choice.action_key}")
 
     # ❹ 次の RC Tick を再登録（0.2 s 後）
-    scheduler.register(rc_tick, 0.2, rc_char, game_state)
+    if rc_char.is_npc:           # ← 再登録は AI 時だけで OK
+        scheduler.register(rc_tick, 0.2, rc_char, game_state)
 
 # -------------------------------
 
-def init_game_state():
-    hero = CharacterStatus("Hero", is_rc=True)      # 主人公自身も RC 扱いにすると後々ラク
-    npc  = CharacterStatus("Luna", is_rc=True)
 
-    party = {c.name: c for c in (hero, npc)}
-    hero.is_active = True        # 初期操作キャラ
+# ---------------- Simulation スレッド ----------------
+def player_loop(gs):              # ← 引数で参照を受け取る
+    # ① 全キャラをスケジューラに登録
+    for ch in gs["party"].values():
+        scheduler.register(rc_tick, 0.2, ch, gs)
 
-    return {
-        "party": party,
-        "active_char": hero,
-        # 既存キー(game_turn 等)はそのまま
-    }
+    # ② メインループ
+    while gs["running"]:
+        while scheduler.run_once():          # due を全部消化
+            pass
+        actor = gs["active_char"]
+        # ▼ CLI で直接 input() する場合（GUI を使わないモード）
+        if USE_CLI:
+            raw = input(">> ").strip()
+            handle_quit(raw, gs)          # ★ ここで判定
+            cmd = raw                     # → 後続処理へ
+
+        # ▼ GUI モード：Entry から event_q を受信
+        else:
+            try:
+                num_choice_map = present_choices(actor, gs)     # ← dict を受け取る
+                cmd = event_q.get(timeout=0.05)
+            except Empty:
+                continue
+            handle_quit(cmd, gs)          # ★ ここでも同じ
+        
+
+        # 数字入力なら Choice に変換
+        if cmd.isdigit():
+            idx = int(cmd)
+            if idx in num_choice_map:
+                selected_choice = num_choice_map[idx]
+                # action_key と対象キャラ名を組み合わせて文字列化
+                cmd = selected_choice.action_key
+                if selected_choice.action_key == "switch_character":
+                    # シンプルに Actor 以外の最初のキャラをターゲット
+                    others = [c for c in gs["party"].values() if c is not actor]
+                    cmd += f" {others[0].name}"
+        
+        
+        gs["input_pending"] = True          # ← ロック ON
+        # ★ プレイヤーが操作する瞬間に必ず手動フラグを立て直す
+        actor.is_npc = False                   # ← これを追加
+        gs["input_pending"] = False         # ← ロック OFF
+        result = execute_player_choice(actor, cmd, gs)
+
+
+
+        # 旧プレイヤーが CharacterStatus なら AI キューに登録
+        if isinstance(result, CharacterStatus):
+            print('[REG]', result.name, result.is_npc)
+            scheduler.register(rc_tick, 0.01, result, gs)
+        # flush AI 行動
+        while scheduler.run_once() is not None:
+            pass
+
 
 choices = []
 
@@ -94,13 +175,31 @@ def display_choices_with_emotion(choices, player_emotion_color):
         color_code = rgb_to_ansi(r, g, b)
         print(f"{color_code}{i}. {choice.label}{Style.RESET_ALL}")
 
+def choose_target_for_switch(rc_char, game_state):
+    candidates = [c for c in game_state["party"].values() if c is not rc_char]
+    return random.choice(candidates).name if candidates else rc_char.name
+
+# ---------------- 起動処理 ----------------
+if __name__ == "__main__":
+    gs = game_state                           # ローカル短縮も可
+
+    threading.Thread(target=player_loop, args=(gs,), daemon=True).start()
+    start_gui(gs)                               # GUI は内部でサブスレッドを立てても良い
+    # メインスレッドは生存維持だけ
+    try:
+        while gs["running"]:
+            time.sleep(1)
+    except SystemExit:
+        pass                        # どこかのスレッドで raise SystemExit 渡ってきたら即終了
+
+#-----------------以下は旧実装--------------------------
 def main():
     # ① 二重生成をやめる
-    player   = CharacterStatus("プレイヤー", faction="player", is_rc=True)
+    player   = CharacterStatus("Hero", faction="player", is_rc=True, is_npc=False)
     player.equip_weapon({"name": "鉄の剣", "attack_bonus": 5})
-    luna     = CharacterStatus("ルナ",       faction="player", is_rc=True)
-    ally     = CharacterStatus("仲間NPC",    faction="player", is_rc=True)
-    goblin   = CharacterStatus("ゴブリン",   faction="enemy",  is_rc=True)
+    luna     = CharacterStatus("ルナ",       faction="player", is_rc=True, is_npc=True)
+    ally     = CharacterStatus("仲間NPC",    faction="player", is_rc=True, is_npc=True)
+    goblin   = CharacterStatus("ゴブリン",   faction="enemy",  is_rc=True,  is_npc=True)
     merchant = CharacterStatus("旅の商人",   faction="neutral", is_rc=False)
 
     party = {c.name: c for c in (player, luna)}   # ← goblin も入れると切替可
@@ -121,13 +220,17 @@ def main():
     }
 
     conversation_key = f"{player.name}_{game_state['current_target']}"
-    scheduler.register(rc_tick, 0.2, luna, game_state)
+    
+    
+    # 起動時に 全キャラ分 登録する
+    for ch in game_state["party"].values():
+        scheduler.register(rc_tick, 0.2, ch, game_state)
 
     while True:
         # UIを青く表示
         player = game_state["active_char"]
         checker = RequirementsChecker(game_state, player)
-        print(Fore.BLUE + "\n=== 選択可能なアクション ===" + Style.RESET_ALL)
+        print(Fore.BLUE + "\n=== {}(あなた)の 選択可能なアクション ===".format(player.name) + Style.RESET_ALL)
 
 
         # 利用可能な選択肢の抽出
@@ -151,7 +254,16 @@ def main():
             effect = selected_action["function"]
             args = parse_args(selected_action, player.name, game_state)
             result = effect(player, game_state, *args)
+
+            
+
             # 必要に応じて結果の処理を追加
+
+            # switch_charactorしたら新たに NPC になったキャラを 0.01 s 後に AI キューへ
+            if selected_choice.action_key in ["switch_character"]:
+                prev_ai =result
+                scheduler.register(rc_tick, 0.01, prev_ai, game_state)
+            
             # 会話関連アクションの場合のみ履歴更新するよう修正
             if selected_choice.action_key in ["石像に話す", "石像に話す（クールダウン）"]:
                 actor = player.name
@@ -213,22 +325,29 @@ def main():
 
             target_for_log = get_contextual_target(selected_choice.action_key, actor, game_state, *args)
             # log_actionはすべてのアクションで実行
-            log_action(
-                actor= actor,   # 実際に動いたキャラ,
-                action=selected_choice.action_key,
-                target=target_for_log,
-                location=game_state.get("current_location", "不明"),
-                result=result,
-                game_state=game_state
-            )
+            if selected_choice.action_key == "switch_character":
+                log_action(
+                    actor= actor,   # 実際に動いたキャラ,
+                    action=selected_choice.action_key,
+                    target=target_for_log,
+                    location=game_state.get("current_location", "不明"),
+                    result="操作キャラクターを{}に切り替えた".format(target_for_log),
+                    game_state=game_state
+                )
+            
+            else:log_action(
+                    actor= actor,   # 実際に動いたキャラ,
+                    action=selected_choice.action_key,
+                    target=target_for_log,
+                    location=game_state.get("current_location", "不明"),
+                    result=result,
+                    game_state=game_state
+                )
 
         else:
             print(Fore.BLUE + "無効な選択です。再度選択してください。" + Style.RESET_ALL)
 
         scheduler.run_once() 
-
-
-
 
 
 
@@ -332,5 +451,3 @@ def pre_combat_moment(player, enemy_npc, game_state):
     )
 
 
-if __name__ == "__main__":
-    main()
