@@ -1,9 +1,25 @@
 from src.choice_model import Choice
 
 choice_definitions = {
-    "戦う":            {"axis": "red",   "value": 250},
-    "戦わない":        {"axis": "red",   "value": 180},
-    "ただ、受け入れる": {"axis": "red",   "value": 180},
+    # 戦闘系コマンド
+    "戦う": {
+        "axis": "red",
+        "value": 250,
+        "requirements": {"has_enemy": True},
+        "available_to": ["player", "npc"],
+    },
+    "戦わない": {
+        "axis": "red",
+        "value": 180,
+        "requirements": {"has_enemy": True},
+        "available_to": ["player"],
+    },
+    "ただ、受け入れる": {
+        "axis": "red",
+        "value": 180,
+        "requirements": {"has_enemy": True},
+        "available_to": ["player"],
+    },
     "攻撃する":        {"axis": "blue",  "value": 200},
     "switch_character": {"axis": "green", "value": 150},
     "石像に話す":      {"axis": "blue",  "value": 80},

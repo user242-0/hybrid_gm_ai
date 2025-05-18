@@ -42,7 +42,7 @@ actions = {
     },
     "戦わない": {
         "description": "戦闘を避けて逃げる。",
-        "function": accept_attack,
+        "function": avoid_combat,
         "args_template": [], 
         "requirements": {"has_enemy": True},
         "available_to": ["player"]
