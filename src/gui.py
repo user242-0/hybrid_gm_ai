@@ -26,15 +26,24 @@ def start_gui(gs):              # ★ 引数で受け取る
         # ---- 50 ms ごとにログを吸い上げて表示 ----
         def pump_logs():
             try:
-                while True:                 # 1 ループで溜まった分は全部表示
-                    msg = log_q.get_nowait()
+                while True:
+                    item = log_q.get_nowait()
+                    # ❶ タプルか文字列か判定
+                    if isinstance(item, tuple):
+                        msg, tag = item           # (message, tag)
+                    else:
+                        msg, tag = item, None     # 旧形式は tag=None
+
                     txt.config(state="normal")
-                    txt.insert(tk.END, msg + "\n")
+                    if tag:
+                        txt.insert(tk.END, msg + "\n", tag)
+                    else:
+                        txt.insert(tk.END, msg + "\n")
                     txt.see(tk.END)
                     txt.config(state="disabled")
             except Empty:
                 pass
-            root.after(50, pump_logs)       # 50 ms 周期
+            root.after(50, pump_logs)
         pump_logs()
         root.mainloop()
 

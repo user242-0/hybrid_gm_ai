@@ -16,6 +16,7 @@ def init_game_state():
         "active_char": hero,
         "running": True,
         "input_pending" : False,
+        "use_gui" : True,
         # ほか HP, ロケーション, etc.
         "events": {
             "statue_trial_unlocked": False
