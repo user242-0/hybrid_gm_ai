@@ -64,6 +64,19 @@ conversation_manager = ConversationManager()
 scheduler = Scheduler()
 game_state = init_game_state()    # ★ ここで一度だけ生成
 
+"""
+# Luna への参照を取得
+if isinstance(game_state["party"], dict):
+    luna_from_party = game_state["party"]["Luna"]
+else:  # list or tuple
+    luna_from_party = next(c for c in game_state["party"] if c.name == "Luna")
+
+luna_from_map = game_state["party_map"]["Luna"]
+
+print("id in party:", id(luna_from_party))
+print("id in map  :", id(luna_from_map))
+"""
+
 def record(msg):
     log_q.put(msg)          # ← 旧 logger と二重にしても OK
 
@@ -164,6 +177,8 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         while scheduler.run_once() is not None:
             pass
 
+        # 操作キャラが変わっている可能性があるので再表示
+        present_choices(gs["active_char"], gs)
 
 choices = []
 
