@@ -88,11 +88,15 @@ def rc_tick(rc_char, game_state):
     args = parse_args(act_info, rc_char, game_state)
     if choice.action_key == "switch_character":
         target_name = choose_target_for_switch(rc_char, game_state)
-        act_info["function"](rc_char, game_state, target_name)
+        result = act_info["function"](rc_char, game_state, target_name)
     else:
-        act_info["function"](rc_char, game_state, *args)
+        result = act_info["function"](rc_char, game_state, *args)
 
     record(f"[AI] {rc_char.name} ▶ {choice.action_key}")
+
+    if isinstance(result, CharacterStatus) and result.is_npc:
+        scheduler.register(rc_tick, 0.01, result, game_state)
+
 
     # ❹ 次の RC Tick を再登録（0.2 s 後）
     if rc_char.is_npc:           # ← 再登録は AI 時だけで OK
