@@ -42,7 +42,7 @@ actions = {
     },
     "戦わない": {
         "description": "戦闘を避けて逃げる。",
-        "function": accept_attack,
+        "function": avoid_combat,
         "args_template": [], 
         "requirements": {"has_enemy": True},
         "available_to": ["player"]
@@ -87,14 +87,14 @@ actions = {
         "function": switch_character_action,       # ← ルート直下に置く
         "args_template": ["<target_name>"],        # ← parse_args() が読むキー名
         "requirements": ["has_rc_in_party"],
-        "available_to": ["player"]
+        "available_to": ["player", "npc"]
     },
     "感情を設定する": {
         "description": "RGB値でプレイヤーの心の色を設定する",
         "function": set_emotion_color_action,       
         "args_template": [],        
         "requirements": None,
-        "available_to": ["player"]
+        "available_to": ["player", "npc"]
     }
 }
 

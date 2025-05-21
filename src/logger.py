@@ -1,42 +1,23 @@
-import json
-from datetime import datetime
-import os
+# logger.py
+import json, datetime, os
+from pathlib import Path
+from src.character_status import CharacterStatus
 
+LOG_DIR = Path("data/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_PATH = LOG_DIR / "gameplay_log_latest.jsonl"   # 拡張子を .jsonl にするとIDEが扱いやすい
 
-def log_action(actor, action, target, location, result, game_state):
+def _encode(obj):
+    if isinstance(obj, CharacterStatus):
+        return {"name": obj.name, "hp": obj.hp, "is_npc": obj.is_npc}
+    raise TypeError(f"{type(obj)} is not JSON serializable")
 
-    current_time = datetime.now()
-
-    # 明示的に初期化
-    talk_count = None
-    interval = None
-    talk_situation = None
-
-    if action in ["石像に話す", "石像に話す（クールダウン）"]:
-
-        # game_state経由で安全に値を取得（推奨）
-        talk_count = game_state.get("talk_count")
-        interval = game_state.get("interval")
-        talk_situation = game_state.get("talk_situation", ["normal"])
-
-        
-
-    # 以下デバッグ用プリント追加
-    # print(f"[DEBUG] action: {action}, talk_count: {talk_count}, interval: {interval}, talk_situation: {talk_situation}")
-
-    log_entry = {
-        "timestamp": current_time.isoformat(),
-        "actor": actor,
-        "action": action,
-        "target": target,
-        "location": location,
-        "result": result,
-        "talk_count": talk_count,
-        "interval": interval,
-        "talk_situation": talk_situation
-    }
-
-    os.makedirs("data/logs", exist_ok=True)
-
-    with open("data/logs/gameplay_log_latest.json", "a", encoding="utf-8") as logfile:
-        logfile.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+def log_action(**fields):
+    """
+    timestamp, actor, action, target, location, result, ... を kwargs で受け取る想定。
+    追加フィールドがあってもそのまま書き出す。
+    """
+    fields["ts"] = datetime.datetime.now().isoformat(timespec="seconds")
+    with LOG_PATH.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(fields, ensure_ascii=False, default=_encode) + "\n")
+        f.flush()

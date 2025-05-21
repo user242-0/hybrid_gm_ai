@@ -11,7 +11,10 @@ def get_contextual_target(action_key, actor, game_state, *args):
         return game_state["enemy"].name
     return game_state.get("current_target")
 
-def prompt_target_rc(game_state):
+def prompt_target_rc(actor, game_state):
+    if actor.is_npc:
+        return next(c.name for c in game_state["party"].values() if c is not actor)
+    # プレイヤー用の input プロンプト…
     candidates = [
         m.name for m in game_state["party"].values()
         if m.is_rc and not m.is_active
