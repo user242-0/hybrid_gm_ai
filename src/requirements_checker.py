@@ -24,7 +24,7 @@ class RequirementsChecker:
             "target": lambda target_name: self.game_state.get("current_target") == target_name,
             #"has_rc_in_party": lambda: any(member.is_rc and not member.is_active for member in self.game_state["party"].values()),
             "has_rc_in_party": lambda: any(
-                member.is_rc and not member.is_active
+                member.is_rc and not member.is_active and member.faction == "player"
                 for member in self.game_state["party"].values()
             )
         }

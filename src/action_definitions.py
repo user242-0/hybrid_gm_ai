@@ -29,7 +29,7 @@ actions = {
     "攻撃する": {
         "description": "敵に対して攻撃を行う。",
         "function": perform_attack,
-        "args_template": ["target"],
+        "args_template": ["<target_name>"],
         "requirements": {"has_weapon": True},
         "available_to": ["player", "npc"],
     },

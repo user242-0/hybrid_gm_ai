@@ -271,8 +271,8 @@ def run_simulation_step(character, global_game_state, controlled_by_ai=False, op
         selected_action_name = available_actions[0]
 
     action_details = actions[selected_action_name]
-    function_to_execute = action_details["effects"]["function"]
-    args = action_details["effects"]["args"]
+    function_to_execute = action_details["function"]
+    args = parse_args(action_details, character.name, global_game_state)
 
     result = function_to_execute(character, current_state, *args)
 
@@ -307,11 +307,11 @@ def pre_combat_moment(player, enemy_npc, game_state):
 
     # アクション実行
     action_details = actions[selected_action_name]
-    function_to_execute = action_details["effects"]["function"]
-    args = action_details["effects"]["args"]
-
-    result = function_to_execute(player, game_state, enemy_character_status=enemy_npc) if selected_action_name == "戦う" else function_to_execute(player, game_state)
-
+    function_to_execute = action_details["function"]
+    # 「戦う」だけは敵を引数として渡す約束のままにする（engage_combat 側の既存インタフェース維持）
+    result = (function_to_execute(player, game_state, enemy_character_status=enemy_npc)
+              if selected_action_name == "戦う"
+              else function_to_execute(player, game_state))
     print(f"行動結果：{result}")
 
     # ログに記録

@@ -1,6 +1,9 @@
 # choice_model.py
 
-from src.ui_emotion_mapper import map_emotion_to_ui_color
+try:
+    from src.ui_emotion_mapper import map_emotion_to_ui_color
+except Exception:
+    map_emotion_to_ui_color = None
 
 AXIS_RGB = {
     "red":   (1, 0, 0),
@@ -14,12 +17,18 @@ def lift_brightness(value: int) -> int:
     return max(value, MIN_BRIGHTNESS)
 
 class Choice:
-    def __init__(self, label, action_key, emotion_axis, emotion_value=255, requirement_keys=None):
+    def __init__(self, label, action_key, emotion_axis, emotion_value=255,
+                 requirements=None, requirement_keys=None, **kwargs):
         self.label = label
         self.action_key = action_key
         self.emotion_axis = emotion_axis  # "red", "green", "blue"
         self.emotion_value = emotion_value  # 0–255（強さ）
-        self.requirement_keys = requirement_keys or []
+        # actions[action_key]['requirements'] を渡しておくと is_available で使える
+
+        # 後方互換: requirement_keys / requirements の両方を受け付ける
+        self.requirements = requirements if requirements is not None else requirement_keys
+        # 既存コード互換のため古い属性名も残す
+        self.requirement_keys = self.requirements        
 
     def get_emotion_color(self):
         """emotion_axis と emotion_value を使って RGB 色を返す（明度底上げ）"""
@@ -52,9 +61,18 @@ class Choice:
             return (0, 0, lift_brightness(int(b * scale)))
 
     def get_ui_color(self):
-        """emotion軸からUI表示用のカラーを取得（②で利用）"""
-        return map_emotion_to_ui_color(self.rgb_value)
+        """
+        emotion軸からUI表示用のカラーを取得。
+        ui_emotion_mapper が無ければ self.get_emotion_color() を返す。
+        """
+        rgb = self.get_emotion_color()
+        if map_emotion_to_ui_color:
+            try:
+                return map_emotion_to_ui_color(rgb)
+            except Exception:
+                pass
+        return rgb
 
     def is_available(self, checker):
         """requirements_checker.py で条件を満たしているかを判定"""
-        return checker.check_all(self.requirement_keys)
+        return checker.check_all(self.requirements)
