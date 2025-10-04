@@ -4,11 +4,14 @@ from src.requirements_checker import RequirementsChecker
 def select_action(rc_char, game_state, available):
     checker = RequirementsChecker(game_state, rc_char)
 
-    # ❶ フィルタリング段階で switch_character を除外
+    # ❶ switch_character は最優先（input_pending 中でも許可）
+    for c in available:
+        if c.action_key == "switch_character" and c.is_available(checker):
+            return c
+
+    # ❷ 通常時は緑から抽選
     green = [c for c in available
-               if c.emotion_axis == "green"
-               and c.is_available(checker)
-               and not (game_state["input_pending"] and c.action_key == "switch_character")]
+             if c.emotion_axis == "green" and c.is_available(checker)]
 
     if not green:
         return None

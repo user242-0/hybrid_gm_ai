@@ -1,0 +1,170 @@
+(Q)gitで今操作しているブランチを確認する方法と今の変更をメインに反映させる方法、ついでにそれが出来たら、昔のブランチを消す方法もお願いします。
+
+(5pro)了解です。**現在のブランチの確認 → 今の変更を `main` に取り込む → 使い終わった古いブランチを消す**までを、最も無難な（安全寄りの）CLI手順でまとめます。
+※リポジトリによっては既定ブランチ名が `master` の場合があります。以下の `main` は必要に応じて読み替えてください。
+
+---
+
+## 1) いま操作しているブランチを確認する
+
+```bash
+# いま居るブランチ名だけ知りたい（最短）
+git branch --show-current
+
+# ブランチと作業ツリーの状態を一緒に確認
+git status -sb
+
+# ローカルの全ブランチ一覧（現在のブランチに * が付く）
+git branch
+
+# リモート追跡ブランチも含めて確認
+git branch -a
+
+# リモートの既定ブランチ（main か master か）を確認したいとき
+git remote show origin
+```
+
+---
+
+## 2) “今の変更” を `main` に反映させる（ローカルでマージして push する基本手順）
+
+最も衝突に強く、履歴を書き換えない**マージ型**で説明します（チームで「リニア履歴必須」のルールがあるなら下の★Rebase案も参照）。
+
+### A. まず作業中の変更をコミット（未コミットがある場合）
+
+```bash
+git add -A
+git commit -m "作業内容を要約したメッセージ"
+# 未コミットのまま他ブランチへ移る必要があるときは一時退避
+# git stash -u
+```
+
+### B. `main` を最新化してから、作業ブランチを `main` に取り込む
+
+```bash
+# リモート情報を取得
+git fetch origin
+
+# main へ移動して最新化（fast-forwardのみを許可して安全に引き上げ）
+git switch main
+git pull --ff-only origin main
+
+# 作業していたブランチを main にマージ
+git merge <作業ブランチ名>
+# コンフリクトが出たら、該当ファイルを手で直して:
+#   git add <修正したファイル>
+#   git commit   # マージコミットを確定
+```
+
+### C. `main` をリモートへ反映
+
+```bash
+git push origin main
+```
+
+> **Pull Request（PR）運用の場合**
+> 手元でマージせず、作業ブランチを push → ホスティング（GitHub/GitLab/Bitbucket）で PR を作成 → レビュー後に `main` へマージ、という流れに置き換えてください。
+> コマンド例：
+>
+> ```bash
+> git push -u origin <作業ブランチ名>
+> # 以降はWebでPR作成 → マージ
+> ```
+
+---
+
+### ★（参考）Rebase で取り込む場合（履歴を真っ直ぐにしたいとき）
+
+> Rebase は **履歴を書き換える** 操作です。共有済みブランチでの実施はチームルールに従ってください。
+
+```bash
+git fetch origin
+git switch <作業ブランチ名>
+git rebase origin/main     # 作業ブランチを最新main上に組み替え
+# コンフリクトは直して: git add <file> && git rebase --continue
+
+git switch main
+git pull --ff-only origin main
+git merge --ff-only <作業ブランチ名>  # fast-forward で取り込めるはず
+git push origin main
+```
+
+---
+
+## 3) 使い終わった “昔のブランチ” を削除する
+
+### A. 安全に消してよいブランチの洗い出し（`main` に取り込まれているもの）
+
+```bash
+git switch main
+git fetch -p origin                 # リモート情報更新＆不要な追跡枝を掃除
+git branch --merged main            # ← ここに出るブランチは基本安全に削除可
+# 逆に、まだ取り込まれていないブランチは:
+# git branch --no-merged main
+```
+
+### B. ローカルブランチを削除
+
+```bash
+# 取り込まれているブランチを安全に削除（-d）
+git branch -d <古いブランチ名>
+
+# どうしても未マージのまま強制削除する場合（注意！）
+git branch -D <古いブランチ名>
+```
+
+### C. リモートブランチを削除（必要なら）
+
+```bash
+git push origin --delete <古いブランチ名>
+# あるいは旧式表記: git push origin :<古いブランチ名>
+
+# その後、ローカルのリモート追跡を掃除
+git fetch -p origin
+# さらに徹底するなら:
+# git remote prune origin
+```
+
+---
+
+## すぐ使えるチートシート（コピペ用）
+
+```bash
+# いまのブランチ
+git branch --show-current
+
+# 今の変更を main へ取り込む（マージ方式）
+git add -A
+git commit -m "…"
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git merge <作業ブランチ名>
+git push origin main
+
+# 取り込まれた古いブランチを消す（ローカル→リモート）
+git branch --merged main
+git branch -d <古いブランチ名>
+git push origin --delete <古いブランチ名>
+git fetch -p origin
+```
+
+---
+
+## つまずきやすいポイントと対処
+
+* **`main` ではなく `master` を使っている**：
+  `git remote show origin` の “HEAD branch” を確認し、以後のコマンドの `main` をその名前に置換してください。
+
+* **ブランチを移動できない（未コミット変更がある）**：
+  `git add -A && git commit -m "WIP"` か、退避なら `git stash -u`→後で `git stash pop`。
+
+* **コンフリクト**：
+  `git status` で該当ファイルを確認 → 編集 → `git add` → マージなら `git commit`、Rebase なら `git rebase --continue`。
+
+* **“detached HEAD” と言われた**：
+  `git switch -c rescue` で一時ブランチを切って保護し、そこからやり直すと安全。
+
+---
+
+必要なら、あなたの状況（ブランチ名・PR運用の有無・`main`/`master` どちらか）に合わせたコマンドを、上記からピンポイントで書き下ろします。

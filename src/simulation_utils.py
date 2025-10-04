@@ -51,7 +51,7 @@ def execute_player_choice(player, cmd: str, game_state):
         action_key = key,
         target     = " ".join(args) if args else "",
         result     = result,
-        game_state = game_state,
+        #game_state = game_state,
     )
     # 3-b) 画面ログ
     log_q.put(f"[PLY] {player.name} ▶ {key} {' '.join(args)}")

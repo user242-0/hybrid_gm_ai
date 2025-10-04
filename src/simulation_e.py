@@ -198,6 +198,10 @@ def display_choices_with_emotion(choices, player_emotion_color):
         print(f"{color_code}{i}. {choice.label}{Style.RESET_ALL}")
 
 def choose_target_for_switch(rc_char, game_state):
+    # rc_charが現在アクティブでないなら、自分自身をターゲット（プレイヤー操作役に）する
+    if game_state["active_char"] is not rc_char:
+        return rc_char.name
+    # rc_charがアクティブキャラの場合は、他の候補から選ぶ（従来処理）
     candidates = [c for c in game_state["party"].values() if c is not rc_char]
     return random.choice(candidates).name if candidates else rc_char.name
 
@@ -470,7 +474,7 @@ def pre_combat_moment(player, enemy_npc, game_state):
         target=enemy_npc.name,
         location=player.location,
         result=result,
-        game_state=game_state
+        # game_state=game_state
     )
 
 
