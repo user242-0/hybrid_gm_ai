@@ -70,6 +70,7 @@ def main():
     player.is_active = True
 
     game_state = {
+        "use_gui" : False,
         "active_char": player,            # ← ここは上で作った player の参照を使う
         "party": party,
         "has_enemy": True,
@@ -106,7 +107,7 @@ def main():
         for i, action_key in enumerate(available_actions, start=1):
             if action_key in ["戦う", "戦わない", "ただ、受け入れる"]:
                 color = Fore.RED
-            elif action_key in ["switch_character"]:
+            elif action_key in ["switch_character","感情を設定する"]:
                 color = Fore.GREEN         
             else:
                 color = Fore.BLUE

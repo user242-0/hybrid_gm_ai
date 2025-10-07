@@ -26,8 +26,48 @@ class RequirementsChecker:
             "has_rc_in_party": lambda: any(
                 member.is_rc and not member.is_active and member.faction == "player"
                 for member in self.game_state["party"].values()
-            )
+            ),
+            # ---- Emotion related (LC基準) ----
+            "emotion_r_at_least": lambda v: self._lc()[0] >= int(v),
+            "emotion_g_at_least": lambda v: self._lc()[1] >= int(v),
+            "emotion_b_at_least": lambda v: self._lc()[2] >= int(v),
+            "emotion_any_at_least": lambda v: any(c >= int(v) for c in self._lc()),
+            "emotion_is_linear_ordered": lambda: self._lc()[0] >= self._lc()[1] >= self._lc()[2],
+            # ---- Relationship label (observer=player_status → target=current_target) ----
+            "has_relation_label_to_target": lambda label: self._has_relation_label_to_target(label),            
         }
+
+    # --- helpers ---
+    def _lc(self):
+        """現在のプレイヤーUI色（LC）を取得。EmotionState優先、なければ従来のemotion_color。"""
+        if hasattr(self.player_status, "emotion"):
+            return tuple(self.player_status.emotion.linear)
+        return tuple(getattr(self.player_status, "emotion_color", (127,127,255)))
+
+    def _find_character_by_name(self, name: str):
+        if not name:
+            return None
+        party = self.game_state.get("party")
+        if isinstance(party, dict):
+            for ch in party.values():
+                if getattr(ch, "name", None) == name:
+                    return ch
+        party_map = self.game_state.get("party_map")
+        if isinstance(party_map, dict) and name in party_map:
+            return party_map[name]
+        enemy = self.game_state.get("enemy")
+        if enemy and getattr(enemy, "name", None) == name:
+            return enemy
+        return None
+
+    def _has_relation_label_to_target(self, label: str) -> bool:
+        target_name = self.game_state.get("current_target")
+        target = self._find_character_by_name(target_name)
+        if not target or not hasattr(target, "relationship_tags_from"):
+            return False
+        labels = target.relationship_tags_from.get(self.player_status.name, set())
+        return str(label) in labels
+
 
     def check_all(self, requirements):
         """

@@ -1,0 +1,12 @@
+5) 「主人公から見た関係」ラベルの保持方法
+
+データ形：CharacterStatus.relationship_tags_from: dict[observer_name → set[str]] を各キャラが持ちます。
+例）Bに対して、主人公が「友人」「Bの恋人」と見なすなら：
+
+B.add_label_from("主人公", "友人")
+B.add_label_from("主人公", "（主人公にとって）Bの恋人")
+
+
+要件判定：{"has_relation_label_to_target": "友人"} のように貼れます（current_target を対象に検索）。
+
+この方式は視点ごとにラベルを持てるため、「Aから見たB」と「Cから見たB」を両立します。N^2の全組管理は不要で、必要な相手のみ relationships を持ち、ラベルもオンデマンドで付与するだけです。

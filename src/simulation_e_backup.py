@@ -121,6 +121,7 @@ def main():
     player.is_active = True
 
     game_state = {
+        "use_gui" : False,
         "active_char": player,            # ← ここは上で作った player の参照を使う
         "party": party,
         "has_enemy": True,
