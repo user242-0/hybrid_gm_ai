@@ -61,7 +61,7 @@ def rc_tick(rc_char, game_state):
 
     # ❸ アクション実行
     act_info = actions[choice.action_key]
-    args = parse_args(act_info, rc_char.name, game_state)
+    args = parse_args(act_info, rc_char, game_state)
     if choice.action_key == "switch_character":
         target_name = choose_target_for_switch(rc_char, game_state)
         act_info["function"](rc_char, game_state, target_name)
@@ -117,7 +117,7 @@ def main():
     goblin   = CharacterStatus("ゴブリン",   faction="enemy",  is_rc=True,  is_npc=True)
     merchant = CharacterStatus("旅の商人",   faction="neutral", is_rc=False)
 
-    party = {c.name: c for c in (player, luna)}   # ← goblin も入れると切替可
+    party = {c.name: c for c in (player, luna, goblin)}   # ← goblin も入れると切替可
     player.is_active = True
 
     game_state = {
@@ -168,7 +168,7 @@ def main():
             selected_action = actions[selected_choice.action_key]
             actor=game_state["active_char"].name
             effect = selected_action["function"]
-            args = parse_args(selected_action, player.name, game_state)
+            args = parse_args(selected_action, player, game_state)
             result = effect(player, game_state, *args)
 
             
@@ -248,7 +248,7 @@ def main():
                     target=target_for_log,
                     location=game_state.get("current_location", "不明"),
                     result="操作キャラクターを{}に切り替えた".format(target_for_log),
-                    game_state=game_state
+                    # game_state=game_state
                 )
             
             else:log_action(
@@ -257,7 +257,7 @@ def main():
                     target=target_for_log,
                     location=game_state.get("current_location", "不明"),
                     result=result,
-                    game_state=game_state
+                    # game_state=game_state
                 )
 
         else:
@@ -330,7 +330,7 @@ def run_simulation_step(character, global_game_state, controlled_by_ai=False, op
         target=args[0] if args else None,
         location=current_location,
         result=result,
-        game_state=current_state
+        # game_state=current_state
     )
 
 
@@ -366,7 +366,7 @@ def pre_combat_moment(player, enemy_npc, game_state):
         target=enemy_npc.name,
         location=player.location,
         result=result,
-        game_state=game_state
+        # game_state=game_state
     )
 
 

@@ -1,6 +1,6 @@
 # simulation_utils.py （場所は任意）
 import json
-from event_bus import log_q
+from src.event_bus import log_q   # ※使わないなら削除可
 
 from src.choice_definitions   import choice_definitions
 from src.action_definitions   import actions
@@ -22,21 +22,29 @@ def execute_player_choice(player, cmd: str, game_state):
     """
     # ---- (1) 入力文字列を Choice にマッピング ----
     #   例: 数字なら choice_definitions のインデックス順で解釈 など
+    # 入力を解析
     if cmd.isdigit():
         idx = int(cmd) - 1
-        key = list(choice_definitions.keys())[idx]
+        keys = list(choice_definitions.keys())
+        if idx < 0 or idx >= len(keys):
+            game_state["last_action_note"] = {"text": f"⚠ 無効な番号: {cmd}", "tag": "red"}
+            return
+        key = keys[idx]
+        rest = []
     else:
-        # 'switch Hero' → ['switch','Hero']
-        key, *rest = cmd.split()
+        parts = cmd.split()
+        key  = parts[0] if parts else ""
+        rest = parts[1:] if len(parts) > 1 else []
+
     if key not in choice_definitions:
-        log_q.put(f"[ERR] Unknown command: {cmd}")
+        game_state["last_action_note"] = {"text": f"⚠ 無効なコマンド: {cmd}", "tag": "red"}
         return
 
     choice_meta = choice_definitions[key]
     action_info = actions[key]
     checker = RequirementsChecker(game_state, player)
     if not checker.check_all(action_info.get("requirements")):
-        log_q.put(f"[ERR] Requirements not met: {key}")
+        game_state["last_action_note"] = {"text": f"⚠ 実行条件を満たしていません: {key}", "tag": "red"}
         return
 
     # 固定で 1 つだけ追加引数がある例（switch_character）
@@ -53,7 +61,10 @@ def execute_player_choice(player, cmd: str, game_state):
         result     = result,
         #game_state = game_state,
     )
-    # 3-b) 画面ログ
-    log_q.put(f"[PLY] {player.name} ▶ {key} {' '.join(args)}")
+    # 3-b) 画面ノート（次の手番で α として出す）
+    game_state["last_action_note"] = {
+        "text": f"[PLY] {player.name} ▶ {key} {' '.join(args)}",
+        "tag":  "green"
+    }
 
     return result       # ← 戻り値として返すだけ

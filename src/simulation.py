@@ -209,7 +209,7 @@ def main():
                 target=target_for_log,
                 location=game_state.get("current_location", "不明"),
                 result=result,
-                game_state=game_state
+                # game_state=game_state
             )
 
 
@@ -286,7 +286,7 @@ def run_simulation_step(character, global_game_state, controlled_by_ai=False, op
         target=args[0] if args else None,
         location=current_location,
         result=result,
-        game_state=current_state
+        # game_state=current_state
     )
 
 
@@ -322,7 +322,7 @@ def pre_combat_moment(player, enemy_npc, game_state):
         target=enemy_npc.name,
         location=player.location,
         result=result,
-        game_state=game_state
+        # game_state=game_state
     )
 
 

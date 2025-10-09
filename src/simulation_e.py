@@ -180,6 +180,8 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         # 操作キャラが変わっている可能性があるので再表示
         present_choices(gs["active_char"], gs)
 
+
+
 choices = []
 for label, meta in choice_definitions.items():
     if label in actions:
@@ -358,7 +360,7 @@ def main():
                     target=target_for_log,
                     location=game_state.get("current_location", "不明"),
                     result="操作キャラクターを{}に切り替えた".format(target_for_log),
-                    game_state=game_state
+                    #game_state=game_state
                 )
             
             else:log_action(
@@ -367,7 +369,7 @@ def main():
                     target=target_for_log,
                     location=game_state.get("current_location", "不明"),
                     result=result,
-                    game_state=game_state
+                    #game_state=game_state
                 )
 
         else:

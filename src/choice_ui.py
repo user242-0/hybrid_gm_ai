@@ -14,18 +14,37 @@ def present_choices(actor, game_state):
     """
     # 1) Choice 列挙
     choices = get_available_choices(actor, game_state)  # 既存 util を想定
+    num_choice_map = {}
 
     if not choices:
         log_q.put(f"\n⚠️ {actor.name} は今実行可能な行動がありません。\n")
         return {}
 
-    # 2) GUI へ番号付きで送る
-    header = f"\n🎮 {actor.name} のターン — 行動を選択してください\n"
-    body   = "\n".join(
-        f"[{i}] {c.action_key:15}  ({c.emotion_axis})"
-        for i, c in enumerate(choices, 1)
-    )
-    log_q.put(header + body)
+    # ★ まず新しい手番開始を宣言（過去を消す）
+    log_q.put({"mode": "turn", "reset": True})
 
-    # 3) 番号 → Choice の dict を返す
-    return {i: c for i, c in enumerate(choices, 1)}
+    # 見出し
+    log_q.put({"mode":"turn", "text": f"=== {actor.name} の手番 ===", "tag": "header"})
+
+
+    # 各選択肢を「心×コマンドの強さ」で発色
+    player_color = getattr(actor, "emotion_color", (127,127,255))
+    for i, ch in enumerate(choices, start=1):
+        r, g, b = ch.get_emotion_x_player_scaled_color(player_color)  # RGBが返る（0-255）  :contentReference[oaicite:4]{index=4}
+        log_q.put({
+            "mode":"turn",
+            "text": f"{i}. {ch.label}",
+            "tag": f"rgb:{r},{g},{b}",
+            })
+        num_choice_map[i] = ch
+
+    # 補足（色なし）
+    log_q.put({"text": "番号を入力して決定（例: 1）", "mode": "turn"})
+
+    # ★ 追加：直前アクションの1行を “補足(α)” として毎回描画
+    note = game_state.get("last_action_note")
+    if note:
+        # 例: {"text":"[PLY] Hero ▶ switch_character Luna", "tag":"green"}
+        log_q.put({"mode": "note", **note})
+
+    return num_choice_map

@@ -1,6 +1,7 @@
 from random import randint
 from src.quit_helper import handle_quit                # ← 追加
 from src.event_bus import event_q, log_q
+# GUIは「mode」付き辞書だけを描画する（厳格モード）
 
 def set_emotion_color_action(player, game_state):
     # NPC はランダム値を即時セットして終了
@@ -15,10 +16,13 @@ def set_emotion_color_action(player, game_state):
         return
     
     if game_state["use_gui"]:
-        log_q.put((
-            "❓ 感情値入力: LCは `rgb 200 160 120` / NLCは `nlc 200 160 120`（任意: `conf=0.8`）",
-            "YELLOW"
-        ))
+        # 既存の補足を一旦クリアしてから、ガイダンスを補足モードで表示
+        log_q.put({"mode":"note_clear"})
+        log_q.put({
+            "mode":"note",
+            "text":"❓ 感情値入力: LCは `rgb 200 160 120` / NLCは `nlc 200 160 120`（任意: `conf=0.8`）",
+            "tag":"yellow"
+        })
         cmd = event_q.get()       # ブロックは GUI 側だけ
         try:
             tokens = cmd.split()
