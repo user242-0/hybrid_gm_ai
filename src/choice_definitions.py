@@ -1,7 +1,6 @@
 from src.choice_model import Choice
 
 choice_definitions = {
-    # 戦闘系コマンド
     "戦う":            {"axis": "red", "value": 250},
     "戦わない":        {"axis": "red","value": 180},
     "ただ、受け入れる": {"axis": "red","value": 180},

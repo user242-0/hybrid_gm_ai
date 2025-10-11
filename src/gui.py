@@ -1,5 +1,4 @@
 # gui.py -----------------------------------------------------------
-# gui.py -----------------------------------------------------------
 from src.event_bus import event_q, log_q
 from src.quit_helper import handle_quit
 import tkinter as tk
