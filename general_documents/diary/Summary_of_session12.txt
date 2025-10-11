@@ -1,0 +1,20 @@
+**セッション12：簡潔な概要（ダイアリー用）**
+
+* **方針確定**：心の色を二層化。**NLC（非線形＝内面の真）**を主として保持し、**LC（線形＝R≥G≥B）**をUI表示・判定に使用。
+* **変換規則**：
+
+  * **NLC→LC**＝単調射影（等方単調回帰）＋低ノイズ。
+  * **LC→NLC**＝残差サンプリング（直交方向 u1/u2）＋高ノイズ（confidence依存）。
+* **A→B知覚色**：`perceived_color(observer, target)` を追加。**trust**が高いほどBの「真」に近づき、低いほど**Hadamard合成（A×B）**で“歪む”。コンテキストでtint/ノイズ調整可。
+* **データ構造**：`EmotionState{ nonlinear(NLC), linear(LC), confidence, source }` を導入。`CharacterStatus` に内包し、既存 `emotion_color` は **LCの別名**として後方互換。
+* **関係情報の拡張**：`relationships[name→Relationship]` を追加し、さらに**視点別ラベル** `relationship_tags_from[observer→set[str]]` を実装（例：「主人公→B＝友人／恋人候補」）。
+* **要件キー**：`RequirementsChecker` に感情しきい値（`emotion_r/g/b_at_least` 等）と**関係ラベル判定**（`has_relation_label_to_target`）を追加。
+* **入出力**：LCをUIから直接設定しても、**NLCの直接設定（API/CLI）を維持**。GUI入力は現状 `rgb …` 方式で、追加予定の `nlc …` 入力は別スレッドで検討。
+* **テスト（B〜E）**：pytestで**全テスト合格**。
+
+  * **B**：NLC→LCの単調性、**LC↔NLC**往復の安定性（ノイズ固定）。
+  * **C**：A→B知覚色の**trust極限**（0→レンズ一致／100→真LC一致）。
+  * **D**：感情しきい値要件の動作（例：`emotion_b_at_least`）。
+  * **E**：視点別関係ラベル要件の動作（付与→判定→剥奪→再判定）。
+* **既知の課題**：GUIで色が文字表示のみ／ログが高速スタックする問題は**別スレッドで対応**。A→Bの**TTLキャッシュ**やUI配色の**アクセシビリティ調整**は今後の改善項目。
+* **到達点**：色の概念・変換・知覚・要件連動までを**最小実装で一貫**。ゲーム内ロジックとUIの橋渡しが現実的なレベルに到達。

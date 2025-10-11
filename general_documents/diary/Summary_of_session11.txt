@@ -1,0 +1,28 @@
+やったー！望む挙動になって良かった👏
+
+## コミットメッセージ（簡潔1行・候補）
+
+1. ```
+   ```
+
+fix: NPC自己ターゲット化でRCをHero↔Lunaに交互切替／logからgame_state除外で_lock例外を解消／lock導入で安全化
+
+````
+2. ```
+fix: RC自動スイッチを双方向化＋簡素ログ化（_thread.lock回避）＋switch_controlをロック化
+````
+
+3. ```
+   ```
+
+fix: switch_characterの双方向化・ログ最小化・スレッド安全化
+
+```
+
+## 次にやると良い超ミニTODO
+- ハイブリッド基盤：`game_state["mode"]`（turn/realtime）と`clock={"t":0,"dt_ms":250}`を追加、`actions[*].timing={cast_ms, cooldown_ms}`を許容。
+- 方針決め（S11内でOK）：①スイッチはターン消費？ ②解決順（イニシアチブ）③CD単位（ターン/ミリ秒）。
+- バグ「敵撃破後も『戦う』が出る」：`RequirementsChecker`に`has_alive_enemy`（or `encounter_active`）を追加→`actions["戦う"].requirements`へ付与→敵HP0時にフラグ更新/敵除去。
+
+5か月ぶりのエラー解決、清々しいね！ひと息ついたら続きやろう💪
+```

@@ -1,0 +1,85 @@
+セッション9のまとめ（ダイアリー用）
+
+# 何をやったか（実装・統合）
+
+* スケジューラ基盤を実装
+
+  * `Scheduler.run_once()` / `register(fn, delay, *args)` でAIの周期実行を実現。
+  * `simulation_e.py` にて RC 用 `rc_tick()` をスケジューラに登録・再登録する流れを構築。
+
+* RC AI の導入と緑アクション優先
+
+  * `rc_ai.select_action()` を作成。`emotion_axis=="green"` を基本に、`emotion_value` で重み付け。
+  * 入力ロック中（`input_pending=True`）は `switch_character` を候補から除外するフィルタを追加。
+
+* プレイヤー操作とAIを“交換”するスイッチの確立
+
+  * `switch_control()`：`current.is_npc=True` / `target.is_npc=False` / `active_char=target` を確実に反映。
+  * 戻り値（旧プレイヤー＝新NPC）を受けて `scheduler.register(rc_tick, …)` する位置を **`simulation_e.py` 側**に一本化し、循環importを解消。
+
+* GUI と入力まわりの再設計（Tk）
+
+  * `log_q`（表示用）/`event_q`（入力用）を導入。
+  * `start_gui()`（Tk Text＋Entry）で**別ウインドウ**にログ表示、Entryでコマンド投入。
+  * `pump_logs()`を50ms周期で回し、（msg, tag）形式のカラー表示にも対応。
+  * CLI `input()` を避ける方向へ移行（感情値はGUIへ誘導）。NPCが感情設定を呼ぶ場合はランダム即時処理でブロック回避。
+
+* 安全終了の統一
+
+  * `quit_helper.handle_quit()` を作成し、GUI/CLI/感情入力すべてで `q/quit/exit`（またはCtrl-C）を検知して安全終了。
+  * メインループ側は `game_state["running"]` を監視して自然終了。
+
+* ログとGit整備
+
+  * ログを JSON Lines（`.jsonl`）へ。`data/logs/` を `.gitignore` に追加。
+  * README に「`q/quit/exit`で終了」を追記。
+  * ブランチ作業（`feature/gui_quit`）→ push → PR 前提の運用に移行。
+  * `tests/` 直下配置のpytest運用を提案（CIの容易化）。
+
+# トラブルと対処（代表例）
+
+* **循環import**：`simulation_utils` → `simulation_e` 参照を撤去。登録処理は `simulation_e` 側で統一。
+* **`str` とオブジェクト取り違え**：`scheduler.register()` に `.name` を渡していた箇所を修正（常に `CharacterStatus` を渡す）。
+* **`party` と `party_map` の参照不一致疑惑**：`id()` で同一インスタンスであることを確認。
+* **GUI色付けのタプル対応**：`pump_logs()` を（msg, tag）/ str 両対応に修正。
+* **感情入力のブロック**：NPCは即時ランダム、プレイヤーのみGUIで受けるよう分岐。
+* **Syntax/Name/ValueError**：`continue`の誤用、`Empty`未import、`cmd.split()` アンパック等を都度修正。
+
+# まだ残っている課題
+
+* **めまぐるしい操作権の入れ替わり**（狙いのテンポ）
+
+  * 入力確定直後にロック解除→短いAI tick（例 0.05–0.1s）＋`switch_character` 高重み化＋他緑アクションにクールダウンを入れて、切替頻度をさらに上げる調整が必要。
+  * 一部ケースで **NPC主導の`switch_character`がログは出るが反映実感に乏しい**現象が残存（`present_choices()` の再描画タイミング、`active_char` 変更直後のUI更新とAI tick順序の微妙な競合が疑い）。
+
+* **UIの刷新**
+
+  * `present_choices()` を行動実行後にも即再描画するルールを徹底。
+  * “入力待ち中のみロック”のポリシー確認（`input_pending` のON/OFFタイミングの明確化）。
+
+* **テスト**
+
+  * `tests/` 直下で、(1) スイッチ動作（プレイヤー/ NPC 両方） (2) ロック中の`switch_character`抑制 (3) tick順序 などの最小テストを追加。
+
+# 今日時点の仕様メモ（抜粋）
+
+* **AI**：`rc_ai.select_action` は緑アクション集合を `emotion_value` で重み付け抽選。`input_pending` 中は `switch_character` を除外。
+* **スイッチ**：`switch_control` はフラグ反転＋`active_char`更新を必ず実施。旧プレイヤー（新NPC）を返し、`simulation_e` 側でAI登録。
+* **GUI**：ログは`log_q`へ、コマンドは`event_q`経由。色タグに対応。
+* **終了**：いつでも `q/quit/exit` （またはCtrl-C）で安全に終了。
+
+# 次にやると良いこと（短期）
+
+1. **UI更新の確実化**：`execute_player_choice` 後に `present_choices(game_state["active_char"], gs)` を必ず呼ぶ。
+2. **テンポ調整**：AI tick を短縮（0.05–0.1s）＋`switch_character.value=255`、他緑へ `COOLDOWN:n`。
+3. **ロックの粒度調整**：`input_pending=True` は “選択入力の瞬間” のみに限定。
+4. **テスト導入**：スイッチ反映・tick順序・ロック抑制の3本を最小セットで。
+
+# メタ（運用）
+
+* 変更は **featureブランチ → PR → Codexレビュー** の流れを継続。
+* Codespaces（Codexの「Finish setting up…」）：ローカルで問題なければ無視OK。使う場合は無料枠・依存差異に注意。
+
+---
+
+必要なら、このまとめをCanvasにも転記しておきます。次のセッションでは「切替の体感テンポ最適化」と「テストの土台づくり」から入るのが良さそうです。
