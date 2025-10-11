@@ -1,11 +1,23 @@
-from src.init_state import init_game_state
+from src.character_status import CharacterStatus
 from src.scheduler import Scheduler
 import src.simulation_e as sim
 from src.choice_model import Choice
 
 
 def test_npc_switch(monkeypatch):
-    gs = init_game_state()
+    hero = CharacterStatus("Hero", is_rc=True, is_npc=False)
+    luna = CharacterStatus("Luna", is_rc=True, is_npc=True)
+    test_game_state = {
+        "allow_ai_to_seize_control" : False,  # セッション14用：NPCが“自分”をターゲットにして奪う
+        "party": {
+            hero.name: hero,
+            luna.name: luna,
+        },
+        "active_char": hero,
+    }
+    gs = test_game_state
+
+
     luna = gs["party"]["Luna"]
     hero = gs["party"]["Hero"]
 

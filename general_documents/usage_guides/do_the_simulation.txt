@@ -1,2 +1,4 @@
-python src\simulation.py
+python -m src.simulation_e
 
+### Quit / Exit
+立ち上がった"GUI"コンソール(not CLI)にいつでも `q`, `quit`, `exit` を入力  すると、安全にシャットダウンします。

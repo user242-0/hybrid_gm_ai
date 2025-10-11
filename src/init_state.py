@@ -14,6 +14,7 @@ def init_game_state():
             luna.name: luna,
         },
         "active_char": hero,
+        "allow_ai_to_seize_control" : True,  # セッション14用：NPCが“自分”をターゲットにして奪う
         "running": True,
         "input_pending" : False,
         "use_gui" : True,

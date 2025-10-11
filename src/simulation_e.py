@@ -200,10 +200,19 @@ def display_choices_with_emotion(choices, player_emotion_color):
         print(f"{color_code}{i}. {choice.label}{Style.RESET_ALL}")
 
 def choose_target_for_switch(rc_char, game_state):
-    # rc_charが現在アクティブでないなら、自分自身をターゲット（プレイヤー操作役に）する
+    """
+    Policy:
+      - デフォルト(no_seize): アクティブでないNPCは現在のアクティブキャラをターゲットにし、
+        プレイヤー操作を“奪わない”。（テスト期待と一致）
+      - もし game_state['allow_ai_to_seize_control'] が True のときは、
+        従来どおり“自分自身”をターゲットにしてスイッチ（目まぐるしい入れ替え用）。
+    """
+    seize = bool(game_state.get("allow_ai_to_seize_control", False))
     if game_state["active_char"] is not rc_char:
-        return rc_char.name
-    # rc_charがアクティブキャラの場合は、他の候補から選ぶ（従来処理）
+        # 非アクティブNPC → デフォルトは“奪わない”
+        return rc_char.name if seize else game_state["active_char"].name
+
+    # rc_char がアクティブな場合は従来通り、他候補から選択
     candidates = [c for c in game_state["party"].values() if c is not rc_char]
     return random.choice(candidates).name if candidates else rc_char.name
 

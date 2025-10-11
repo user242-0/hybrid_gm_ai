@@ -27,8 +27,14 @@ def switch_control(actor, game_state: dict, target_name: str) -> CharacterStatus
             return False
         """
 
-        current.is_npc   = True      # 今まで手動だったキャラを AI 化
-        target.is_npc = False     # 新しい操作キャラを手動化
+        # ログ用に「入れ替わる相手」を決める
+        #  - 非アクティブNPCが自分(target=actor)を指名 → 相手は current
+        #  - それ以外（アクティブが他者を指名など）   → 相手は target
+        partner_for_log = current.name if target is actor else target.name
+
+        current.is_npc = True      # 今まで手動だったキャラを AI 化
+        target.is_npc  = False     # 新しい操作キャラを手動化
+
 
         current.is_active = False
         target.is_active  = True
@@ -36,8 +42,8 @@ def switch_control(actor, game_state: dict, target_name: str) -> CharacterStatus
     
     
 
-        # print('[SW]', current.name, current.is_npc, '|', target.name, target.is_npc)
-        print("{}は操作キャラクターを{} に切り替えた".format(actor.name,target.name))
+        # 表示は「交換した相手」を出す
+        print("{}は操作キャラクターを{} に切り替えた".format(actor.name, partner_for_log))
         """
         print("DBG active:", game_state["active_char"].name)
         print("DBG hero npc?", target.is_npc, "luna npc?", current.is_npc)
