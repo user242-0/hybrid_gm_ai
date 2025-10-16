@@ -1,0 +1,17 @@
+name: fight
+rgb_mode: floats_0_1
+base_rgb: [0.6, 0.2, 0.2]   # 規範プロトタイプ色（赤寄り）
+mixing:
+  alpha: 0.5   # baseの配合比
+  beta:  0.3   # heart（主体の心）の配合比
+  gamma: 0.2   # 文脈（W·f_context）の配合比
+features: [threat_immediacy, protect_value, self_regulation, public_exposure,
+           trust_to_target, affinity_to_target, time_pressure, power_balance]
+W_action:
+  # R,G,B それぞれが features 配列順（8要素）
+  R: [1.2, 0.3, -0.8, 0.2, -0.2, -0.2, 0.7, 0.5]
+  G: [-0.4, 0.1, 1.0, 0.3, 0.2, 0.1, -0.2, 0.1]
+  B: [0.0, 1.0, 0.2, -0.1, 0.3, 0.6, -0.1, -0.3]
+notes:
+  - 文脈の青（protect_value/affinity）が高い場合、「守るための青い戦う」が現れやすい。
+  - self_regulation が高いと、Rが抑制されGが上がる（抑制/規律の戦い）。

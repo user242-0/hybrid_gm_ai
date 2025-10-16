@@ -1,0 +1,27 @@
+version: 1
+rgb_mode: floats_0_1   # RGBは[0.0,1.0]の実数で扱う（UI側で0–255に変換）
+features:
+  - id: threat_immediacy
+    range: [0.0, 1.0]
+    description: 即時脅威の強さ（今すぐ反応が必要か）
+  - id: protect_value
+    range: [0.0, 1.0]
+    description: 守る対象（人/物/誓約）の重要度
+  - id: self_regulation
+    range: [0.0, 1.0]
+    description: 自己抑制・規律・誓約の強さ
+  - id: public_exposure
+    range: [0.0, 1.0]
+    description: 人目の多さ/公開度（高いほどパブリック）
+  - id: trust_to_target
+    range: [0.0, 1.0]
+    description: 対象への信頼
+  - id: affinity_to_target
+    range: [0.0, 1.0]
+    description: 対象への親和/好意
+  - id: time_pressure
+    range: [0.0, 1.0]
+    description: 時間的切迫（締切/猶予の少なさ）
+  - id: power_balance
+    range: [-1.0, 1.0]
+    description: 力関係のバランス（-1=不利, 0=拮抗, +1=優位）
