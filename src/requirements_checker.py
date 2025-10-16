@@ -3,6 +3,19 @@ class RequirementsChecker:
         self.game_state = game_state
         self.player_status = player_status
 
+        # 内部ヘルパ：現在装備の weapon_type を安全に取得
+        # - dict でもオブジェクトでも OK
+        # - 未装備 / キー欠損 なら None
+        def _equipped_weapon_type():
+            w = getattr(self.player_status, "equipped_weapon", None)
+            if w is None:
+                return None
+            if isinstance(w, dict):
+                return w.get("weapon_type")
+            return getattr(w, "weapon_type", None)
+        self._equipped_weapon_type = _equipped_weapon_type
+
+
         # 条件を辞書形式で管理（追加・削除が容易！）
         self.checks = {
             "is_tired": lambda: self.player_status.is_tired,
@@ -15,6 +28,10 @@ class RequirementsChecker:
                 item for item in self.player_status.inventory if item["type"] == "weapon"
             ),
             "has_weapon": lambda: self.player_status.equipped_weapon is not None,
+            # 装備中の武器タイプが "sword" か？
+            "equipped_sword": lambda: self._equipped_weapon_type() == "sword",
+            # 任意タイプに拡張できる総称版（必要なら）
+            "equipped_weapon_is": lambda t: self._equipped_weapon_type() == t,
             #"has_weapon": lambda: self.player_status.has_weapon,
             "has_enemy": lambda: self.game_state.get("has_enemy"),   # この行を追加
             "location": lambda loc: self.game_state.get("current_location") == loc,

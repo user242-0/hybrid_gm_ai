@@ -111,7 +111,7 @@ def choose_target_for_switch(rc_char, game_state):
 def main():
     # ① 二重生成をやめる
     player   = CharacterStatus("Hero", faction="player", is_rc=True, is_npc=False)
-    player.equip_weapon({"name": "鉄の剣", "attack_bonus": 5})
+    player.equip_weapon({"name": "鉄の剣", "weapon_type":"sword","attack_bonus": 5})
     luna     = CharacterStatus("ルナ",       faction="player", is_rc=True, is_npc=True)
     ally     = CharacterStatus("仲間NPC",    faction="player", is_rc=True, is_npc=True)
     goblin   = CharacterStatus("ゴブリン",   faction="enemy",  is_rc=True,  is_npc=True)

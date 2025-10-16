@@ -60,6 +60,9 @@ def perform_attack(character_status, game_state, target="敵"):
     # 常に成功するととりあえず仮定
     return "成功"
 
+def swing_sword(character_status, game_state, target="敵"):
+    print(f"{character_status.name}が{target}に対して{character_status.equipped_weapon['name']}を振りました（仮）")
+
 def present_event_choices(event_type):
     print("\n行動を選択してください:")
 
@@ -127,5 +130,5 @@ def pre_combat_moment(player, enemy_npc, game_state):
         target=enemy_npc.name,
         location=player.location,
         result=result,
-        game_state=game_state
+        #game_state=game_state
     )

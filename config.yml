@@ -1,0 +1,6 @@
+# config.yml
+profile: prod   # prod | lab
+datalab:
+  emit_scene_graph: true
+  emit_threshold:
+    salience: 0.6

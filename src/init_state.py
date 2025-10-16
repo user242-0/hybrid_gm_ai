@@ -3,7 +3,7 @@ from src.character_status import CharacterStatus
 def init_game_state():
     hero = CharacterStatus("Hero", is_rc=True, is_npc=False)
     luna = CharacterStatus("Luna", is_rc=True, is_npc=True)
-
+    hero.equip_weapon({"name": "鉄の剣", "weapon_type":"sword","attack_bonus": 5})
     return {
         "party": {
             hero.name: hero,

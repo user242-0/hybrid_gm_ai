@@ -1,6 +1,6 @@
 # actions.py のサンプル（整理版）
-from src.actions import explore_location, move_forward, rest_with_event, perform_attack, engage_combat, avoid_combat, accept_attack,\
- talk_to_statue, talk_to_statue_with_cooldown, generate_card_and_print, npc_speak_and_log
+from src.actions import explore_location, move_forward, rest_with_event, perform_attack, swing_sword, engage_combat, avoid_combat,\
+      accept_attack, talk_to_statue, talk_to_statue_with_cooldown, generate_card_and_print, npc_speak_and_log
 from src.control_manager import switch_character_action
 from src.emotion_manager import set_emotion_color_action
 
@@ -31,6 +31,13 @@ actions = {
         "function": perform_attack,
         "args_template": ["<target_name>"],
         "requirements": {"has_weapon": True},
+        "available_to": ["player", "npc"],
+    },
+    "swing_sword": {
+        "description": "敵に対して剣を振るう。",
+        "function": swing_sword,
+        "args_template": ["<target_name>"],
+        "requirements": {"equipped_weapon_is": "sword"},
         "available_to": ["player", "npc"],
     },
     "戦う": {

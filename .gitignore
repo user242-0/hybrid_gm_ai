@@ -4,3 +4,6 @@ __pycache__/
 .env
 data/logs/
 general_documents/Sharedocs_forChatGPT
+backups/
+jobs/**/outputs/
+jobs/**/prefs/

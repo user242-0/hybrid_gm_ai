@@ -13,6 +13,100 @@ from src.character_status import CharacterStatus
 # from src.simulation_e import rc_tick
 # from src.scheduler import Scheduler
 
+#以下、datalab用インポート
+import re
+from pathlib import Path
+from datalab.registry.action_registry import normalize_action
+from datalab.emitters.scene_graph_emitter import emit_scene_graph
+from schemas.scene_graph import ObjectSpec, Pose
+
+SCENE_EMIT_ON = True           # 一旦ハードコード。後でconfig化
+SCENE_JOB_DIR = Path("jobs/quick/")  # とりあえず固定。後で日付ジョブに
+
+LOG_RE = re.compile(r"^\[PLY\]\s+(?P<player>.+?)\s+▶\s+(?P<key>\w+)\s*(?P<args>.*)$")
+
+def emit_from_log_if_good(moment_text: str):
+    """
+    既存のログ1行を受け取って、条件に合えば scene_graph.yml を吐く。
+    """
+    if not SCENE_EMIT_ON:
+        return
+    m = LOG_RE.match(moment_text)
+    if not m:
+        return
+
+    key = m.group("key")
+    args = m.group("args").strip().split() if m.group("args") else []
+    action = normalize_action(key, args)
+    if action not in {"swing_sword", "crouch_ready"}:  # まず2語彙だけ拾う
+        return
+
+    # とりあえず決め打ち：Knightを2パターン出す（後で可変に）
+    objs = [
+        ObjectSpec(
+            name="Knight_A",
+            category="character",
+            base_prompt="chibi knight in plate armor",
+            action="swing_sword",
+            pose=Pose(kind="skeleton", ref="controls/poses/swing_A.json"),
+            materials_hint=["steel_brushed","leather_soft"],
+            scale={"height_m": 1.2},
+        ),
+        ObjectSpec(
+            name="Knight_B",
+            category="character",
+            base_prompt="chibi knight ready stance",
+            action="crouch_ready",
+            pose=Pose(kind="skeleton", ref="controls/poses/ready_crouch.json"),
+        ),
+    ]
+    emit_scene_graph(
+        job_root=SCENE_JOB_DIR,
+        theme="古城の回廊での稽古",
+        background="torch-lit stone corridor",
+        objects=objs,
+        loras=["ferlon_style_v1"],
+    )
+
+# --- 追加 ---
+DEBUG_SCENE = True
+
+def emit_from_choice(player_name: str, key: str, args: list[str]):
+    if not SCENE_EMIT_ON:
+        return
+    action = normalize_action(key, args)
+    if DEBUG_SCENE:
+        print(f"[SCENE] player={player_name} key={key} args={args} -> action={action}")
+    if action not in {"swing_sword", "crouch_ready"}:
+        return
+
+    objs = [
+        ObjectSpec(
+            name="Knight_A",
+            category="character",
+            base_prompt="chibi knight in plate armor",
+            action="swing_sword",
+            pose=Pose(kind="skeleton", ref="controls/poses/swing_A.json"),
+            materials_hint=["steel_brushed","leather_soft"],
+            scale={"height_m": 1.2},
+        ),
+        ObjectSpec(
+            name="Knight_B",
+            category="character",
+            base_prompt="chibi knight ready stance",
+            action="crouch_ready",
+            pose=Pose(kind="skeleton", ref="controls/poses/ready_crouch.json"),
+        ),
+    ]
+    emit_scene_graph(
+        job_root=SCENE_JOB_DIR,
+        theme="古城の回廊での稽古",
+        background="torch-lit stone corridor",
+        objects=objs,
+        loras=["ferlon_style_v1"],
+    )
+
+
 def execute_player_choice(player, cmd: str, game_state):
     """
     cmd は GUI で入力した文字列（例: 'attack' / '1' / 'switch Hero'）
@@ -47,8 +141,20 @@ def execute_player_choice(player, cmd: str, game_state):
         game_state["last_action_note"] = {"text": f"⚠ 実行条件を満たしていません: {key}", "tag": "red"}
         return
 
-    # 固定で 1 つだけ追加引数がある例（switch_character）
-    args = rest or parse_args(action_info, player.name, game_state)
+    # まずGUIで自動解決できる引数は埋める
+    args = list(rest)
+    if not args:
+        if key == "攻撃する":
+            enemy = game_state.get("enemy")
+            if enemy:
+                args = [enemy.name]
+            elif game_state.get("current_target"):
+                # 例：初期状態だと「古代の石像」を攻撃対象にする
+                args = [game_state["current_target"]]
+    # まだ空なら汎用パーサに委譲（※ 文字列ではなく CharacterStatus を渡す）
+    if not args:
+        args = parse_args(action_info, player, game_state)
+
     result = action_info["function"](player, game_state, *args)
 
 
@@ -62,9 +168,11 @@ def execute_player_choice(player, cmd: str, game_state):
         #game_state = game_state,
     )
     # 3-b) 画面ノート（次の手番で α として出す）
+    line = f"[PLY] {player.name} ▶ {key} {' '.join(args)}"
     game_state["last_action_note"] = {
-        "text": f"[PLY] {player.name} ▶ {key} {' '.join(args)}",
+        "text": line,
         "tag":  "green"
     }
+    emit_from_choice(player.name, key, args)
 
     return result       # ← 戻り値として返すだけ
