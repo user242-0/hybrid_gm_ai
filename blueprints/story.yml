@@ -1,0 +1,5 @@
+# blueprints/story.yml
+story_id: "<auto>"
+theme: "古城の回廊での稽古"
+beats: []
+constraints: { tone: "静かな緊張感", pov: "三人称/近距離" }

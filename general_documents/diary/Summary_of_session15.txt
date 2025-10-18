@@ -1,0 +1,33 @@
+文脈評価（f_context，W_action）の導入方針を決める（詳しくは）
+
+
+
+セッション15、進め方の結論です。
+
+
+結論：まず “契約（インターフェース）だけ固める” → すぐにコア/UI分離へ。
+つまり f_context の特徴セットと W_action の「形（3×K）・入出力・保存形式」だけ最小で確定し、数値のチューニングは後回しにします。これでスキーマが安定し、パッケージ分離を迷いなく進められます。三層＋因数分解の方針（行動定義・個人の心・文脈評価）は先のメモと一致しており十分妥当です。
+
+(コアパッケージ分離案)
+core/
+  __init__.py           # 公開APIをここで束ねる
+  types.py              # RGB, VecK, ActionColor, Seed など
+  time.py               # 固定Δt/step/pause/step_once
+  geom.py               # (x,y)/距離/FOV
+  state.py              # WorldState, Actor, Relationship
+  context.py            # f_context と特徴定義
+  actions.py            # base色・W_actionロード/合成
+  decision.py           # 選好・ユーティリティ・サンプリング
+  adapters.py           # 低ランク/関係/シーンアダプタ
+  logging.py            # base/heart/ctx/weightsの内訳ログ
+ui/
+  ...
+config/
+  actions/*.yaml
+tests/
+  test_context.py
+  test_action_color.py
+  test_determinism.py
+
+(f_contextの設計)
+f_context は actor→target の関係を使い、色合成の直前で呼ぶ。

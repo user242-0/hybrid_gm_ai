@@ -1,0 +1,45 @@
+決定・方針
+
+・GM本編の出力を共通YAML（scene_graph）に統一し、データ工房／3D生成（LoRA連携）への橋渡しにする。
+
+・リポは分割せず 1リポ（hybrid_gm_ai）を母艦化。モジュール境界で疎結合にする。
+
+構成追加
+
+・追加ディレクトリ：src/schemas/, src/datalab/emitters/, src/datalab/registry/, jobs/.gitignore
+
+　更新（backups/, jobs/**/outputs/, jobs/**/prefs/ などを除外）
+
+実装
+
+・schemas/scene_graph.py（Pydantic）を宣言。
+
+・datalab/emitters/scene_graph_emitter.py（決め打ちエミッタ）を実装。
+
+・datalab/registry/action_registry.py（語彙正規化・日本語キー対応）を実装。
+
+・ログ経由ではなく、行動実行直後のkey/argsから直呼びで scene_graph.yml を吐くフックを追加。
+
+・テスト：swing_sword 実行で jobs/quick/scene_graph.yml の生成を確認。
+
+バックアップ
+
+・main をスナップショット化（タグ付け＋.bundle作成）、復元テストOK。
+
+次やること（短期 To-Do）
+
+・config.yml で datalab.emit_scene_graph ON/OFF と ジョブ出力先を日付ベースに。
+
+・Round-trip テスト（YAML→Pydantic→YAML）を tests/ に追加。
+
+・jobs/<date_id>/ に seed台帳（seed_ledger.csv）を出す。
+
+・2枚比較の簡易Triage UI→ prefs/preference_pair_*.yml 保存。
+
+・固定**評価セット（20–30件）**を決め、ワンコマンド生成で退行検知。
+
+コミットログ（済／推奨フォーマット）
+
+・feat(schemas,datalab): データ工房方針＋scene_graph基盤／暫定エミッタ
+
+・次：feat(config): datalab flags & dated job dir / test(schemas): scene_graph round-trip

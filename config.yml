@@ -1,6 +1,9 @@
-# config.yml
+# config.yml（提案）
 profile: prod   # prod | lab
+
 datalab:
   emit_scene_graph: true
-  emit_threshold:
-    salience: 0.6
+  job_dir_pattern: "jobs/%Y%m%d_quick"
+  emit_thresholds:
+    salience_min: 0.60
+    red_impulse_min: 0.50

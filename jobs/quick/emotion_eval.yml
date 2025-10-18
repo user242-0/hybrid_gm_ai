@@ -1,0 +1,11 @@
+eval_id: auto
+signals:
+  salience: 0.3
+  novelty: 0.5
+  emotion:
+    red_impulse: 0.6235
+    green_control: 0.6235
+    blue_kindness: 0.749
+emit_if:
+  salience_min: 0.6
+  red_impulse_min: 0.5

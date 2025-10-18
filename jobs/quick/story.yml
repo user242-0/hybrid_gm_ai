@@ -1,0 +1,8 @@
+story_id: 20251018-170928
+theme: ''
+beats:
+- id: beat1
+  summary: 祭壇で、Heroは一閃する
+  intent: 実行
+constraints:
+  pov: 三人称/近距離

@@ -20,6 +20,9 @@ from datalab.registry.action_registry import normalize_action
 from datalab.emitters.scene_graph_emitter import emit_scene_graph
 from schemas.scene_graph import ObjectSpec, Pose
 
+from datalab.emitters.story_emitter import emit_story_line
+from datalab.emitters.emotion_emitter import emit_emotion_eval
+
 SCENE_EMIT_ON = True           # 一旦ハードコード。後でconfig化
 SCENE_JOB_DIR = Path("jobs/quick/")  # とりあえず固定。後で日付ジョブに
 
@@ -174,5 +177,9 @@ def execute_player_choice(player, cmd: str, game_state):
         "tag":  "green"
     }
     emit_from_choice(player.name, key, args)
+
+    # 追加：可読ログ（Story）と評価ログ（Emotion）
+    emit_story_line(SCENE_JOB_DIR, actor=player.name, action=key, args=args, game_state=game_state)
+    emit_emotion_eval(SCENE_JOB_DIR, actor_obj=player, game_state=game_state)
 
     return result       # ← 戻り値として返すだけ

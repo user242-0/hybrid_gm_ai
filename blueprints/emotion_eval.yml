@@ -1,0 +1,4 @@
+# blueprints/emotion_eval.yml
+eval_id: "<auto>"
+signals: { salience: 0.0, novelty: 0.0, emotion: { red_impulse: 0.0, green_control: 0.0, blue_kindness: 0.0 } }
+emit_if: { salience_min: 0.60, red_impulse_min: 0.50 }
