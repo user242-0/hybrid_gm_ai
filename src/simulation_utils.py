@@ -17,96 +17,114 @@ from src.character_status import CharacterStatus
 import re
 from pathlib import Path
 from datalab.registry.action_registry import normalize_action
+from datalab.registry.scene_resolver import resolve
 from datalab.emitters.scene_graph_emitter import emit_scene_graph
 from schemas.scene_graph import ObjectSpec, Pose
 
 from datalab.emitters.story_emitter import emit_story_line
-from datalab.emitters.emotion_emitter import emit_emotion_eval
+from datalab.emitters.emotion_emitter import emit_emotion_eval, summarize_why_now
+from utility.config_loader import get_cfg, job_root_from_cfg
 
-SCENE_EMIT_ON = True           # 一旦ハードコード。後でconfig化
-SCENE_JOB_DIR = Path("jobs/quick/")  # とりあえず固定。後で日付ジョブに
+CFG = get_cfg()
+SCENE_EMIT_ON = bool(CFG["datalab"].get("emit_scene_graph", True))
+SCENE_JOB_DIR = job_root_from_cfg()
 
-LOG_RE = re.compile(r"^\[PLY\]\s+(?P<player>.+?)\s+▶\s+(?P<key>\w+)\s*(?P<args>.*)$")
+def _guess_materials_from_player(player, action: str):
+    mats = []
+    w = getattr(player, "equipped_weapon", None)
+    wtype = w.get("weapon_type") if isinstance(w, dict) else getattr(w, "weapon_type", None)
+    if action in ("swing_sword", "attack") and wtype == "sword":
+        mats += ["steel_brushed", "leather_soft"]
+    return mats
 
-def emit_from_log_if_good(moment_text: str):
-    """
-    既存のログ1行を受け取って、条件に合えば scene_graph.yml を吐く。
-    """
-    if not SCENE_EMIT_ON:
+def _build_ctx(player, game_state, action: str, args: list[str], raw_key: str | None = None):
+    # 関係ラベルの取得（ターゲット名は args 先頭 or game_state 既定）
+    target_name = (args[0] if args else game_state.get("current_target"))
+    labels = set()
+    tgt = None
+    if target_name and hasattr(player, "get_labels_from"):
+        # game_state.party から対象を引けるユーティリティがあるなら使う
+        party = game_state.get("party", {})
+        tgt = party.get(target_name)
+        if tgt and hasattr(tgt, "relationship_tags_from"):
+            labels = tgt.relationship_tags_from.get(player.name, set())
+
+    r, g, b = getattr(player, "emotion_color", (127,127,255))
+
+    return {
+        "actor": player.name,
+        "raw_key": (raw_key if raw_key is not None else action), 
+        "action": action,                # 正規化後
+        "args": args,
+        "location": game_state.get("current_location", "どこか"),
+        "time": game_state.get("time_of_day", "night"),
+        "relation_labels": labels,
+        "emotion": {"red": r/255.0, "green": g/255.0, "blue": b/255.0},
+    }
+
+# emit_from_choice の定義を少し拡張（why_now, profile, actor情報を渡す）
+def emit_from_choice(player, key: str, args: list[str], game_state, why_now: str | None = None):
+    if not CFG["datalab"].get("emit_scene_graph", True):
         return
-    m = LOG_RE.match(moment_text)
-    if not m:
-        return
-
-    key = m.group("key")
-    args = m.group("args").strip().split() if m.group("args") else []
     action = normalize_action(key, args)
-    if action not in {"swing_sword", "crouch_ready"}:  # まず2語彙だけ拾う
-        return
+    ctx = _build_ctx(player, game_state, action, args, raw_key=key)
+    picked = resolve(ctx)  # scene_policy.yaml を解決
 
-    # とりあえず決め打ち：Knightを2パターン出す（後で可変に）
-    objs = [
-        ObjectSpec(
-            name="Knight_A",
-            category="character",
-            base_prompt="chibi knight in plate armor",
-            action="swing_sword",
-            pose=Pose(kind="skeleton", ref="controls/poses/swing_A.json"),
-            materials_hint=["steel_brushed","leather_soft"],
-            scale={"height_m": 1.2},
-        ),
-        ObjectSpec(
-            name="Knight_B",
-            category="character",
-            base_prompt="chibi knight ready stance",
-            action="crouch_ready",
-            pose=Pose(kind="skeleton", ref="controls/poses/ready_crouch.json"),
-        ),
-    ]
-    emit_scene_graph(
-        job_root=SCENE_JOB_DIR,
-        theme="古城の回廊での稽古",
-        background="torch-lit stone corridor",
-        objects=objs,
-        loras=["ferlon_style_v1"],
+    # objects は YAML から来る dict 群を ObjectSpec/Pose に変換
+    objs = []
+    for o in (picked.get("objects") or []):
+        pose = o.get("pose")
+        pose_obj = Pose(**pose) if isinstance(pose, dict) else None
+
+        # ここで kwargs を組み立て、None の項目は渡さない
+        kwargs = dict(
+            name=o.get("name", "{actor}").format(actor=player.name),
+            category=o.get("category", "character"),
+            base_prompt=o.get("base_prompt", ""),
+            action=o.get("action", action),
+            pose=pose_obj,
+        )
+
+        # materials_hint は list を要求 → 文字列なら [str] に、None は渡さない
+        mats = o.get("materials_hint", None)
+        if mats is not None:
+            if isinstance(mats, (list, tuple, set)):
+                kwargs["materials_hint"] = list(mats)
+            else:
+                kwargs["materials_hint"] = [mats]  # YAMLで単一文字列の場合に対応
+
+        # scale は dict を要求 → dict のときだけ渡す（None や不正型は渡さない）
+        sc = o.get("scale", None)
+        if isinstance(sc, dict):
+            kwargs["scale"] = sc
+
+        objs.append(ObjectSpec(**kwargs))
+    fallback_mats = _guess_materials_from_player(player, action)
+    fallback_kwargs = dict(
+        name=f"{player.name}",
+        category="character",
+        base_prompt="default character",
+        action=action,
     )
+    if fallback_mats:
+        fallback_kwargs["materials_hint"] = fallback_mats
 
-# --- 追加 ---
-DEBUG_SCENE = True
+    objects=objs if objs else [ObjectSpec(**fallback_kwargs)]
+    print("[CTX]", ctx["location"], ctx["time"], ctx["raw_key"], "=>", ctx["action"])
+    print("[PICKED-keys]", list(picked.keys()))
 
-def emit_from_choice(player_name: str, key: str, args: list[str]):
-    if not SCENE_EMIT_ON:
-        return
-    action = normalize_action(key, args)
-    if DEBUG_SCENE:
-        print(f"[SCENE] player={player_name} key={key} args={args} -> action={action}")
-    if action not in {"swing_sword", "crouch_ready"}:
-        return
-
-    objs = [
-        ObjectSpec(
-            name="Knight_A",
-            category="character",
-            base_prompt="chibi knight in plate armor",
-            action="swing_sword",
-            pose=Pose(kind="skeleton", ref="controls/poses/swing_A.json"),
-            materials_hint=["steel_brushed","leather_soft"],
-            scale={"height_m": 1.2},
-        ),
-        ObjectSpec(
-            name="Knight_B",
-            category="character",
-            base_prompt="chibi knight ready stance",
-            action="crouch_ready",
-            pose=Pose(kind="skeleton", ref="controls/poses/ready_crouch.json"),
-        ),
-    ]
     emit_scene_graph(
         job_root=SCENE_JOB_DIR,
-        theme="古城の回廊での稽古",
-        background="torch-lit stone corridor",
-        objects=objs,
-        loras=["ferlon_style_v1"],
+        theme=picked.get("theme", f"{ctx['location']}での{action}"),
+        background=picked.get("background", "generic scene"),
+        objects=objects,
+        loras=picked.get("loras", []),
+        why_now=why_now,
+        profile=CFG.get("profile", "prod"),
+        actor=player.name, action=action, args=args,
+        extra_meta={"camera": picked.get("camera"), "lighting": picked.get("lighting"),
+                    "tpo_ctx": {"location": ctx["location"], "time": ctx["time"],
+                                "relation_labels": sorted(list(ctx["relation_labels"]))}},
     )
 
 
@@ -176,10 +194,21 @@ def execute_player_choice(player, cmd: str, game_state):
         "text": line,
         "tag":  "green"
     }
-    emit_from_choice(player.name, key, args)
 
-    # 追加：可読ログ（Story）と評価ログ（Emotion）
+
+    signals_doc = emit_emotion_eval(SCENE_JOB_DIR, actor_obj=player, game_state=game_state)
+    thresholds  = CFG["datalab"].get("emit_thresholds", {})
+    decision    = summarize_why_now(signals_doc.get("signals", {}), thresholds)
+
+    policy = CFG["datalab"].get("emit_policy", "always")
+    emit_ok = (policy == "always") or (policy == "threshold" and decision["ok"])
+    why_now_text = f'{decision["text"]} | policy={policy} {"emit" if emit_ok else "skip"}'
+
+    if emit_ok:
+        emit_from_choice(player, key, args, game_state, why_now=why_now_text)
+    # （この後に story_emitter 等を呼ぶ）
+
+    # 追加：可読ログ（Story）
     emit_story_line(SCENE_JOB_DIR, actor=player.name, action=key, args=args, game_state=game_state)
-    emit_emotion_eval(SCENE_JOB_DIR, actor_obj=player, game_state=game_state)
-
+    
     return result       # ← 戻り値として返すだけ

@@ -1,0 +1,17 @@
+ts,scene_file,seed,commit_hash,profile,actor,action,args
+2025-10-19T00:47:29,jobs\20251019_quick\scene_graph.yml,3226860235,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Hero,swing_sword,Luna
+2025-10-19T00:50:50,jobs\20251019_quick\scene_graph.yml,401576496,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,,Hero
+2025-10-19T00:54:14,jobs\20251019_quick\scene_graph.yml,443095357,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Hero,swing_sword,Luna
+2025-10-19T00:54:16,jobs\20251019_quick\scene_graph.yml,1372904937,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Hero,swing_sword,Luna
+2025-10-19T00:54:17,jobs\20251019_quick\scene_graph.yml,3733230700,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,,
+2025-10-19T00:55:28,jobs\20251019_quick\scene_graph.yml,3812449311,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,,Hero
+2025-10-19T00:55:30,jobs\20251019_quick\scene_graph.yml,2928150326,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,,Hero
+2025-10-19T00:55:31,jobs\20251019_quick\scene_graph.yml,1636482711,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,,Hero
+2025-10-19T00:55:33,jobs\20251019_quick\scene_graph.yml,2005788078,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,,Hero
+2025-10-19T00:55:34,jobs\20251019_quick\scene_graph.yml,2466172690,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,,Hero
+2025-10-19T00:55:36,jobs\20251019_quick\scene_graph.yml,2404709259,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Hero,swing_sword,古代の石像
+2025-10-19T00:56:41,jobs\20251019_quick\scene_graph.yml,3250188046,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Hero,,
+2025-10-19T02:12:12,jobs\20251019_quick\scene_graph.yml,1848387926,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,talk_to_statue,
+2025-10-19T02:16:28,jobs\20251019_quick\scene_graph.yml,488957499,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Hero,swing_sword,Luna
+2025-10-19T02:45:08,jobs\20251019_quick\scene_graph.yml,1847227899,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Luna,talk_to_statue,
+2025-10-19T02:45:12,jobs\20251019_quick\scene_graph.yml,103795818,56e183d239f67d8e5c4f9481069aa2bf5119eacf,prod,Hero,swing_sword,Luna

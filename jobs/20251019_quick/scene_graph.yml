@@ -1,0 +1,35 @@
+theme: 祭壇での稽古
+background: ancient altar under moonlight
+objects:
+- name: Hero
+  category: character
+  base_prompt: chibi knight in plate armor
+  action: swing_sword
+  pose:
+    kind: skeleton
+    ref: controls/poses/swing_A.json
+    text: null
+  control: {}
+  materials_hint:
+  - steel_brushed
+  - leather_soft
+  scale: {}
+loras:
+- ferlon_style_v1
+outputs:
+  image:
+    seed: 103795818
+meta:
+  commit: 56e183d239f67d8e5c4f9481069aa2bf5119eacf
+  profile: prod
+  why_now: 'NG: salience 0.30 < 0.60, red_impulse 0.62 ≥ 0.50 | policy=always emit'
+  camera:
+    shot: mid
+    lens_mm: 50
+  lighting:
+    key: torch_warm
+    fill: low
+  tpo_ctx:
+    location: 祭壇
+    time: night
+    relation_labels: []

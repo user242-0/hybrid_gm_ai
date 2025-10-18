@@ -1,0 +1,53 @@
+story_id: 20251019-004729
+theme: ''
+beats:
+- id: beat1
+  summary: 祭壇で、Heroは一閃する
+  intent: 実行
+- id: beat2
+  summary: 祭壇で、Lunaがswitch_character Hero
+  intent: 描写
+- id: beat3
+  summary: 祭壇で、Heroは一閃する
+  intent: 実行
+- id: beat4
+  summary: 祭壇で、Heroは一閃する
+  intent: 実行
+- id: beat5
+  summary: 祭壇で、Lunaが石像に話す
+  intent: 描写
+- id: beat6
+  summary: 祭壇で、Lunaがswitch_character Hero
+  intent: 描写
+- id: beat7
+  summary: 祭壇で、Lunaがswitch_character Hero
+  intent: 描写
+- id: beat8
+  summary: 祭壇で、Lunaがswitch_character Hero
+  intent: 描写
+- id: beat9
+  summary: 祭壇で、Lunaがswitch_character Hero
+  intent: 描写
+- id: beat10
+  summary: 祭壇で、Lunaがswitch_character Hero
+  intent: 描写
+- id: beat11
+  summary: 祭壇で、Heroが攻撃する 古代の石像
+  intent: 実行
+- id: beat12
+  summary: 祭壇で、Heroが石像に話す
+  intent: 描写
+- id: beat13
+  summary: 祭壇で、Lunaが石像に話す
+  intent: 描写
+- id: beat14
+  summary: 祭壇で、Heroは一閃する
+  intent: 実行
+- id: beat15
+  summary: 祭壇で、Lunaが石像に話す
+  intent: 描写
+- id: beat16
+  summary: 祭壇で、Heroは一閃する
+  intent: 実行
+constraints:
+  pov: 三人称/近距離

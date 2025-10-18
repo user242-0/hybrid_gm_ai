@@ -3,6 +3,7 @@ profile: prod   # prod | lab
 
 datalab:
   emit_scene_graph: true
+  emit_policy: always # always | threshold | policy
   job_dir_pattern: "jobs/%Y%m%d_quick"
   emit_thresholds:
     salience_min: 0.60
