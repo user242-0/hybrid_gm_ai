@@ -1,25 +1,25 @@
-theme: 祭壇でのattack
-background: stone corridor
+theme: 月下の祭壇
+background: ancient altar under moonlight
 objects:
 - name: Hero
   category: character
-  base_prompt: default character
-  action: attack
+  base_prompt: pilgrim speaking to an ancient statue
+  action: talk_to_statue
   pose: null
   control: {}
   materials_hint: []
   scale: {}
-loras: []
+loras:
+- mystic_soft_v1
 outputs:
   image:
-    seed: 675693010
+    seed: 2681666632
 meta:
   commit: 5e8ffbc3cfc697555c1416bc2827a08f1bd055c2
   profile: prod
   why_now: 'OK: salience 0.70 ≥ 0.60, red_impulse 0.62 ≥ 0.50 | policy=always emit'
   camera:
     shot: mid
-    lens_mm: 50
   lighting:
     key: torch_warm
     fill: low

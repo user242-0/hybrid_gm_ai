@@ -1,0 +1,9 @@
+- name: "祭壇_戦う"
+  cmd: "戦う"
+  location: "祭壇"
+  time: "night"
+
+- name: "祭壇_剣を振る"
+  cmd: "剣を振る"
+  location: "祭壇"
+  time: "night"

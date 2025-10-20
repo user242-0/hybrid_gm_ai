@@ -110,8 +110,8 @@ def emit_from_choice(player, key: str, args: list[str], game_state, why_now: str
         fallback_kwargs["materials_hint"] = fallback_mats
 
     objects=objs if objs else [ObjectSpec(**fallback_kwargs)]
-    print("[CTX]", ctx["location"], ctx["time"], ctx["raw_key"], "=>", ctx["action"])
-    print("[PICKED-keys]", list(picked.keys()))
+    #print("[CTX]", ctx["location"], ctx["time"], ctx["raw_key"], "=>", ctx["action"])
+    #print("[PICKED-keys]", list(picked.keys()))
 
     emit_scene_graph(
         job_root=SCENE_JOB_DIR,

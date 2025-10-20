@@ -1,4 +1,4 @@
-文脈評価（f_context，W_action）の導入方針を決める（詳しくは）
+文脈評価（f_context，W_action）の導入方針を決める（詳しくは「general_docs/technical_guides/心の三層設計についての回答」参照）
 
 
 
@@ -31,3 +31,5 @@ tests/
 
 (f_contextの設計)
 f_context は actor→target の関係を使い、色合成の直前で呼ぶ。
+
+（注！！）結局、f_context実装の前にこのセッションは中断し、セッション16に入った。

@@ -28,8 +28,5 @@ beats:
 - id: beat9
   summary: 祭壇で、Heroは石像にそっと語りかける
   intent: 会話
-- id: beat10
-  summary: 祭壇で、Heroは攻めかかる
-  intent: 実行
 constraints:
   pov: 三人称/近距離
