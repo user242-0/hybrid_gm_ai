@@ -34,7 +34,7 @@ python -m src.simulation_e
 ```bash
 python -m src.simulation
 ```
-旧エントリ。simulation_utils.py を介さずに動作します（移行中のため、最新機能は simulation_e.py に集約）。
+>旧エントリ。simulation_utils.py を介さずに動作します（移行中のため、最新機能は simulation_e.py に集約）。
 
 ---
 # 出力（jobs/）
@@ -63,10 +63,10 @@ datalab:
 ---
 # 実行フロー（概略）
 
-1.execute_player_choice() が入力を解釈し、要件チェックを通過したらアクション実行。
-1.Story/Emotion を出力し、emit_policy に応じて SceneGraph を出力。
->未定義の choice キーは無効として即リターンします（ログは吐かれません）。
-1.SceneGraph には meta.commit / outputs.image.seed / meta.why_now / meta.tpo_ctx を付与。
+1. execute_player_choice() が入力を解釈し、要件チェックを通過したらアクション実行。
+1. Story/Emotion を出力し、emit_policy に応じて SceneGraph を出力。
+> 未定義の choice キーは無効として即リターンします（ログは吐かれません）。
+1. SceneGraph には meta.commit / outputs.image.seed / meta.why_now / meta.tpo_ctx を付与。
 
 
 
