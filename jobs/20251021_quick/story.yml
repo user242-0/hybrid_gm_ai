@@ -1,0 +1,29 @@
+story_id: 20251021-002151
+theme: ''
+beats:
+- id: beat1
+  summary: 祭壇で、Lunaは石像にそっと語りかける
+  intent: 会話
+- id: beat2
+  summary: 祭壇で、Lunaは石像にそっと語りかける
+  intent: 会話
+- id: beat3
+  summary: 祭壇で、Lunaは石像にそっと語りかける
+  intent: 会話
+- id: beat4
+  summary: 祭壇で、HeroはLunaへ一閃する
+  intent: 実行
+- id: beat5
+  summary: 視点がHeroへ切り替わる
+  intent: 視点移動
+- id: beat6
+  summary: 祭壇で、HeroはLunaへ一閃する
+  intent: 実行
+- id: beat7
+  summary: 視点がHeroへ切り替わる
+  intent: 視点移動
+- id: beat8
+  summary: 祭壇で、Heroは古代の石像に攻めかかる
+  intent: 実行
+constraints:
+  pov: 三人称/近距離

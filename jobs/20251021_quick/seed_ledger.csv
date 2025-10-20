@@ -1,0 +1,9 @@
+ts,scene_file,seed,commit_hash,profile,actor,action,args
+2025-10-21T00:21:51,jobs\20251021_quick\scene_graph.yml,2719275081,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Luna,talk_to_statue,
+2025-10-21T00:23:08,jobs\20251021_quick\scene_graph.yml,1809166479,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Luna,talk_to_statue,
+2025-10-21T00:23:10,jobs\20251021_quick\scene_graph.yml,966232090,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Luna,talk_to_statue,
+2025-10-21T00:23:11,jobs\20251021_quick\scene_graph.yml,4242329915,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Hero,swing_sword,Luna
+2025-10-21T00:24:01,jobs\20251021_quick\scene_graph.yml,121891214,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Luna,switch_character,Hero
+2025-10-21T00:24:12,jobs\20251021_quick\scene_graph.yml,4160576478,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Hero,swing_sword,Luna
+2025-10-21T00:24:16,jobs\20251021_quick\scene_graph.yml,4059740971,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Luna,switch_character,Hero
+2025-10-21T00:24:18,jobs\20251021_quick\scene_graph.yml,354367964,822daa1829a0bd1e5a225497476957cf7ac80f2e,prod,Hero,attack,古代の石像

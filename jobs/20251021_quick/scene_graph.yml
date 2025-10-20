@@ -1,0 +1,31 @@
+theme: 祭壇でのattack
+background: stone corridor
+objects:
+- name: Hero
+  category: character
+  base_prompt: default character
+  action: attack
+  pose: null
+  control: {}
+  materials_hint:
+  - steel_brushed
+  - leather_soft
+  scale: {}
+loras: []
+outputs:
+  image:
+    seed: 354367964
+meta:
+  commit: 822daa1829a0bd1e5a225497476957cf7ac80f2e
+  profile: prod
+  why_now: 'NG: salience 0.30 < 0.60, red_impulse 0.62 ≥ 0.50 | policy=always emit'
+  camera:
+    shot: mid
+    lens_mm: 50
+  lighting:
+    key: torch_warm
+    fill: low
+  tpo_ctx:
+    location: 祭壇
+    time: night
+    relation_labels: []

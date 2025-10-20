@@ -1,15 +1,38 @@
 from pathlib import Path
 from datetime import datetime
 import yaml
+from datalab.registry.action_registry import normalize_action
 
-def _infer_intent(action: str) -> str:
-    return {"swing_sword": "実行", "攻撃する": "実行", "戦う": "実行"}.get(action, "描写")
+
+from datalab.registry.action_registry import normalize_action
 
 def _one_liner(actor, action, args, gs) -> str:
     loc = gs.get("current_location", "どこか")
-    if action == "swing_sword":
-        return f"{loc}で、{actor}は一閃する"
+    tgt = args[0] if args else ""
+    norm = normalize_action(action, args)
+
+    if norm == "swing_sword":
+        return f"{loc}で、{actor}は{(tgt + 'へ') if tgt else ''}一閃する"
+    if norm == "attack":
+        return f"{loc}で、{actor}は{(tgt + 'に') if tgt else ''}攻めかかる"
+    if norm == "talk_to_statue":
+        return f"{loc}で、{actor}は石像にそっと語りかける"
+    if norm == "switch_character":
+        new_char = tgt or gs.get("next_actor") or "別のキャラ"
+        return f"視点が{new_char}へ切り替わる"
+
+    # フォールバック
     return f"{loc}で、{actor}が{action}{(' ' + ' '.join(args)) if args else ''}"
+
+def _infer_intent(action: str) -> str:
+    norm = normalize_action(action, None)
+    if norm in ("swing_sword", "attack"):
+        return "実行"
+    if norm == "talk_to_statue":
+        return "会話"
+    if norm == "switch_character":
+        return "視点移動"
+    return "描写"
 
 def emit_story_line(job_root, *, actor, action, args, game_state, extra=None):
     job = Path(job_root); job.mkdir(parents=True, exist_ok=True)
