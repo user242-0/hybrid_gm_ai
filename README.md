@@ -22,7 +22,7 @@ git clone <this-repo>
 cd hybrid_gm_ai
 pip install -e .
 ```
-# 実行（推奨）
+## 実行（推奨）
 ```bash
 python -m src.simulation_e
 ```
@@ -30,14 +30,14 @@ python -m src.simulation_e
 
 * 終了: ゲーム中いつでも q, quit, exit を入力すると安全に終了します。
 
-# 互換実行（従来版）
+## 互換実行（従来版）
 ```bash
 python -m src.simulation
 ```
 >旧エントリ。simulation_utils.py を介さずに動作します（移行中のため、最新機能は simulation_e.py に集約）。
 
 ---
-# 出力（jobs/）
+## 出力（jobs/）
 実行ごとに jobs/<date_id>_.../ が生成されます（Git管理外を推奨）。
 
 * scene_graph.yml … 3D/LoRA 連動の共通契約（カメラ/照明/オブジェクト/LoRA など）
@@ -48,7 +48,7 @@ python -m src.simulation
 .gitignore で jobs/ を除外してください（サンプルは samples/ や fixtures/ にスナップショットを保存）。
 
 ---
-# 設定（config.yml 例）
+## 設定（config.yml 例）
 
 ```yaml
 profile: lab  # prod | lab
@@ -61,17 +61,17 @@ datalab:
     red_impulse_min: 0.50
 ```
 ---
-# 実行フロー（概略）
+## 実行フロー（概略）
 
 1. execute_player_choice() が入力を解釈し、要件チェックを通過したらアクション実行。
 1. Story/Emotion を出力し、emit_policy に応じて SceneGraph を出力。
 > 未定義の choice キーは無効として即リターンします（ログは吐かれません）。
-1. SceneGraph には meta.commit / outputs.image.seed / meta.why_now / meta.tpo_ctx を付与。
+3. SceneGraph には meta.commit / outputs.image.seed / meta.why_now / meta.tpo_ctx を付与。
 
 
 
 ---
-# TPOポリシー
+## TPOポリシー
 * ルール: src/datalab/registry/scene_policy.yaml
 
 * 解決: scene_resolver が最も具体的に一致するルールを選びます（場所/時間/関係/感情）。
