@@ -1,22 +1,28 @@
-theme: 祭壇でのattack
-background: stone corridor
+theme: 祭壇での稽古
+background: ancient altar under moonlight
 objects:
 - name: Hero
   category: character
-  base_prompt: default character
-  action: attack
-  pose: null
+  base_prompt: chibi knight in plate armor
+  action: swing_sword
+  pose:
+    kind: skeleton
+    ref: controls/poses/swing_A.json
+    text: null
   control: {}
-  materials_hint: []
+  materials_hint:
+  - steel_brushed
+  - leather_soft
   scale: {}
-loras: []
+loras:
+- ferlon_style_v1
 outputs:
   image:
-    seed: 675693010
+    seed: 3451111122
 meta:
-  commit: 5e8ffbc3cfc697555c1416bc2827a08f1bd055c2
+  commit: e7a06eeccc1fb3a73abe846a8b8678b711491019
   profile: prod
-  why_now: 'OK: salience 0.70 ≥ 0.60, red_impulse 0.62 ≥ 0.50 | policy=always emit'
+  why_now: 'NG: salience 0.30 < 0.60, red_impulse 0.62 ≥ 0.50 | policy=always emit'
   camera:
     shot: mid
     lens_mm: 50

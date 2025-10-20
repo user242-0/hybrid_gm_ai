@@ -24,10 +24,21 @@ from schemas.scene_graph import ObjectSpec, Pose
 from datalab.emitters.story_emitter import emit_story_line
 from datalab.emitters.emotion_emitter import emit_emotion_eval, summarize_why_now
 from utility.config_loader import get_cfg, job_root_from_cfg
+import difflib
 
 CFG = get_cfg()
 SCENE_EMIT_ON = bool(CFG["datalab"].get("emit_scene_graph", True))
 SCENE_JOB_DIR = job_root_from_cfg()
+
+def _map_to_choice_key(raw_key: str):
+    if raw_key in choice_definitions:
+        return raw_key
+    canon = normalize_action(raw_key)
+    for k in choice_definitions.keys():
+        if normalize_action(k) == canon:
+            return k
+    close = difflib.get_close_matches(raw_key, list(choice_definitions.keys()), n=1, cutoff=0.75)
+    return close[0] if close else None
 
 def _guess_materials_from_player(player, action: str):
     mats = []
@@ -135,23 +146,13 @@ def execute_player_choice(player, cmd: str, game_state):
     2) 対応する action.function を呼び出す
     3) ログを残す（persist   + 画面用 log_q）
     """
-    # ---- (1) 入力文字列を Choice にマッピング ----
-    #   例: 数字なら choice_definitions のインデックス順で解釈 など
+    # ---- (1) キー写像 ----  
     # 入力を解析
-    if cmd.isdigit():
-        idx = int(cmd) - 1
-        keys = list(choice_definitions.keys())
-        if idx < 0 or idx >= len(keys):
-            game_state["last_action_note"] = {"text": f"⚠ 無効な番号: {cmd}", "tag": "red"}
-            return
-        key = keys[idx]
-        rest = []
-    else:
-        parts = cmd.split()
-        key  = parts[0] if parts else ""
-        rest = parts[1:] if len(parts) > 1 else []
-
-    if key not in choice_definitions:
+    parts = cmd.split()
+    raw_key = parts[0] if parts else ""
+    rest    = parts[1:] if len(parts) > 1 else []
+    key     = _map_to_choice_key(raw_key)
+    if not key:
         game_state["last_action_note"] = {"text": f"⚠ 無効なコマンド: {cmd}", "tag": "red"}
         return
 

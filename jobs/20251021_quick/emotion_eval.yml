@@ -1,6 +1,6 @@
 eval_id: auto
 signals:
-  salience: 0.7
+  salience: 0.3
   novelty: 0.5
   emotion:
     red_impulse: 0.6235

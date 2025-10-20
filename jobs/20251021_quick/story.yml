@@ -31,5 +31,20 @@ beats:
 - id: beat10
   summary: 祭壇で、Heroは攻めかかる
   intent: 実行
+- id: beat11
+  summary: 祭壇で、Heroは攻めかかる
+  intent: 実行
+- id: beat12
+  summary: 祭壇で、Heroは石像にそっと語りかける
+  intent: 会話
+- id: beat13
+  summary: 祭壇で、HeroはHeroへ一閃する
+  intent: 実行
+- id: beat14
+  summary: 祭壇で、Heroは石像にそっと語りかける
+  intent: 会話
+- id: beat15
+  summary: 祭壇で、HeroはLunaへ一閃する
+  intent: 実行
 constraints:
   pov: 三人称/近距離

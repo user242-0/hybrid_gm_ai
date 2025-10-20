@@ -22,7 +22,7 @@ def _slug(s: str) -> str:
 _CANON = {
     "swing_sword": [
         "swing_sword","swing sword","slash",
-        "斬る","斬りつける","剣を振る","剣をふる","剣で斬る","剣を振り下ろす"
+        "斬る","斬りつける","剣を振る","剣をふる","剣を振るう","剣をふるう","剣で斬る","剣を振り下ろす"
     ],
     "attack": [
         "attack","atk","attk","atack","hit","strike",

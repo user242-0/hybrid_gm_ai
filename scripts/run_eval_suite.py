@@ -48,8 +48,8 @@ def run_case(case):
         return {"name": case.get("name"), "status": "SKIP", "reason": f"unknown cmd: {case['cmd']}"}
 
     hero = CharacterStatus("Hero", is_rc=True, is_npc=False)
+    hero.equipped_weapon = {"name": "鉄の剣", "weapon_type": "sword"}
     gs = _make_min_state(case)
-
     execute_player_choice(hero, key + (" " + " ".join(args) if args else ""), gs)
 
     # 生成物の存在チェック
