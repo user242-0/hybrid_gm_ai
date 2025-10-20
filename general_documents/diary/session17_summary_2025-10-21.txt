@@ -1,0 +1,48 @@
+セッション17 まとめ（2025-10-21）
+
+■ 概要
+・3D/生成の母艦となる「SceneGraph（YAML）」を本番経路に導入。
+・人が読みたくなる「story.yml」と、学習／発火管理の「emotion_eval.yml」を同時出力。
+・行動直後フック（emit_from_choice）で共通契約を吐く方式を確立。
+
+■ 主要タスクと達成
+[P0]
+- config.yml 実読込で出力ON/OFFと出力先の切替 → 実装済。
+- seed_ledger.csv（seed, commit）追記 → 実装済。
+- why_now（発火理由）を scene_graph.yml の meta に記録 → 実装済。
+
+[P1]
+- TPOポリシー（scene_policy.yaml）＋resolver で場所/時間/関係/感情に応じて切替 → 実装済。
+- action 正規化の実運用化（NFKC/別表記/軽微typo/外部増補）→ 実装・小テスト通過。
+- Story/Emotion の1行ビートを3アクション分拡充（攻撃／石像に話す／交代）→ 実装済。
+
+[P2（着手）]
+- SceneGraph Round-trip スモーク → 通過。
+- 固定評価セットのランナー整備 → PASS（複数ケース）。A/B 選好の保存も稼働。
+
+■ 代表ログの状態
+- scene_graph.yml:
+  - outputs.image.seed が付与
+  - meta.commit, meta.why_now, meta.tpo_ctx を出力
+- story.yml:
+  - 「場所＋短い動詞表現」の1行ビートが累積
+- emotion_eval.yml:
+  - salience 等のsignals と emit_if
+
+■ 決定／方針
+- SceneGraph をゲーム時（prod）＋工房時（lab）の共通契約とする。
+- emit_policy は lab=always、prod=threshold を基本に。
+- jobs/ は Git 管理外。サンプルは snapshots を fixtures 等に保存。
+
+■ 既知の落とし穴（回避策）
+- choice 未定義キーは無効として即return → 入力段で normalize→choiceキー化。
+- 要件未充足（例：剣未装備の swing）→ 最小状態で装備を付与。
+- YAMLの None → Pydantic 型エラー → Noneは渡さずデフォルト活用。
+
+■ 次セッションに引き継ぐこと（セッション18方針）
+- 固定評価セットを 4〜8 ケースへ拡充（朝/昼/夜、友好/敵対など）。
+- A/B の実体スナップショットを2件以上作成し、preference を収集。
+- policy linter（未知 action/typo の検知）、emit_policy=threshold運用の実地検証。
+- README 整理・共有ファイルの最小セットの維持運用。
+
+以上

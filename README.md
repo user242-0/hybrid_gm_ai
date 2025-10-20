@@ -1,92 +1,113 @@
-## ゲームマスターAI
+# hybrid_gm_ai — フォルダ整理中の実験ゲームAI（データ工房機能搭載）
 
-AI（主にOpenAI ChatGPT）と人間が協調してゲーム作りをするAI、それが「ゲームマスターAI」です。  
-このプロジェクトは、AIがプレイヤーの行動ログを解析し、動的にルールを提案・実装する「進化するゲームシステム」を目指します。
-
-詳しくは [`general_documents/gm_ai_definition.md`](general_documents/gm_ai_definition.md) を参照してください。  
-このファイルには、ゲームマスターAIの定義、目的、AIと人間の役割分担などの基本設計思想が記載されています。
+> **Status**: WIP（フォルダ構成を移行中）  
+> **タグライン**: 人とAIが協働し、行動ログから“物語”と“3D向けシーン情報”を同時に生み出すハイブリッドGM。
 
 ---
 
-## フォルダ構成（概要）
-
-```
-hybrid_gm_ai/
-├── general_documents/       # ゲームマスターAIの定義や構想メモなど
-├── src/                     # Pythonによる実装コード群
-│   ├── simulation.py        # 実行エントリーポイント
-│   └── ...                  # 各種モジュール
-├── data/                    # プレイヤーのログやルールデータなど
-├── tests/                   # テストプログラム
-├── scripts/                 # テスト以外のプログラム(ルール提案プログラムなど)
-├── .env.example             # APIキーなどの環境変数テンプレート
-└── README.md                # 本ファイル
-```
+## 何ができる？
+- **感情ドリブンのシミュレーション**（`simulation_e.py`）  
+  行動選択やログ出力が“心の色（RGB）”やTPO（場所/時間/関係/感情）に反応します。
+- **二層ログ**
+  - 人が読める `story.yml`（1行ビートが累積）
+  - 3D/生成向けの `scene_graph.yml`（共通契約：カメラ/照明/オブジェクト/LoRA 等）
+- **TPOポリシー**  
+  `scene_policy.yaml` のルールで、場所/時間/関係/感情ごとにシーンを切替。
 
 ---
 
-## 環境構築
-
-以下の手順でセットアップできます：
-
+## クイックスタート
 ```bash
-git clone https://github.com/user242-0/hybrid_gm_ai.git
+git clone <this-repo>
 cd hybrid_gm_ai
-cp .env.example .env      # 自分のAPIキーを.envに記入
 pip install -e .
-python -m src.simulation
 ```
-
----
-
-## 使い方（例）
-
-初期状態では、**シンプルなテキストベースのアドベンチャーゲーム**が動作します。
-プレイヤーの行動に応じて、AIが状況描写やNPCの反応を返します。
-
-```bash
-python -m src.simulation
-```
-
----
-
-## 編集ポイント（今後の開発方針）
-
-### ① シミュレーションの充実
-
-* 色に意味を持たせる：戦闘関連の「赤」、静寂や内省の「青」、システムの正常動作「緑」など。
-* イメージはピクセル単位で視覚化されることを想定。
-* NPC ↔ プレイヤー間の切り替え、関係性定義、およびリアルタイム行動の制御を検討中。
-
-### ② AIによるルール提案～実装の自動化
-
-+ * プレイログは `data/logs/*.jsonl` に保存されます（※ `.jsonl` = JSON Lines）。
-+ * **現在はルール自動生成ロジックは未着手**。  
-+   将来的に `scripts/generate_rules.py` でログ → `rules_draft.jsonl` を生成 →  
-+   人間レビュー → `src/action_definitions.py` へ反映、というワークフローを予定しています。
-
----
-
-今後の発展に向けて、**AIによるルール提案・実装の全自動化と、意味のある色／関係性の付与**を軸に進化させていきます。
-
-
-## 💡 Emotion-Based Simulation: simulation_e.py
-
-This version implements an emotion-driven action selection system.
-
-- Each choice is assigned an RGB axis and intensity.
-- The player's emotional color (心の色) affects which actions stand out.
-- Visual feedback is provided via ANSI terminal coloring.
-
-⚠️ Note:
-Currently, simulation_e.py defaults to auto-selecting "green" actions.
-This is a placeholder behavior and not yet dynamically controlled.
-
-### Run emotion-based version:
-
+# 実行（推奨）
 ```bash
 python -m src.simulation_e
 ```
+* 挙動: 現行設定では 操作権限が Hero ↔ Luna に自動でスイッチします（デモ用の挙動）。
+
+* 終了: ゲーム中いつでも q, quit, exit を入力すると安全に終了します。
+
+# 互換実行（従来版）
+```bash
+python -m src.simulation
+```
+旧エントリ。simulation_utils.py を介さずに動作します（移行中のため、最新機能は simulation_e.py に集約）。
+
 ---
-### Quit / Exit
-ゲーム中いつでも `q`, `quit`, `exit` を入力 (または `Ctrl-C`) すると、安全にシャットダウンします。
+# 出力（jobs/）
+実行ごとに jobs/<date_id>_.../ が生成されます（Git管理外を推奨）。
+
+* scene_graph.yml … 3D/LoRA 連動の共通契約（カメラ/照明/オブジェクト/LoRA など）
+* story.yml … 可読な1行ビートが蓄積
+* emotion_eval.yml … salience 等の発火シグナル
+* seed_ledger.csv … seed と commit の台帳（再現性のため）
+
+.gitignore で jobs/ を除外してください（サンプルは samples/ や fixtures/ にスナップショットを保存）。
+
+---
+# 設定（config.yml 例）
+
+```yaml
+profile: lab  # prod | lab
+datalab:
+  emit_scene_graph: true
+  emit_policy: always   # always | threshold | policy
+  job_dir_pattern: "jobs/%Y%m%d_quick"
+  emit_thresholds:
+    salience_min: 0.60
+    red_impulse_min: 0.50
+```
+---
+# 実行フロー（概略）
+
+1.execute_player_choice() が入力を解釈し、要件チェックを通過したらアクション実行。
+
+1.Story/Emotion を出力し、emit_policy に応じて SceneGraph を出力。
+
+未定義の choice キーは無効として即リターンします（ログは吐かれません）。
+
+1.SceneGraph には meta.commit / outputs.image.seed / meta.why_now / meta.tpo_ctx を付与。
+---
+# TPOポリシー
+* ルール: src/datalab/registry/scene_policy.yaml
+
+* 解決: scene_resolver が最も具体的に一致するルールを選びます（場所/時間/関係/感情）。
+
+* 正規化: normalize_action() が日本語/英語/揺れ/軽微typoを吸収（例「攻撃する」「attack」「atack」→ attack）。
+---
+# テスト/Eval スニペット
+```bash
+# 正規化の単体テスト
+pytest -k normalize_action
+
+# SceneGraphのRound-tripスモーク
+pytest -k roundtrip
+
+# 固定評価セット（例）
+python scripts/run_eval_suite.py
+
+# A/Bのスナップショット → 選好保存
+python scripts/snapshot_job.py 20251020_A
+python scripts/snapshot_job.py 20251020_B
+python scripts/preference_cli.py jobs/20251020_A jobs/20251020_B a "構図Aの方が良い"
+```
+---
+# フォルダ（移行中）
+```bash
+hybrid_gm_ai/
+  blueprints/                 # 人手テンプレ（story/emotion）
+  src/
+    datalab/emitters/         # story/emotion/scene_graph エミッタ
+    datalab/registry/         # action正規化・TPOポリシー
+    utility/                  # config/seed_ledger/git_info
+    simulation_e.py           # 推奨エントリ
+    simulation.py             # 従来エントリ（utils非経由）
+  schemas/                    # SceneGraph 等の契約
+  scripts/                    # eval/snapshot/preference
+  jobs/                       # 生成物（Git管理外）
+  tests/                      # 最小テスト
+```
+詳細は今後の整理で更新します。
