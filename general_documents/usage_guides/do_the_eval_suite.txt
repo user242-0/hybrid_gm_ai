@@ -1,2 +1,2 @@
 python scripts/run_eval_suite.py --glob "data/eval_set/cases/p2_*.yml"
-"data/eval_set/cases/"の中にp2_*.ymlを必要個用意して
+"data/eval_set/cases/"の中にp2_*.ymlを必要個用意してから
