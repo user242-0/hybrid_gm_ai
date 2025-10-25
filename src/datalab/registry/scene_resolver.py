@@ -36,8 +36,9 @@ def resolve(ctx, policy_path=Path("src/datalab/registry/scene_policy.yaml")):
     best, best_score = None, -1
     for rule in y.get("rules", []):
         s, ok = _score_and_hit(rule.get("when", {}), ctx)
-        if ok and s > best_score:
-            best, best_score = rule, s
+        if ok:
+            s += int(rule.get("priority", 0))   # ← 勝ちやすいルールに傾斜
+            if s > best_score:
     out = {**defaults}
     if best:
         out.update({k: v for k, v in best.items() if k != "when"})

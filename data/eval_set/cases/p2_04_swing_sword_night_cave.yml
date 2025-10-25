@@ -1,0 +1,12 @@
+# cases/p2_04_swing_sword_night_cave.yml
+ctx:
+  current_location: "洞窟"
+  time_of_day: "night"
+  has_enemy: true
+  equipped_weapon_is: "sword"
+actor: "Hero"
+action: "swing_sword"
+args: ["Luna"]
+expect:
+  emotion.salience: 0.7
+  scene_graph: "auto"

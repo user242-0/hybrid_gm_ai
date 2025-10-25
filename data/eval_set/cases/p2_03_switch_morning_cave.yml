@@ -1,0 +1,11 @@
+# cases/p2_03_switch_morning_cave.yml
+ctx:
+  current_location: "洞窟"
+  time_of_day: "morning"
+  has_enemy: false
+actor: "Hero"
+action: "switch_character"
+args: ["Luna"]
+expect:
+  emotion.salience: 0.3
+  scene_graph: "auto"

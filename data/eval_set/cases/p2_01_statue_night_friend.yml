@@ -1,0 +1,23 @@
+# cases/p2_01_statue_night_friend.yml
+ctx:
+  current_location: "祭壇"
+  time_of_day: "night"
+  has_enemy: false
+  current_target: "古代の石像"
+  # 任意：relations（runnerが party に対象を作ってラベル付与）
+  relation_labels:
+    from_actor: "Hero"
+    target: "古代の石像"
+    labels: ["friend"]
+
+  # 任意：装備・補助フラグ
+  equipped_weapon_is: "sword"   # "swing_sword" の要件に対応 :contentReference[oaicite:11]{index=11}
+
+actor: "Hero"                   # 実行アクター
+action: "石像に話す"            # 別表記もOK（内部で正規化） :contentReference[oaicite:12]{index=12}
+args: []                        # 省略可
+
+expect:
+  story: "1 beat"               # story.yml のビートが増える
+  emotion.salience: 0.3         # 敵なし→0.3（丸め許容） :contentReference[oaicite:13]{index=13}
+  scene_graph: "auto"  # emit_policy=threshold かつ NGなら出ない

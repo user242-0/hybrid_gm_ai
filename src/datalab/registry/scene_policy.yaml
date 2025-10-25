@@ -1,9 +1,24 @@
 defaults:
-  camera:   { shot: "mid", lens_mm: 50 }
-  lighting: { key: "torch_warm", fill: "low" }
-  background: "stone corridor"
+  theme: ""
+  background: ""         # 旧 "torch-lit stone corridor" などは空に
+  camera:    { text: "" }
+  lighting:  { text: "" }
 
 rules:
+  # swing_sword：洞窟×夜 → 暗所の決闘
+  - when: { action: ["swing_sword","攻撃する"], location: "洞窟", time: "night" }
+    theme: "暗い洞窟での剣の一閃"
+    background: "dark cave interior, wet rocks, narrow passage, hanging stalactites"
+    camera: "35mm low angle close-up, dynamic perspective, slight motion blur trails"
+    lighting: "torchlight warm bounce, cool blue rim from darkness, high contrast"
+
+  # swing_sword：フィールド×夕暮れ → 夕景の決闘
+  - when: { action: ["swing_sword","攻撃する"], location: "フィールド", time: "dusk" }
+    theme: "夕暮れの野での剣の一閃"
+    background: "open grass field at sunset, golden hour, long shadows, distant mountains"
+    camera: "85mm medium telephoto, chest-height, rule-of-thirds framing"
+    lighting: "backlit sun, warm rim light, slight volumetric rays, dust motes"
+
   # (より具体) 祭壇でのswing_sword
   - when: { action: "swing_sword", location: "祭壇" }
     theme: "祭壇での稽古"

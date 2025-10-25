@@ -166,7 +166,7 @@ def execute_player_choice(player, cmd: str, game_state):
     # まずGUIで自動解決できる引数は埋める
     args = list(rest)
     if not args:
-        if key == "攻撃する":
+        if key == ("攻撃する", "swing_sword"):
             enemy = game_state.get("enemy")
             if enemy:
                 args = [enemy.name]

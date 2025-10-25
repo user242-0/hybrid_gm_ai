@@ -1,0 +1,12 @@
+# cases/p2_06_swing_sword_dusk_field.yml
+ctx:
+  current_location: "フィールド"
+  time_of_day: "dusk"
+  has_enemy: true
+  equipped_weapon_is: "sword"
+actor: "Hero"
+action: "swing_sword"
+args: ["Luna"]
+expect:
+  emotion.salience: 0.7
+  scene_graph: "auto"

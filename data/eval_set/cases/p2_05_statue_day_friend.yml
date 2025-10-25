@@ -1,0 +1,12 @@
+# cases/p2_05_statue_day_friend.yml
+ctx:
+  current_location: "祭壇"
+  time_of_day: "day"
+  has_enemy: false
+  current_target: "古代の石像"
+  relation_labels: { from_actor: "Hero", target: "古代の石像", labels: ["friend"] }
+actor: "Hero"
+action: "石像に話す"
+expect:
+  emotion.salience: 0.3
+  scene_graph: "auto"

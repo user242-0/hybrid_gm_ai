@@ -1,0 +1,11 @@
+# cases/p2_02_battle_day_hostile.yml
+ctx:
+  current_location: "フィールド"
+  time_of_day: "day"
+  has_enemy: true
+  current_target: "ゴブリン"
+actor: "Hero"
+action: "戦う"
+expect:
+  emotion.salience: 0.7
+  scene_graph: "auto"

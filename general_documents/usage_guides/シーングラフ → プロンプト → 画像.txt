@@ -1,0 +1,8 @@
+# 1) SG → プロンプト
+python scripts/sg_to_prompt.py --jobs "jobs/snapshots/A/p2_04_*" --style realistic
+python scripts/sg_to_prompt.py --jobs "jobs/snapshots/B/p2_06_*" --style realistic
+
+# 2) プロンプト → 画像
+python scripts/render_with_diffusers.py --jobs "jobs/snapshots/A/p2_04_*"
+python scripts/render_with_diffusers.py --jobs "jobs/snapshots/B/p2_06_*"
+# → 各ジョブの render/preview.png を目視比較 → preference を記入

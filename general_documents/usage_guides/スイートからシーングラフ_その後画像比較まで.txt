@@ -1,0 +1,30 @@
+●スイートからシーングラフ出力
+(venv)> python scripts/run_eval_suite.py --glob "data/eval_set/cases/p2_04_*.yml" ^
+         --out "jobs/%Y%m%d_%H%M_p2_suite_rerun"
+
+(venv)> python scripts/run_eval_suite.py --glob "data/eval_set/cases/p2_06_*.yml" ^
+         --out "jobs/%Y%m%d_%H%M_p2_suite_rerun"
+
+※"～.yml"は適宜書き換え
+
+●その後スナップショット作成
+# A を jobs/snapshots/A/20251025_205002/… に
+python scripts/snapshot_job.py --label A --jobs "jobs/20251025_205002_p2_suite_rerun/p2_04_*" --run-id "20251025_205002"
+
+# B を jobs/snapshots/B/20251025_205022/… に
+python scripts/snapshot_job.py --label B --jobs "jobs/20251025_205022_p2_suite_rerun/p2_06_*" --run-id "20251025_205022"
+
+
+※20251025_205002_p2_suite_rerun,20251025_205022_p2_suite_rerunの部分は最初のコマンドで出来た、それぞれのフォルダ名に変える
+
+●SG→プロンプト（TPO先頭）→ プレビュー再生成
+(venv)> python scripts/sg_to_prompt.py --jobs "jobs/snapshots/A/20251025_205002/p2_04_*" --style realistic
+(venv)> python scripts/sg_to_prompt.py --jobs "jobs/snapshots/B/20251025_205022/p2_06_*" --style realistic
+(venv)> python scripts/render_with_diffusers.py --jobs "jobs/snapshots/A/20251025_205002/p2_04_*"
+(venv)> python scripts/render_with_diffusers.py --jobs "jobs/snapshots/B/20251025_205022/p2_06_*"
+
+※A/20251025_205002，B/～ は作成時のものに置き換える
+
+
+(venv)> python scripts/preference_cli.py "jobs/snapshots/A_20251025_205002/p2_04_*" "jobs/snapshots/B_20251025_205022/p2_06_*" a "明るい雰囲気でB"
+
