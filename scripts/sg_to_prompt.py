@@ -80,6 +80,9 @@ def sg_to_prompt(sg: dict, *, style: str = "realistic") -> tuple[str, str, dict]
     }
     seed = int(((sg.get("outputs") or {}).get("image") or {}).get("seed", 0))
     out_meta["seed"] = seed
+    
+    # 出力直前に：
+    prompt = _approx_trim_to_tokens(prompt, budget=72)
     return prompt, negative, out_meta
 
 def process_job(job_dir: Path, *, style: str):
@@ -93,6 +96,18 @@ def process_job(job_dir: Path, *, style: str):
     (out/"negative.txt").write_text(negative,encoding="utf-8")
     (out/"meta.json"   ).write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print("wrote:", out)
+
+def _approx_trim_to_tokens(prompt: str, budget: int = 72) -> str:
+    # 77未満に収める目安。カンマ区切り→単語に分解して70語程度で切る
+    words = []
+    for chunk in prompt.split(","):
+        words += chunk.strip().split()
+    if len(words) <= budget:
+        return prompt
+    trimmed = " ".join(words[:budget])
+    return trimmed
+
+
 
 def main():
     ap=argparse.ArgumentParser()

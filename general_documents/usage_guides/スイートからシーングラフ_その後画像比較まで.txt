@@ -23,8 +23,23 @@ python scripts/snapshot_job.py --label B --jobs "jobs/20251025_205022_p2_suite_r
 (venv)> python scripts/render_with_diffusers.py --jobs "jobs/snapshots/A/20251025_205002/p2_04_*"
 (venv)> python scripts/render_with_diffusers.py --jobs "jobs/snapshots/B/20251025_205022/p2_06_*"
 
-※A/20251025_205002，B/～ は作成時のものに置き換える
+※A_20251025_205002，B_～ は上記（スナップショット作成時）のものに置き換える
+
+★ases.yaml二つ設置してから、ここまでを一気に繋ぐスクリプト
+(venv)> python scripts/ab_pipeline.py ^
+  --case-a data/eval_set/cases/p2_02_*.yml ^
+  --case-b data/eval_set/cases/p2_03_*.yml ^
+  --label-a A --label-b B --style realistic
+
+●どっちが好みか決める
+
+(venv)> python scripts/preference_cli.py "jobs/snapshots/A/20251025_205002/p2_04_*" "jobs/snapshots/B/20251025_205022/p2_06_*" b "明るい雰囲気でB"
+
+●集めた jobs/prefs/preference_*.ymlから勝った側の TPO × 行為をカウント→優先度の素案を出します
+(venv)> python scripts/prefs_aggregate.py
+# → jobs/prefs/priority_suggestions.yaml を生成
 
 
-(venv)> python scripts/preference_cli.py "jobs/snapshots/A_20251025_205002/p2_04_*" "jobs/snapshots/B_20251025_205022/p2_06_*" a "明るい雰囲気でB"
+●suggesttionの自動反映スクリプトも置いておきます。
 
+(venv)> python scripts/apply_priority_suggestions.py

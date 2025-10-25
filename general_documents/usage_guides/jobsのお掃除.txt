@@ -1,0 +1,3 @@
+jobsのお掃除
+まず python scripts/list_referenced_jobs.py で pref が参照しているパスを確認。
+次に python scripts/gc_jobs.py（dry-run）→ 問題なければ --delete。
