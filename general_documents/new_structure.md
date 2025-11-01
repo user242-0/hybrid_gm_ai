@@ -6,7 +6,11 @@ hybrid_gm_ai/
 │  ├─ training/            # LoRA/DPO/CPTの最小ハーネス（ローカル用）
 │  ├─ adapters/            # 画像/3D生成系のブリッジ（SD, pose/depth/normal提供など）
 │  └─ runners/             # 実行エントリ（prod＝ゲーム／lab＝データ工房）
-├─ jobs/                   # 1ジョブ=1フォルダ（scene_graph.yml, outputs/, prefs/…）
+├─ jobs/                   # 生成物（Git管理外）
+│  ├─snapshots/            # A/B の保管庫（画像・SG・メタ）
+│  │ A/<run-id>/<case>/...
+│  │ B/<run-id>/<case>/...
+│  └─prefs/                # 選好ログ（preference_*.yml / priority_suggestions.yaml）
 ├─ data/
 │  ├─ style_images/        # LoRA学習画像（多視点レンダ等）
 │  └─ eval_set/            # 固定の“合格例”一式
