@@ -1,0 +1,123 @@
+ゲームマスターAI — セッション18 ダイアリ
+日付: 2025-11-01
+作成: ChatGPT（ゲームマスターAIアシスタント）
+
+────────────────────────────────────────
+■ セッション18の目的（要約）
+SceneGraph（SG）→画像の評価ループを確立し、A/B 比較で得た選好（preference）を scene_policy.yaml へ還元する運用を“誰でも再現”できる状態にする。
+
+────────────────────────────────────────
+■ 成果サマリー（達成）
+- 固定評価：p2_* 6ケース → 6/6 PASS（最新 policy / resolver で再確認完了）
+- A/B 比較：2セット以上を作成・評価
+  - 例1：swing_sword（夜×洞窟） vs （夕暮れ×フィールド）
+  - 例2：talk_to_statue（夜×祭壇） vs （昼×祭壇）
+- preference 収集：jobs/prefs/preference_*.yml に保存（勝者・理由・パス）
+- 集計→反映：prefs_aggregate → apply_priority_suggestions（修正版）で priority を policy に反映
+- Linter：policy_linter OK（未知 action / 未知キーなし）
+- 生成物レイアウト：jobs/ に集約（snapshots, prefs）。スナップショットは jobs/snapshots/<label>/<run-id>/<case>/… 形式。
+
+────────────────────────────────────────
+■ 重要決定事項（DoDの根拠）
+1) 評価導線の確立
+   A/B → preference → aggregate → apply → run_eval を 1 コマンド程度の作業で回せる。
+   - ab_pipeline.py で “ケース2つ → 画像” まで自動化。
+   - preference_cli.py は jobs/prefs/ に保存し、以後の集計はこのパスを参照。
+2) 再現性の担保
+   SceneGraph には meta.tpo_ctx / camera / lighting / why_now / commit / profile と outputs.image.seed を記録。seed_ledger.csv と整合。
+3) Policy の解決戦略
+   resolver は「defaults を土台に、when を満たす最良一致ルールで上書き」。
+   priority は “一致した候補に加点”のみ（time/day/night などの文脈はねじ曲げない）。
+4) ディレクトリ規約
+   生成物は jobs/ に集約（Git管理外）。共有は scripts/・scene_policy.yaml・cases・README などの軽量ファイルのみ。
+
+────────────────────────────────────────
+■ 主要変更点（Changelog）
+[更新/差し替え]
+- scripts/run_eval_suite.py：--out に strftime (%Y%m%d_%H%M…) 展開を追加。
+- scripts/snapshot_job.py：jobs/snapshots/<label>/<run-id>/<case>/… 方式／mkdir 不足のバグ修正／--from-suite の属性名修正。
+- scripts/sg_to_prompt.py：TPO（location/time）/ camera / lighting をプロンプトへ投影。dict安全化（_to_text）。必要に応じて TPO を先頭に。
+- scripts/preference_cli.py：出力先を jobs/prefs/ に統一。
+- scripts/policy_linter.py：正規化ベースの action 照合（日本語/英語揺れに対応）。
+- scripts/apply_priority_suggestions.py：when.action がリストのときの一致判定バグを修正＋正規化で照合。
+
+[新規追加]
+- scripts/ab_pipeline.py：ケース2つを渡すだけで再エミット→スナップショット→プロンプト→画像（プレビュー）まで自動。
+- scripts/prefs_aggregate.py：preference 集計→ jobs/prefs/priority_suggestions.yaml を生成。
+- scripts/render_with_diffusers.py：ローカル 2D 生成（SDXL‑Turbo 等）。
+- scripts/list_referenced_jobs.py：preference が参照するパスの棚卸し。
+- scripts/gc_jobs.py：未参照ジョブ（jobs/<timestamp>_*）の削除（まず dry-run）。
+- scripts/repair_prefs_paths.py：preference YAML 内パスの安全置換。
+- docs/README_session18_workflow.md：1ページ運用メモ（README.md と統一）。
+
+[Policy]
+- src/datalab/registry/scene_policy.yaml：
+  - swing_sword（洞窟×夜／フィールド×夕暮れ）など TPOルールを増補。
+  - talk_to_statue（祭壇×昼／夜）を追加。
+  - prefs 集計結果を priority で反映（例：talk_to_statue|祭壇|night に priority: 2〜3）。
+
+[Resolver]
+- scene_resolver.py：score += rule.priority の“ひと押し”を追加（候補内の傾斜）。
+
+────────────────────────────────────────
+■ 実行コマンド（再現ログの雛形）
+# 固定評価
+python scripts/run_eval_suite.py --glob "data/eval_set/cases/p2_*.yml" --out "jobs/%Y%m%d_%H%M_p2_suite"
+
+# A/B（例：p2_01 vs p2_05）
+python scripts/ab_pipeline.py ^
+  --case-a data/eval_set/cases/p2_01_*.yml ^
+  --case-b data/eval_set/cases/p2_05_*.yml ^
+  --label-a A --label-b B --style realistic
+
+# 好みの保存
+python scripts/preference_cli.py jobs/snapshots/A/<run-id> jobs/snapshots/B/<run-id> a "より神秘的"
+
+# 集計 → 反映 → Lint
+python scripts/prefs_aggregate.py
+python scripts/apply_priority_suggestions.py
+python scripts/policy_linter.py
+
+# 回帰（6/6維持確認）
+python scripts/run_eval_suite.py --glob "data/eval_set/cases/p2_*.yml"
+
+────────────────────────────────────────
+■ 既知の注意点 / トラブルと対処
+- CLIP 77トークン制限：長文プロンプトは末尾が切れる。重要語は先頭へ、装飾語は短縮（sg_to_prompt の近似トリミングを利用可）。
+- スナップショット名のミス：preference は A/B の“パス”を保持。リネーム時は repair_prefs_paths.py で置換。
+- 旧スナップショットの扱い：pref が参照していない run ディレクトリは gc_jobs.py（dry-run）→ --delete で削除可。
+
+────────────────────────────────────────
+■ セッション19（計画）
+19-A：Δt / (x,y) の導入（骨格）
+- game_state.time: { t, dt, time_of_day }、主要アクター pos(x,y), speed, facing。
+- SG.meta.spatial に actor_positions / camera_anchor を記録。sg_to_prompt で簡易反映。
+- p3_10_walk_field_day.yml / p3_11_walk_field_night.yml の2ケースで差分確認。
+
+19-B：文脈評価（context_eval）
+- 入力：relation, privacy, recent_events, tpo_ctx, distance 等 → 出力：colors / gating / coeff。
+- SG/Story に context_color を記録。同一アクションでも色別テンプレで文言を分岐。
+
+19-C：RC選択（行動選択）
+- 有効スコア S(a)=R×c_ctx×c_cd×c_dist。gating=hard-block なら除外。
+- 選択は argmax or softmax(T)。decision_log.csv に候補/選択/理由を追記。
+
+マイルストーン（19のDoD）
+- A：位置・時間の差が SG/画像に出る（2ケース）。
+- B：文脈色で台詞/描写が変わる（2ケース）。
+- C：Rが高くても文脈が悪ければ抑制されることを A/B で実証。
+
+────────────────────────────────────────
+■ コミットメッセージ例（採用済み）
+feat(scripts): snapshotを jobs/snapshots/<label>/<run-id>/ へ整理し _index.csv/LATEST を追加
+feat(scripts): sg_to_prompt に TPO/camera/lighting 投影と dict安全化を実装
+feat(scripts): preference_cli の出力先を jobs/prefs に統一
+feat(scripts): run_eval_suite の --out に strftime 展開を追加
+feat(policy): TPO別ルール（洞窟×夜 / フィールド×夕暮れ / 祭壇×昼夜）を追加、defaults を弱化
+fix(apply): action一致判定（リストaction＋正規化）を修正
+docs: セッション18ワークフロー（1ページ運用メモ）を追加
+
+────────────────────────────────────────
+■ 付記
+- policy は“読むだけ”。tpo_ctx（time/location）は実行側の世界状態に依存し、policy が時空を上書きしない設計を維持。
+- 生成物は jobs/ に集約し、共有は軽量ファイル（scripts, policy, cases, README）のみとする。

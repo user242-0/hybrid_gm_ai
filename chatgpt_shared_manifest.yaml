@@ -1,0 +1,29 @@
+# chatgpt_shared_manifest.yml
+version: 1
+must_share:
+  - config.yml
+  - src/datalab/registry/scene_policy.yaml
+  - data/eval_set/cases/p2_*.yml
+  - scripts/run_eval_suite.py
+  - scripts/snapshot_job.py
+  - scripts/sg_to_prompt.py
+  - scripts/preference_cli.py
+  - scripts/policy_linter.py
+  - README.md
+recommended:
+  - scripts/ab_pipeline.py
+  - scripts/prefs_aggregate.py
+  - scripts/apply_priority_suggestions.py
+  - scripts/render_with_diffusers.py
+nice_to_have:
+  - scripts/list_referenced_jobs.py
+  - scripts/gc_jobs.py
+  - scripts/repair_prefs_paths.py
+exclude:
+  - jobs/**            # 生成物は共有しない（重い/再現可能）
+  - hydrate_shared_files.py   # 開発環境用のため共有不要
+  - *.venv/**          # 仮想環境
+  - __pycache__/**
+notes:
+  - "scene_policy.yaml は priority 反映済みの最新版を共有"
+  - "scripts はセッション18改訂版（修正版）を共有"
