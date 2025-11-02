@@ -5,6 +5,10 @@ datalab:
   emit_scene_graph: true
   emit_policy: always # always | threshold | policy
   job_dir_pattern: "jobs/%Y%m%d_quick"
+  # Optional explicit job directory override. When set, this path is used
+  # instead of the dated pattern above (useful when re-running tests against
+  # a specific captured job).
+  # job_dir: "jobs/20240101_quick"
   emit_thresholds:
     salience_min: 0.60
     red_impulse_min: 0.50

@@ -1,3 +1,0 @@
-[codex-patch 9f3b4b5] pyproject.tomlに PyYAML
- 2 files changed, 2 insertions(+), 9 deletions(-)
- delete mode 100644 general_documents/usage_guides/do_the_simulation.txt.rej
