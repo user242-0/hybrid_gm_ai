@@ -4,6 +4,7 @@ must_share:
   - config.yml
   - src/datalab/registry/scene_policy.yaml
   - data/eval_set/cases/p2_*.yml
+  - data/eval_set/cases/p3_*.yml
   - scripts/run_eval_suite.py
   - scripts/snapshot_job.py
   - scripts/sg_to_prompt.py

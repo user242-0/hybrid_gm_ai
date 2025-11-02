@@ -6,7 +6,7 @@
 ---
 
 ## 何ができる？
-- **感情ドリブンのシミュレーション**（`simulation_e.py`）  
+- **感情ドリブンのシミュレーション**（`simulation.py`）
   行動選択やログ出力が“心の色（RGB）”やTPO（場所/時間/関係/感情）に反応します。
 - **二層ログ**
   - 人が読める `story.yml`（1行ビートが累積）
@@ -24,7 +24,7 @@ pip install -e .
 ```
 ## 実行（推奨）
 ```bash
-python -m src.simulation_e
+python -m src.simulation
 ```
 * 挙動: 現行設定では 操作権限が Hero ↔ Luna に自動でスイッチします（デモ用の挙動）。
 
@@ -32,9 +32,9 @@ python -m src.simulation_e
 
 ## 互換実行（従来版）
 ```bash
-python -m src.simulation
+python -m src.simulation_old
 ```
->旧エントリ。simulation_utils.py を介さずに動作します（移行中のため、最新機能は simulation_e.py に集約）。
+>旧エントリ。simulation_utils.py を介さずに動作します（移行中のため、最新機能は simulation.py に集約）。
 
 ---
 ## 出力（jobs/）
@@ -103,8 +103,8 @@ hybrid_gm_ai/
     datalab/emitters/         # story/emotion/scene_graph エミッタ
     datalab/registry/         # action正規化・TPOポリシー
     utility/                  # config/seed_ledger/git_info
-    simulation_e.py           # 推奨エントリ
-    simulation.py             # 従来エントリ（utils非経由）
+    simulation.py             # 推奨エントリ
+    simulation_old.py         # 従来エントリ（utils非経由）
   schemas/                    # SceneGraph 等の契約
   scripts/                    # eval/snapshot/preference
   jobs/                       # 生成物（Git管理外）

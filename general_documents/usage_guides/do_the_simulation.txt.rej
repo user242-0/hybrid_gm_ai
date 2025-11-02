@@ -1,0 +1,8 @@
+diff a/general_documents/usage_guides/do_the_simulation.txt b/general_documents/usage_guides/do_the_simulation.txt	(rejected hunks)
+@@ -1,4 +1,4 @@
+-python -m src.simulation_e
++python -m src.simulation
+ 
+ ### Quit / Exit
+ 立ち上がった"GUI"コンソール(not CLI)にいつでも `q`, `quit`, `exit` を入力  すると、安全にシャットダウンします。
+\ No newline at end of file

@@ -10,7 +10,7 @@ from src.logger               import log_action
 #register用import
 from src.character_status import CharacterStatus
 # --- 不要な import を削除 ---
-# from src.simulation_e import rc_tick
+# from src.simulation import rc_tick
 # from src.scheduler import Scheduler
 
 #以下、datalab用インポート

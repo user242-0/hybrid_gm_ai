@@ -131,7 +131,7 @@ def run_case(path: Path, batch_dir: Path, cfg: dict) -> bool:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--glob", default="data/eval_set/cases/p2_*.yml")
+    ap.add_argument("--glob", default="data/eval_set/cases/p[23]_*.yml")
     ap.add_argument("--out", default=None, help="batch dir (default auto)")
     args = ap.parse_args()
 
@@ -139,14 +139,14 @@ def main():
 
     # ★ out の決定ロジックを置き換え
     if args.out:
-        # 例: "jobs/%Y%m%d_%H%M_p2_suite_rerun" → jobs/20251025_1523_p2_suite_rerun
+        # 例: "jobs/%Y%m%d_%H%M_p_suite_rerun" → jobs/20251025_1523_p_suite_rerun
         try:
             out_str = datetime.now().strftime(args.out)
         except Exception:
             out_str = args.out  # 念のためフォールバック
     else:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_str = f"jobs/{ts}_p2_suite"
+        out_str = f"jobs/{ts}_p_suite"
 
     batch_dir = Path(out_str)
     batch_dir.mkdir(parents=True, exist_ok=True)

@@ -14,7 +14,8 @@ hybrid_gm_ai/
     ├── choice_definitions.py(行動の色軸と、その値を定義。行動可能リストを挙げる機能も※choiceを定義しないと、実行可能でも行動可能から漏れる) 
     ├── choice_ui.py　(現在操作キャラクター actor に対して実行可能な Choice を列挙し、 GUI ログに出力する。)   
     ├── init_state.py(ゲームステータスの初期化)
-    ├── simulation_e.py(シミュレーション本体)
+    ├── simulation.py(シミュレーション本体)
+    ├── simulation_old.py(従来フロー／直接実行エントリ)
     ├── simulation_utils.py(シミュレーションの効用関数。コマンドを Action に変換して実行機能)
     ├── control_manager.py(キャラ切り替えアクションの中身)
     ├── rc_ai.py （各キャラクターAI（Reversible Character）の制御）

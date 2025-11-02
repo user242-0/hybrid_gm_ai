@@ -5,7 +5,8 @@ import shutil
 # 共有ファイル（フラットに置かれている）→ 既定の配置先
 MAP = {
   "config.yml": "config.yml",
-  "simulation_e.py": "src/simulation_e.py",
+  "simulation.py": "src/simulation.py",
+  "simulation_old.py": "src/simulation_old.py",
   "simulation_utils.py": "src/simulation_utils.py",
   "requirements_checker.py": "src/requirements_checker.py",
   "action_definitions.py": "src/action_definitions.py",

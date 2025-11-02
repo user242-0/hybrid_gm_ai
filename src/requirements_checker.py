@@ -39,6 +39,13 @@ class RequirementsChecker:
                 item["name"] == item_name for item in self.player_status.inventory
             ),
             "target": lambda target_name: self.game_state.get("current_target") == target_name,
+            "time": lambda expected: self.game_state.get("time_of_day") == expected,
+            "weather_is": lambda expected: (
+                self.game_state.get("world", {})
+                .get("weather", {})
+                .get("kind")
+                == expected
+            ),
             #"has_rc_in_party": lambda: any(member.is_rc and not member.is_active for member in self.game_state["party"].values()),
             "has_rc_in_party": lambda: any(
                 member.is_rc and not member.is_active and member.faction == "player"

@@ -65,14 +65,23 @@ actions = {
         "description": "古代の石像に語りかけることで何かが起こるかもしれない。",
         "function": talk_to_statue,
         "args_template": [],  
-        "requirements": {"location": "祭壇","target": "古代の石像"},
+        "requirements": {
+            "location": "祭壇",
+            "target": "古代の石像",
+            "time": "night",
+        },
         "available_to": ["player"]
     },
     "石像に話す（クールダウン）": {
         "description": "古代の石像に語りかける。連続での使用にはクールダウンが必要。",
         "function": talk_to_statue_with_cooldown, 
         "args_template": [],         
-        "requirements": {"location": "祭壇","target": "古代の石像"},
+        "requirements": {
+            "location": "祭壇",
+            "target": "古代の石像",
+            "time": "night",
+            "weather_is": "clear",
+        },
         "available_to": ["player"],
     },
     "NPCが話す": {

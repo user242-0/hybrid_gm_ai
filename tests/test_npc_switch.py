@@ -1,6 +1,6 @@
 from src.character_status import CharacterStatus
 from src.scheduler import Scheduler
-import src.simulation_e as sim
+import src.simulation as sim
 from src.choice_model import Choice
 
 

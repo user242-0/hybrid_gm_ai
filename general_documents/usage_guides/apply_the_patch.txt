@@ -1,0 +1,11 @@
+# 事前チェック
+git apply --check patch1.patch
+
+git apply --3way --index patch1.patch
+git apply --3way --index patch2.patch
+git apply --3way --index patch3.patch
+#通らなかったら
+git apply -v --reject patch2.patch
+
+git diff --staged
+git commit -m "Apply patches 1-3 from Codex"
