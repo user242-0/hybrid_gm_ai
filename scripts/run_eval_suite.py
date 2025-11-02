@@ -56,12 +56,19 @@ def build_state_from_ctx(ctx: dict):
 
     return hero, gs
 
-def expect_scene_graph(job_dir: Path, cfg: dict):
+def expect_scene_graph(job_dir: Path, cfg: dict, eva: dict | None = None):
     """
     emit_policy=always → 期待=あり
     threshold         → summarize_why_now(signals, thresholds)['ok'] なら あり
     """
-    eva = yaml.safe_load((job_dir / "emotion_eval.yml").read_text(encoding="utf-8"))
+    if eva is None:
+        emo_p = job_dir / "emotion_eval.yml"
+        if not emo_p.exists():
+            return False
+        try:
+            eva = yaml.safe_load(emo_p.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            return False
     signals = eva.get("signals", {})
     th = cfg.get("datalab", {}).get("emit_thresholds", {})
     policy = cfg.get("datalab", {}).get("emit_policy", "always")
@@ -76,18 +83,24 @@ def validate_outputs(job_dir: Path, cfg: dict, expect: dict):
         ok = False
     # 2) emotion_eval.yml
     emo_p = job_dir / "emotion_eval.yml"
+    eva_doc = None
     if not emo_p.exists():
         print("✗ emotion_eval.yml not found"); ok = False
     else:
-        eva = yaml.safe_load(emo_p.read_text(encoding="utf-8"))
-        sal = eva.get("signals", {}).get("salience")
-        exp_sal = expect.get("emotion.salience")
-        if exp_sal is not None and abs(float(sal) - float(exp_sal)) > 1e-3:
-            print(f"✗ salience mismatch: {sal} vs {exp_sal}")
+        try:
+            eva_doc = yaml.safe_load(emo_p.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            print(f"✗ emotion_eval.yml parse error: {exc}")
             ok = False
+        else:
+            sal = eva_doc.get("signals", {}).get("salience")
+            exp_sal = expect.get("emotion.salience")
+            if exp_sal is not None and abs(float(sal) - float(exp_sal)) > 1e-3:
+                print(f"✗ salience mismatch: {sal} vs {exp_sal}")
+                ok = False
     # 3) scene_graph.yml 期待
     sg_p = job_dir / "scene_graph.yml"
-    want_emit = expect_scene_graph(job_dir, cfg) if expect.get("scene_graph") in (None, "auto") \
+    want_emit = expect_scene_graph(job_dir, cfg, eva_doc) if expect.get("scene_graph") in (None, "auto") \
                 else (expect.get("scene_graph") in ("emit", "present"))
     has_sg = sg_p.exists()
     if want_emit != has_sg:

@@ -8,4 +8,4 @@ git apply --3way --index patch3.patch
 git apply -v --reject patch2.patch
 
 git diff --staged
-git commit -m "Apply patches 1-3 from Codex"
+
