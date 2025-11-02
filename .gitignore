@@ -6,6 +6,7 @@ data/logs/
 general_documents/Sharedocs_forChatGPT
 backups/
 *.patch
+*.rej
 # Generated artifacts
 /jobs/
 # keep a placeholder if needed
