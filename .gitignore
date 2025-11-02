@@ -5,7 +5,7 @@ __pycache__/
 data/logs/
 general_documents/Sharedocs_forChatGPT
 backups/
-.patch
+*.patch
 # Generated artifacts
 /jobs/
 # keep a placeholder if needed
