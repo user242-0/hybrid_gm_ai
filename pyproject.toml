@@ -12,7 +12,7 @@ dev = [
   "pytest",
   "python-dotenv",
   "openai>=1.0",
-  "colorama"
+  "colorama",
   "PyYAML>=6.0" 
 ]
 
