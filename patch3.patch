@@ -1,0 +1,57 @@
+diff --git a/src/world.py b/src/world.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..13e6978eb801637d51277f7daac7fa0d99478c58
+--- /dev/null
++++ b/src/world.py
+@@ -0,0 +1,51 @@
++"""World state helpers for driving the in-game clock."""
++from __future__ import annotations
++
++from typing import Dict, Iterable, List
++
++TimeMessages = Iterable[str]
++
++
++def _ensure_clock(game_state: Dict) -> Dict[str, float]:
++    clock = game_state.setdefault("clock", {})
++    clock.setdefault("t", 0.0)  # hours in [0, 24)
++    clock.setdefault("dt", 0.5)  # hours advanced per tick
++    return clock
++
++
++def _phase_from_hour(hour: float) -> str:
++    hour %= 24.0
++    if 5 <= hour < 7:
++        return "dawn"
++    if 7 <= hour < 12:
++        return "morning"
++    if 12 <= hour < 17:
++        return "afternoon"
++    if 17 <= hour < 21:
++        return "evening"
++    return "night"
++
++
++def init_world(game_state: Dict) -> None:
++    """Initialise world level state on the provided ``game_state``."""
++    clock = _ensure_clock(game_state)
++    game_state["time_of_day"] = _phase_from_hour(clock.get("t", 0.0))
++
++
++def world_tick(game_state: Dict, dt: float | None = None) -> List[str]:
++    """Advance the world clock and emit log messages.
++
++    Returns a list of messages describing any notable world updates.
++    """
++    clock = _ensure_clock(game_state)
++    step = dt if dt is not None else clock.get("dt", 0.5)
++    clock["t"] = (clock.get("t", 0.0) + step) % 24.0
++
++    new_phase = _phase_from_hour(clock["t"])
++    messages: List[str] = []
++
++    if new_phase != game_state.get("time_of_day"):
++        game_state["time_of_day"] = new_phase
++        messages.append(f"[WORLD] The time shifts into {new_phase}.")
++
++    return messages

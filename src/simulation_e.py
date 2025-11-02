@@ -33,6 +33,7 @@ from queue import Empty        # ← 追加
 
 # 追加import
 from src.scheduler import Scheduler
+from src.world import init_world, world_tick
 from src.rc_ai import select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
@@ -63,6 +64,7 @@ conversation_manager = ConversationManager()
 # --- 起動時に Scheduler 用意 ---
 scheduler = Scheduler()
 game_state = init_game_state()    # ★ ここで一度だけ生成
+init_world(game_state)
 
 """
 # Luna への参照を取得
@@ -79,6 +81,16 @@ print("id in map  :", id(luna_from_map))
 
 def record(msg):
     log_q.put(msg)          # ← 旧 logger と二重にしても OK
+
+# ---------------- ワールド Tick コールバック ----------------
+def world_tick_cb(gs):
+    messages = world_tick(gs)
+    for msg in messages:
+        record(msg)
+
+    if gs.get("running", False):
+        delay = gs.get("clock", {}).get("dt", 0.5)
+        scheduler.register(world_tick_cb, delay, gs)
 
 # ---------------- RC Tick コールバック ----------------
 def rc_tick(rc_char, game_state):
@@ -123,6 +135,8 @@ def player_loop(gs):              # ← 引数で参照を受け取る
     # ① 全キャラをスケジューラに登録
     for ch in gs["party"].values():
         scheduler.register(rc_tick, 0.2, ch, gs)
+
+    scheduler.register(world_tick_cb, gs.get("clock", {}).get("dt", 0.5), gs)
 
     # ② メインループ
     while gs["running"]:
