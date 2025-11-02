@@ -50,7 +50,12 @@ def _evolve_weather(world: Dict) -> str | None:
 
     weather = world.setdefault(
         "weather",
-        {"condition": "clear", "intensity": "calm", "last_changed": 0},
+        {
+            "kind": "clear",
+            "condition": "clear",
+            "intensity": "calm",
+            "last_changed": 0,
+        },
     )
     cycle = [
         ("clear", "calm"),
@@ -66,6 +71,7 @@ def _evolve_weather(world: Dict) -> str | None:
 
     weather.update(
         {
+            "kind": condition,
             "condition": condition,
             "intensity": intensity,
             "last_changed": world["t_min"],
@@ -87,7 +93,12 @@ def init_world(game_state: Dict) -> None:
         "dt_per_action": 30,  # in-game minutes per player action
         "clock": _clock_from_minutes(6 * MINUTES_PER_HOUR),
         "time_of_day": "morning",
-        "weather": {"condition": "clear", "intensity": "calm", "last_changed": 0},
+        "weather": {
+            "kind": "clear",
+            "condition": "clear",
+            "intensity": "calm",
+            "last_changed": 0,
+        },
         "spatial": {"tile_size": 1, "positions": positions, "terrain": {}},
     }
     world["time_of_day"] = _derive_time_of_day(world["clock"])
