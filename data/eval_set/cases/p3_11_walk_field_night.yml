@@ -1,0 +1,11 @@
+# cases/p3_11_walk_field_night.yml
+ctx:
+  current_location: "フィールド"
+  time_of_day: "night"
+  has_enemy: false
+actor: "Hero"
+action: "walk"
+args: []
+expect:
+  emotion.salience: 0.3
+  scene_graph: "auto"
