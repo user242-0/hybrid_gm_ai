@@ -143,23 +143,36 @@ class DirectorHUD:
 
     def _tick(self) -> None:
         # HUD側の周期処理があればここで実行（軽く保つ）
-        self._drain_pending_calls()
-        try:
-            self.root.update_idletasks()
-            self.root.update()
-        except tk.TclError:
+        if not self._process_frame():
             return
         self.root.after(33, self._tick)
 
     def pump(self) -> None:
         """メインループ側から1ステップだけイベントを捌く"""
+        if threading.current_thread() is self._ui_thread:
+            self._process_frame()
+            return
+
+        done = threading.Event()
+
+        def request() -> None:
+            try:
+                self._process_frame()
+            finally:
+                done.set()
+
+        self._pending_calls.put(request)
+        done.wait(timeout=0.05)
+
+    def _process_frame(self) -> bool:
         self._drain_pending_calls()
         try:
             self.root.update_idletasks()
             self.root.update()
         except tk.TclError:
-            pass
-
+            return False
+        return True
+                
     def _run_or_enqueue(self, func: Callable[[], None]) -> None:
         if threading.current_thread() is self._ui_thread:
             func()
