@@ -23,7 +23,7 @@ from src.world import init_world, world_tick
 from src.rc_ai import select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
-from src.utility.config_loader import job_root_from_cfg
+from src.utility.config_loader import job_root_from_cfg, load_config
 from director.director import Director, load_yaml
 
 # execute_player_choice import
@@ -42,18 +42,41 @@ game_state = init_game_state()    # ★ ここで一度だけ生成
 init_world(game_state)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-PREMISE_DOC = load_yaml(str(BASE_DIR / "data/director/premise.yml")) or {}
-PREMISE = PREMISE_DOC.get("premise", {})
-GOALS = load_yaml(str(BASE_DIR / "data/director/cop_trickster_goals.yml")) or {}
-director = Director(premise=PREMISE, goals_dict=GOALS)
-_existing_world = game_state.get("director_world")
-if _existing_world:
-    director_world = _existing_world
-    director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
+
+cfg = load_config()
+director_cfg = cfg.get("director", {})
+director_enabled = bool(director_cfg.get("enabled", False))
+
+director = None
+director_world = None
+
+if director_enabled:
+    premise_path = Path(director_cfg.get("premise_path", "data/director/premise.yml"))
+    if not premise_path.is_absolute():
+        premise_path = BASE_DIR / premise_path
+    premise_doc = load_yaml(str(premise_path)) or {}
+    premise = premise_doc.get("premise", {})
+    goals_path = BASE_DIR / "data/director/cop_trickster_goals.yml"
+    goals = load_yaml(str(goals_path)) or {}
+    director = Director(premise=premise, goals_dict=goals)
+
+    existing_world = game_state.get("director_world")
+    if existing_world:
+        director_world = existing_world
+        director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
+    else:
+        director_world = director.synthesize_world()
+
+    game_state["director_world"] = director_world
+    game_state["director_micro_goal"] = None
+
+    seed_value = premise.get("seed", director_cfg.get("seed"))
+    title = premise.get("title", "")
+    print(f"[Director] enabled seed={seed_value} premise='{title}'")
 else:
-    director_world = director.synthesize_world()
-game_state["director_world"] = director_world
-game_state["director_micro_goal"] = None
+    game_state["director_world"] = None
+    game_state["director_micro_goal"] = None
+    print("[Director] disabled")
 
 """
 # Luna への参照を取得
@@ -163,7 +186,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
             pass
         actor = gs["active_char"]
         director_world = gs.get("director_world")
-        if director_world is not None:
+        if director is not None and director_world is not None:
             micro_goal = director.next_micro_goal(director_world)
             ui_show_micro(micro_goal, gs)
         num_choice_map = {}
@@ -205,7 +228,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         actor.is_npc = False                   # ← これを追加
         result = execute_player_choice(actor, cmd, gs)
 
-        if director_world is not None:
+        if director is not None and director_world is not None:
             scenes = director.tick(director_world)
             if scenes:
                 write_scenes_to_scene_graph(scenes)

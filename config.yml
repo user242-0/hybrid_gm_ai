@@ -12,3 +12,8 @@ datalab:
   emit_thresholds:
     salience_min: 0.60
     red_impulse_min: 0.50
+
+director:
+  enabled: true
+  seed: 41
+  premise_path: "data/director/premise.yml"

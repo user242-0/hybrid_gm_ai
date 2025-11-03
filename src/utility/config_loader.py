@@ -5,6 +5,16 @@ from pathlib import Path
 from typing import Optional
 
 _CFG = None
+
+
+def load_config(refresh: bool = False):
+    """Load the global YAML configuration as a dict."""
+    global _CFG
+    if refresh:
+        _CFG = None
+    return get_cfg()
+
+
 def get_cfg():
     global _CFG
     if _CFG is None:
