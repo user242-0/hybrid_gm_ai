@@ -1,0 +1,24 @@
+premise:
+  title: "落魄の刑事 vs 愉快犯"
+  seed: 41
+  roles:
+    protagonist:
+      archetype: "cop"
+      state: "burned_out"
+    antagonist:
+      archetype: "trickster_killer"
+      state: "at_large"
+  modes_enabled:
+    - "FREEZE"
+    - "FLEE"
+    - "PURSUE"
+    - "WITNESS"
+  tone:
+    - "neo-noir"
+    - "slow_burn"
+beats:
+  skeleton:
+    - "Inciting"
+    - "Rumination"
+    - "Escalation"
+    - "Climax"

@@ -1,6 +1,8 @@
 # simulation.py
 # ターゲット選択時に使う
 import random
+from pathlib import Path
+import yaml
 
 # ゲーム用モジュール
 from src.character_status import CharacterStatus
@@ -21,6 +23,8 @@ from src.world import init_world, world_tick
 from src.rc_ai import select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
+from src.utility.config_loader import job_root_from_cfg
+from director.director import Director, load_yaml
 
 # execute_player_choice import
 from src.simulation_utils import execute_player_choice
@@ -37,6 +41,20 @@ scheduler = Scheduler()
 game_state = init_game_state()    # ★ ここで一度だけ生成
 init_world(game_state)
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+PREMISE_DOC = load_yaml(str(BASE_DIR / "data/director/premise.yml")) or {}
+PREMISE = PREMISE_DOC.get("premise", {})
+GOALS = load_yaml(str(BASE_DIR / "data/director/cop_trickster_goals.yml")) or {}
+director = Director(premise=PREMISE, goals_dict=GOALS)
+_existing_world = game_state.get("director_world")
+if _existing_world:
+    director_world = _existing_world
+    director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
+else:
+    director_world = director.synthesize_world()
+game_state["director_world"] = director_world
+game_state["director_micro_goal"] = None
+
 """
 # Luna への参照を取得
 if isinstance(game_state["party"], dict):
@@ -52,6 +70,36 @@ print("id in map  :", id(luna_from_map))
 
 def record(msg):
     log_q.put(msg)          # ← 旧 logger と二重にしても OK
+
+
+def ui_show_micro(micro_goal, gs):
+    gs["director_micro_goal"] = micro_goal
+
+
+def write_scenes_to_scene_graph(scenes):
+    if not scenes:
+        return
+    job_root = Path(job_root_from_cfg())
+    sg_path = job_root / "scene_graph.yml"
+    sg_path.parent.mkdir(parents=True, exist_ok=True)
+    if sg_path.exists():
+        existing = yaml.safe_load(sg_path.read_text(encoding="utf-8")) or {}
+    else:
+        existing = {}
+    if not isinstance(existing, dict):
+        existing = {}
+    meta = existing.setdefault("meta", {})
+    entries = meta.setdefault("director_scenes", [])
+    for scene in scenes:
+        entries.append(
+            {
+                "intent": scene.get("intent"),
+                "why_now": scene.get("why_now"),
+                "salience": float(scene.get("salience", 0.0)),
+            }
+        )
+    sg_path.write_text(yaml.safe_dump(existing, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
 
 # ---------------- ワールド Tick コールバック ----------------
 def world_tick_cb(gs):
@@ -114,6 +162,11 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         while scheduler.run_once():          # due を全部消化
             pass
         actor = gs["active_char"]
+        director_world = gs.get("director_world")
+        if director_world is not None:
+            micro_goal = director.next_micro_goal(director_world)
+            ui_show_micro(micro_goal, gs)
+        num_choice_map = {}
         # ▼ CLI で直接 input() する場合（GUI を使わないモード）
         if USE_CLI:
             gs["input_pending"] = True
@@ -151,6 +204,11 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         # ★ プレイヤーが操作する瞬間に必ず手動フラグを立て直す
         actor.is_npc = False                   # ← これを追加
         result = execute_player_choice(actor, cmd, gs)
+
+        if director_world is not None:
+            scenes = director.tick(director_world)
+            if scenes:
+                write_scenes_to_scene_graph(scenes)
 
 
 

@@ -1,0 +1,46 @@
+modes:
+  FREEZE:
+    goals:
+      - type: "Avoid"
+        id: "keep_job"
+        condition: "entropy < 12 for 3d"
+      - type: "Meaning"
+        id: "witness_log"
+        condition: "victim_names_logged >= 3"
+    micro:
+      - "未読の通報を1件だけ確認"
+      - "本日の酒量を規定以下にする"
+      - "被害者の名前をノートに1人追記"
+
+  PURSUE:
+    goals:
+      - type: "Reach"
+        id: "arrest"
+        condition: "evidence_score >= 100"
+      - type: "Meaning"
+        id: "witness"
+        condition: "witness_value >= 3"
+    micro:
+      - "現場で青い繊維を1点採取"
+      - "監視カメラの時刻ズレを補正"
+      - "元相棒に5分だけ電話"
+
+  FLEE:
+    goals:
+      - type: "Reach"
+        id: "escape_dawn"
+        condition: "clock >= Day2 06:00"
+      - type: "Maintain"
+        id: "low_profile"
+        condition: "suspicion < 7 for 2d"
+    micro:
+      - "裏路地→高架下→駅裏へ移動"
+      - "顔を見られた店を避ける（タグ付け）"
+
+  WITNESS:
+    goals:
+      - type: "Meaning"
+        id: "testimony"
+        condition: "witness_value >= 5"
+    micro:
+      - "聞き込みで共通する手がかりを1つ見つける"

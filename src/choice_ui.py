@@ -1,6 +1,7 @@
 # --- choice_ui.py などに置く ---------------------------------------------------
-from src.event_bus            import log_q          # GUI 側へ表示を送る Queue
-from src.choice_definitions   import get_available_choices
+from src.event_bus import log_q  # GUI 側へ表示を送る Queue
+from src.choice_definitions import get_available_choices
+
 
 def present_choices(actor, game_state):
     """
@@ -22,26 +23,31 @@ def present_choices(actor, game_state):
 
     # ★ まず新しい手番開始を宣言（過去を消す）
     log_q.put({"mode": "turn", "reset": True})
+    log_q.put({"mode": "note", "reset": True})
 
     # 見出し
-    log_q.put({"mode":"turn", "text": f"=== {actor.name} の手番 ===", "tag": "header"})
-
+    log_q.put({"mode": "turn", "text": f"=== {actor.name} の手番 ===", "tag": "header"})
 
     # 各選択肢を「心×コマンドの強さ」で発色
-    player_color = getattr(actor, "emotion_color", (127,127,255))
+    player_color = getattr(actor, "emotion_color", (127, 127, 255))
     for i, ch in enumerate(choices, start=1):
-        r, g, b = ch.get_emotion_x_player_scaled_color(player_color)  # RGBが返る（0-255）  :contentReference[oaicite:4]{index=4}
-        log_q.put({
-            "mode":"turn",
-            "text": f"{i}. {ch.label}",
-            "tag": f"rgb:{r},{g},{b}",
-            })
+        r, g, b = ch.get_emotion_x_player_scaled_color(player_color)
+        log_q.put(
+            {
+                "mode": "turn",
+                "text": f"{i}. {ch.label}",
+                "tag": f"rgb:{r},{g},{b}",
+            }
+        )
         num_choice_map[i] = ch
 
     # 補足（色なし）
     log_q.put({"text": "番号を入力して決定（例: 1）", "mode": "turn"})
 
-    # ★ 追加：直前アクションの1行を “補足(α)” として毎回描画
+    micro_goal = game_state.get("director_micro_goal")
+    if micro_goal:
+        log_q.put({"mode": "note", "text": f"Micro Goal: {micro_goal}", "tag": "yellow"})
+
     note = game_state.get("last_action_note")
     if note:
         # 例: {"text":"[PLY] Hero ▶ switch_character Luna", "tag":"green"}

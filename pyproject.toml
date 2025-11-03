@@ -2,6 +2,9 @@
 name = "hybrid_gm_ai"     # パッケージ名
 version = "0.1.0"
 requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
