@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import queue
+import threading
 import tkinter as tk
 from typing import Callable, Optional
 
@@ -32,6 +34,8 @@ class DirectorHUD:
 
         self._frame: Optional[tk.Frame] = None
         self._running = False
+        self._ui_thread = threading.current_thread()
+        self._pending_calls: "queue.Queue[Callable[[], None]]" = queue.Queue()
 
         self._build()
         self._bind_keys()
@@ -102,11 +106,14 @@ class DirectorHUD:
         self.set_mode(mode)
 
     def set_mode(self, mode: str) -> None:
-        self.mode_var.set(mode)
-        color = MODE_COLORS.get(mode, MODE_COLORS["FREEZE"])
-        if not self._frame:
-            return
-        self._update_widget_bg(self._frame, color)
+        def apply() -> None:
+            self.mode_var.set(mode)
+            color = MODE_COLORS.get(mode, MODE_COLORS["FREEZE"])
+            if not self._frame:
+                return
+            self._update_widget_bg(self._frame, color)
+
+        self._run_or_enqueue(apply)
 
     def _update_widget_bg(self, widget: tk.Widget, color: str) -> None:
         try:
@@ -117,10 +124,10 @@ class DirectorHUD:
             self._update_widget_bg(child, color)
 
     def set_clock(self, clock_str: str) -> None:
-        self.clock_var.set(clock_str)
+        self._run_or_enqueue(lambda: self.clock_var.set(clock_str))
 
     def set_microgoal(self, text: Optional[str]) -> None:
-        self.micro_var.set(text or "(MicroGoal なし)")
+        self._run_or_enqueue(lambda: self.micro_var.set(text or "(MicroGoal なし)"))
 
     def run_async(self) -> None:
         """Start polling tkinter in the background."""
@@ -130,15 +137,19 @@ class DirectorHUD:
         self._tick()
 
     def destroy(self) -> None:
-        self._running = False
-        try:
-            self.root.destroy()
-        except tk.TclError:
-            pass
+        def tear_down() -> None:
+            self._running = False
+            try:
+                self.root.destroy()
+            except tk.TclError:
+                pass
+
+        self._run_or_enqueue(tear_down)
 
     def _tick(self) -> None:
         if not self._running:
             return
+        self._drain_pending_calls()
         try:
             self.root.update_idletasks()
             self.root.update()
@@ -146,3 +157,21 @@ class DirectorHUD:
             self._running = False
             return
         self.root.after(33, self._tick)
+
+    def _run_or_enqueue(self, func: Callable[[], None]) -> None:
+        if threading.current_thread() is self._ui_thread:
+            func()
+        else:
+            self._pending_calls.put(func)
+
+    def _drain_pending_calls(self) -> None:
+        while True:
+            try:
+                func = self._pending_calls.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                func()
+            except Exception:
+                # Avoid crashing the UI loop due to background errors.
+                pass

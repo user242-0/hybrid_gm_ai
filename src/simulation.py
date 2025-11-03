@@ -60,6 +60,24 @@ director_enabled = bool(director_cfg.get("enabled", False))
 director = None
 director_world = None
 director_hud = None
+director_hud = None
+
+
+def _director_clock_string(world: dict | None) -> str:
+    if not world:
+        return "Day1 08:00"
+    clock = world.get("clock")
+    if isinstance(clock, str):
+        return clock
+    if isinstance(clock, dict):
+        label = clock.get("label")
+        if label:
+            return str(label)
+        day = clock.get("day")
+        time = clock.get("time")
+        if day is not None and time is not None:
+            return f"Day{day} {time}"
+    return "Day1 08:00"
 
 if director_enabled:
     premise_path = Path(director_cfg.get("premise_path", "data/director/premise.yml"))
@@ -224,6 +242,7 @@ print("id in party:", id(luna_from_party))
 print("id in map  :", id(luna_from_map))
 """
 
+
 def record(msg):
     log_q.put(msg)          # ← 旧 logger と二重にしても OK
 
@@ -263,23 +282,6 @@ def _director_world_path() -> Path:
     job_root = Path(job_root_from_cfg())
     job_root.mkdir(parents=True, exist_ok=True)
     return job_root / "director_world.yml"
-
-
-def _director_clock_string(world: dict | None) -> str:
-    if not world:
-        return "Day1 08:00"
-    clock = world.get("clock")
-    if isinstance(clock, str):
-        return clock
-    if isinstance(clock, dict):
-        label = clock.get("label")
-        if label:
-            return str(label)
-        day = clock.get("day")
-        time = clock.get("time")
-        if day is not None and time is not None:
-            return f"Day{day} {time}"
-    return "Day1 08:00"
 
 
 def save_director_world(world: dict) -> None:
