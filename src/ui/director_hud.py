@@ -33,7 +33,6 @@ class DirectorHUD:
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
 
         self._frame: Optional[tk.Frame] = None
-        self._running = False
         self._ui_thread = threading.current_thread()
         self._pending_calls: "queue.Queue[Callable[[], None]]" = queue.Queue()
 
@@ -130,15 +129,11 @@ class DirectorHUD:
         self._run_or_enqueue(lambda: self.micro_var.set(text or "(MicroGoal なし)"))
 
     def run_async(self) -> None:
-        """Start polling tkinter in the background."""
-        if self._running:
-            return
-        self._running = True
-        self._tick()
+        # Tkの内部タイマーで自走。mainloopは使わない（協調ループ）
+        self.root.after(0, self._tick)
 
     def destroy(self) -> None:
         def tear_down() -> None:
-            self._running = False
             try:
                 self.root.destroy()
             except tk.TclError:
@@ -147,16 +142,23 @@ class DirectorHUD:
         self._run_or_enqueue(tear_down)
 
     def _tick(self) -> None:
-        if not self._running:
-            return
+        # HUD側の周期処理があればここで実行（軽く保つ）
         self._drain_pending_calls()
         try:
             self.root.update_idletasks()
             self.root.update()
         except tk.TclError:
-            self._running = False
             return
         self.root.after(33, self._tick)
+
+    def pump(self) -> None:
+        """メインループ側から1ステップだけイベントを捌く"""
+        self._drain_pending_calls()
+        try:
+            self.root.update_idletasks()
+            self.root.update()
+        except tk.TclError:
+            pass
 
     def _run_or_enqueue(self, func: Callable[[], None]) -> None:
         if threading.current_thread() is self._ui_thread:

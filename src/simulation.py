@@ -110,10 +110,10 @@ if director_enabled:
             director_hud = None
             print(f"[DirectorHUD] failed to initialize: {exc}")
         else:
+            director_hud.run_async()
             director_hud.set_mode(director.mode)
             director_hud.set_clock(_director_clock_string(director_world))
-            if game_state.get("director_micro_goal"):
-                director_hud.set_microgoal(game_state["director_micro_goal"])
+            director_hud.set_microgoal(game_state.get("director_micro_goal"))
 else:
     game_state["director_world"] = None
     game_state["director_micro_goal"] = None
@@ -165,7 +165,8 @@ if director_enabled and director_hud is not None:
             return
         micro = director.next_micro_goal(director_world)
         ui_show_micro(micro, game_state)
-        print(f"[UI] MicroGoal: {micro}")
+        micro_text = micro or "(MicroGoal なし)"
+        print(f"[UI] MicroGoal: {micro_text}")
 
 
     def on_auto_action() -> None:
@@ -227,7 +228,6 @@ if director_enabled and director_hud is not None:
     director_hud.on_save = on_save
     director_hud.on_load = on_load
     director_hud.on_show_micro = on_show_micro
-    director_hud.run_async()
 
 """
 # Luna への参照を取得
@@ -366,7 +366,8 @@ def player_loop(gs):              # ← 引数で参照を受け取る
     # ② メインループ
     while gs["running"]:
         while scheduler.run_once():          # due を全部消化
-            pass
+            if director_hud is not None:
+                director_hud.pump()
         actor = gs["active_char"]
         director_world = gs.get("director_world")
         if director is not None and director_world is not None:
@@ -376,6 +377,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
                 director_hud.set_mode(director.mode)
                 director_hud.set_clock(_director_clock_string(director_world))
         num_choice_map = {}
+        command_ready = False
         # ▼ CLI で直接 input() する場合（GUI を使わないモード）
         if USE_CLI:
             gs["input_pending"] = True
@@ -383,6 +385,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
             gs["input_pending"] = False
             handle_quit(raw, gs)          # ★ ここで判定
             cmd = raw                     # → 後続処理へ
+            command_ready = True
 
         # ▼ GUI モード：Entry から event_q を受信
         else:
@@ -390,12 +393,21 @@ def player_loop(gs):              # ← 引数で参照を受け取る
             try:
                 num_choice_map = present_choices(actor, gs)     # ← dict を受け取る
                 cmd = event_q.get(timeout=0.05)
+                command_ready = True
             except Empty:
+                if director_hud is not None:
+                    director_hud.pump()
+                time.sleep(0.01)
                 continue
             finally:
                 gs["input_pending"] = False
             handle_quit(cmd, gs)          # ★ ここでも同じ
-        
+
+        if not command_ready:
+            if director_hud is not None:
+                director_hud.pump()
+            time.sleep(0.01)
+            continue
 
         # 数字入力なら Choice に変換
         if cmd.isdigit():
@@ -429,10 +441,14 @@ def player_loop(gs):              # ← 引数で参照を受け取る
             scheduler.register(rc_tick, 0.01, result, gs)
         # flush AI 行動
         while scheduler.run_once() is not None:
-            pass
+            if director_hud is not None:
+                director_hud.pump()
 
         # 操作キャラが変わっている可能性があるので再表示
         present_choices(gs["active_char"], gs)
+        if director_hud is not None:
+            director_hud.pump()
+        time.sleep(0.01)
 
 def choose_target_for_switch(rc_char, game_state):
     """
