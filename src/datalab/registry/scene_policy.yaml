@@ -6,99 +6,99 @@ defaults:
   lighting:
     text: ''
 rules:
-- when:
-    action:
-    - swing_sword
-    - 攻撃する
-    location: 洞窟
-    time: night
-  theme: 暗い洞窟での剣の一閃
-  background: dark cave interior, wet rocks, narrow passage, hanging stalactites
-  camera: 35mm low angle close-up, dynamic perspective, slight motion blur trails
-  lighting: torchlight warm bounce, cool blue rim from darkness, high contrast
-- when:
-    action:
-    - swing_sword
-    - 攻撃する
-    location: フィールド
-    time: dusk
-  theme: 夕暮れの野での剣の一閃
-  background: open grass field at sunset, golden hour, long shadows, distant mountains
-  camera: 85mm medium telephoto, chest-height, rule-of-thirds framing
-  lighting: backlit sun, warm rim light, slight volumetric rays, dust motes
-  priority: 2
-- when:
-    action: swing_sword
-    location: 祭壇
-  theme: 祭壇での稽古
-  background: ancient altar under moonlight
-  loras:
-  - ferlon_style_v1
-  objects:
-  - name: '{actor}'
-    category: character
-    base_prompt: chibi knight in plate armor
-    action: swing_sword
-    pose:
-      kind: skeleton
-      ref: controls/poses/swing_A.json
-    materials_hint:
-    - steel_brushed
-    - leather_soft
-- when:
-    action: swing_sword
-  theme: 剣の稽古
-  background: torch-lit stone corridor
-  loras:
-  - ferlon_style_v1
-  objects:
-  - name: '{actor}'
-    category: character
-    base_prompt: knight in plate armor
-    action: swing_sword
-    pose:
-      kind: skeleton
-      ref: controls/poses/swing_A.json
-    materials_hint:
-    - steel_brushed
-    - leather_soft
-- when:
-    action: 攻撃する
-    relation_label: 敵対
-  camera:
-    shot: close
-  loras:
-  - gritty_v2
-- when:
-    action: talk_to_statue
-    location: 祭壇
-    time: day
-  theme: 真昼の祭壇
-  background: ancient altar at day
-  camera:
-    shot: mid
-  loras:
-  - mystic_soft_v1
-  objects:
-  - name: '{actor}'
-    category: character
-    base_prompt: pilgrim speaking to an ancient statue
-    action: talk_to_statue
-- when:
-    action:
-    - talk_to_statue
-    - 石像に話す
-    location: 祭壇
-    time: night
-  theme: 月下の祭壇
-  background: ancient altar under moonlight
-  camera:
-    shot: mid
-  loras:
-  - mystic_soft_v1
-  objects:
-  - name: '{actor}'
-    category: character
-    base_prompt: pilgrim speaking to an ancient statue
-    action: talk_to_statue
-  priority: 3
+  - when:
+      action:
+        - swing_sword
+        - 攻撃する
+      location: 洞窟
+      time: night
+    theme: 暗い洞窟での剣の一閃
+    background: dark cave interior, wet rocks, narrow passage, hanging stalactites
+    camera: 35mm low angle close-up, dynamic perspective, slight motion blur trails
+    lighting: torchlight warm bounce, cool blue rim from darkness, high contrast
+  - when:
+      action:
+        - swing_sword
+        - 攻撃する
+      location: フィールド
+      time: dusk
+    theme: 夕暮れの野での剣の一閃
+    background: open grass field at sunset, golden hour, long shadows, distant mountains
+    camera: 85mm medium telephoto, chest-height, rule-of-thirds framing
+    lighting: backlit sun, warm rim light, slight volumetric rays, dust motes
+    priority: 2
+  - when:
+      action: swing_sword
+      location: 祭壇
+    theme: 祭壇での稽古
+    background: ancient altar under moonlight
+    loras:
+      - ferlon_style_v1
+    objects:
+      - name: '{actor}'
+        category: character
+        base_prompt: chibi knight in plate armor
+        action: swing_sword
+        pose:
+          kind: skeleton
+          ref: controls/poses/swing_A.json
+        materials_hint:
+          - steel_brushed
+          - leather_soft
+  - when:
+      action: swing_sword
+    theme: 剣の稽古
+    background: torch-lit stone corridor
+    loras:
+      - ferlon_style_v1
+    objects:
+      - name: '{actor}'
+        category: character
+        base_prompt: knight in plate armor
+        action: swing_sword
+        pose:
+          kind: skeleton
+          ref: controls/poses/swing_A.json
+        materials_hint:
+          - steel_brushed
+          - leather_soft
+  - when:
+      action: 攻撃する
+      relation_label: 敵対
+    camera:
+      shot: close
+    loras:
+      - gritty_v2
+  - when:
+      action: talk_to_statue
+      location: 祭壇
+      time: day
+    theme: 真昼の祭壇
+    background: ancient altar at day
+    camera:
+      shot: mid
+    loras:
+      - mystic_soft_v1
+    objects:
+      - name: '{actor}'
+        category: character
+        base_prompt: pilgrim speaking to an ancient statue
+        action: talk_to_statue
+  - when:
+      action:
+        - talk_to_statue
+        - 石像に話す
+      location: 祭壇
+      time: night
+    theme: 月下の祭壇
+    background: ancient altar under moonlight
+    camera:
+      shot: mid
+    loras:
+      - mystic_soft_v1
+    objects:
+      - name: '{actor}'
+        category: character
+        base_prompt: pilgrim speaking to an ancient statue
+        action: talk_to_statue
+    priority: 3
