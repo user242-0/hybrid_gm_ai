@@ -155,12 +155,24 @@ class DirectorHUD:
 
     def pump(self) -> None:
         """メインループ側から1ステップだけイベントを捌く"""
-        if threading.current_thread() is self._ui_thread:
+        if threading.current_thread() is not self._ui_thread:
+            self.request_update()
             return
         try:
             self._process_frame()
-        except tk.TclError:
+        except (tk.TclError, RuntimeError):
             pass
+
+    def request_update(self) -> None:
+        """Ensure the next UI pump runs on the Tk thread."""
+        if threading.current_thread() is self._ui_thread:
+            try:
+                self._process_frame()
+            except (tk.TclError, RuntimeError):
+                pass
+            return
+        # 他スレッドからは安全に処理をキューへ投げる
+        self._pending_calls.put(lambda: None)
 
     def _process_frame(self) -> bool:
         self._drain_pending_calls()

@@ -119,6 +119,15 @@ else:
     game_state["director_micro_goal"] = None
     print("[Director] disabled")
 
+
+def _pump_director_hud() -> None:
+    if director_hud is None:
+        return
+    if threading.current_thread() is threading.main_thread():
+        director_hud.pump()
+    else:
+        director_hud.request_update()
+
 if director_enabled and director_hud is not None:
 
     def _hud_adjust_value(path, delta, *, minimum=None, maximum=None):
@@ -405,7 +414,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
 
         if not command_ready:
             if director_hud is not None:
-                director_hud.pump()
+                _pump_director_hud()
             time.sleep(0.01)
             continue
 
@@ -442,12 +451,12 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         # flush AI 行動
         while scheduler.run_once() is not None:
             if director_hud is not None:
-                director_hud.pump()
+                _pump_director_hud()
 
         # 操作キャラが変わっている可能性があるので再表示
         present_choices(gs["active_char"], gs)
         if director_hud is not None:
-            director_hud.pump()
+            _pump_director_hud()
         time.sleep(0.01)
 
 def choose_target_for_switch(rc_char, game_state):
@@ -477,7 +486,7 @@ if __name__ == "__main__":
     try:
         while gs["running"]:
             if director_hud is not None:
-                director_hud.pump()
+                _pump_director_hud()
             time.sleep(0.01)
     except SystemExit:
         pass                        # どこかのスレッドで raise SystemExit 渡ってきたら即終了
