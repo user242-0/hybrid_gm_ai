@@ -26,6 +26,16 @@ from src.utility.args_parser import parse_args
 from src.utility.config_loader import job_root_from_cfg, load_config
 from director.director import Director, load_yaml
 
+try:
+    from tkinter import TclError
+except ImportError:  # pragma: no cover - tkinter may be missing in headless environments
+    TclError = Exception  # type: ignore
+
+try:
+    from src.ui.director_hud import DirectorHUD
+except ImportError:  # pragma: no cover - optional dependency
+    DirectorHUD = None  # type: ignore
+
 # execute_player_choice import
 from src.simulation_utils import execute_player_choice
 from src.choice_ui import present_choices
@@ -49,6 +59,7 @@ director_enabled = bool(director_cfg.get("enabled", False))
 
 director = None
 director_world = None
+director_hud = None
 
 if director_enabled:
     premise_path = Path(director_cfg.get("premise_path", "data/director/premise.yml"))
@@ -73,10 +84,132 @@ if director_enabled:
     seed_value = premise.get("seed", director_cfg.get("seed"))
     title = premise.get("title", "")
     print(f"[Director] enabled seed={seed_value} premise='{title}'")
+
+    if DirectorHUD is not None:
+        try:
+            director_hud = DirectorHUD(title="Director HUD")
+        except TclError as exc:  # pragma: no cover - GUI unavailable
+            director_hud = None
+            print(f"[DirectorHUD] failed to initialize: {exc}")
+        else:
+            director_hud.set_mode(director.mode)
+            director_hud.set_clock(_director_clock_string(director_world))
+            if game_state.get("director_micro_goal"):
+                director_hud.set_microgoal(game_state["director_micro_goal"])
 else:
     game_state["director_world"] = None
     game_state["director_micro_goal"] = None
     print("[Director] disabled")
+
+if director_enabled and director_hud is not None:
+
+    def _hud_adjust_value(path, delta, *, minimum=None, maximum=None):
+        node = director_world
+        if node is None:
+            return
+        for key in path[:-1]:
+            if not isinstance(node, dict):
+                return
+            node = node.get(key)
+        if not isinstance(node, dict):
+            return
+        leaf_key = path[-1]
+        value = node.get(leaf_key, 0)
+        if not isinstance(value, (int, float)):
+            return
+        new_value = value + delta
+        if minimum is not None:
+            new_value = max(minimum, new_value)
+        if maximum is not None:
+            new_value = min(maximum, new_value)
+        node[leaf_key] = new_value
+
+
+    def _hud_get(path):
+        node = director_world
+        if node is None:
+            return None
+        for key in path:
+            if not isinstance(node, dict):
+                return None
+            node = node.get(key)
+        return node
+
+
+    def on_mode_change(new_mode: str) -> None:
+        director.mode = new_mode
+        director_hud.set_mode(new_mode)
+        print(f"[Director] mode -> {new_mode}")
+
+
+    def on_show_micro() -> None:
+        if director_world is None:
+            return
+        micro = director.next_micro_goal(director_world)
+        ui_show_micro(micro, game_state)
+        print(f"[UI] MicroGoal: {micro}")
+
+
+    def on_auto_action() -> None:
+        if director_world is None:
+            return
+        if director.mode == "FREEZE":
+            _hud_adjust_value(["entropy", "value"], -1, minimum=0)
+            if isinstance(director_world, dict):
+                director_world["sobriety_days"] = director_world.get("sobriety_days", 0) + 1
+        elif director.mode == "PURSUE":
+            max_heat = _hud_get(["case_heat", "max"])
+            _hud_adjust_value(["case_heat", "value"], 1, maximum=max_heat)
+            if isinstance(director_world, dict):
+                director_world["evidence_score"] = director_world.get("evidence_score", 0) + 10
+        elif director.mode == "FLEE":
+            _hud_adjust_value(["suspicion", "value"], -1, minimum=0)
+        elif director.mode == "WITNESS":
+            if isinstance(director_world, dict):
+                director_world["report_submitted"] = director_world.get("report_submitted", 0) + 1
+
+        scenes = director.tick(director_world)
+        if scenes:
+            write_scenes_to_scene_graph(scenes)
+            for scene in scenes:
+                print(
+                    f"[SCENE] intent={scene.get('intent')} why_now={scene.get('why_now')} "
+                    f"salience={scene.get('salience')}"
+                )
+        director_hud.set_clock(_director_clock_string(director_world))
+        on_show_micro()
+
+
+    def on_save() -> None:
+        if director_world is None:
+            return
+        save_director_world(director_world)
+        print("[SAVE] world saved")
+
+
+    def on_load() -> None:
+        global director_world
+        loaded = load_director_world(director_world)
+        if loaded is None:
+            return
+        director_world = loaded
+        if isinstance(director_world, dict):
+            director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
+        game_state["director_world"] = director_world
+        director_hud.set_clock(_director_clock_string(director_world))
+        on_show_micro()
+        reload_epoch = (
+            director_world.get("reload_epoch") if isinstance(director_world, dict) else None
+        )
+        print(f"[LOAD] world loaded; reload_epoch={reload_epoch}")
+
+
+    director_hud.on_mode_change = on_mode_change
+    director_hud.on_auto_action = on_auto_action
+    director_hud.on_save = on_save
+    director_hud.on_load = on_load
+    director_hud.on_show_micro = on_show_micro
+    director_hud.run_async()
 
 """
 # Luna への参照を取得
@@ -97,6 +230,8 @@ def record(msg):
 
 def ui_show_micro(micro_goal, gs):
     gs["director_micro_goal"] = micro_goal
+    if director_hud is not None:
+        director_hud.set_microgoal(micro_goal)
 
 
 def write_scenes_to_scene_graph(scenes):
@@ -122,6 +257,52 @@ def write_scenes_to_scene_graph(scenes):
             }
         )
     sg_path.write_text(yaml.safe_dump(existing, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+
+def _director_world_path() -> Path:
+    job_root = Path(job_root_from_cfg())
+    job_root.mkdir(parents=True, exist_ok=True)
+    return job_root / "director_world.yml"
+
+
+def _director_clock_string(world: dict | None) -> str:
+    if not world:
+        return "Day1 08:00"
+    clock = world.get("clock")
+    if isinstance(clock, str):
+        return clock
+    if isinstance(clock, dict):
+        label = clock.get("label")
+        if label:
+            return str(label)
+        day = clock.get("day")
+        time = clock.get("time")
+        if day is not None and time is not None:
+            return f"Day{day} {time}"
+    return "Day1 08:00"
+
+
+def save_director_world(world: dict) -> None:
+    path = _director_world_path()
+    try:
+        path.write_text(
+            yaml.safe_dump(world, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+    except Exception as exc:  # pragma: no cover - logging only
+        print(f"[SAVE] failed to persist director world: {exc}")
+
+
+def load_director_world(fallback: dict | None) -> dict | None:
+    path = _director_world_path()
+    if not path.exists():
+        return fallback
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - logging only
+        print(f"[LOAD] failed to restore director world: {exc}")
+        return fallback
+    return loaded if isinstance(loaded, dict) else fallback
 
 
 # ---------------- ワールド Tick コールバック ----------------
@@ -189,6 +370,9 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         if director is not None and director_world is not None:
             micro_goal = director.next_micro_goal(director_world)
             ui_show_micro(micro_goal, gs)
+            if director_hud is not None:
+                director_hud.set_mode(director.mode)
+                director_hud.set_clock(_director_clock_string(director_world))
         num_choice_map = {}
         # ▼ CLI で直接 input() する場合（GUI を使わないモード）
         if USE_CLI:
@@ -232,6 +416,8 @@ def player_loop(gs):              # ← 引数で参照を受け取る
             scenes = director.tick(director_world)
             if scenes:
                 write_scenes_to_scene_graph(scenes)
+            if director_hud is not None:
+                director_hud.set_clock(_director_clock_string(director_world))
 
 
 
