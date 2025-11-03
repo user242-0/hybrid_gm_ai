@@ -476,7 +476,9 @@ if __name__ == "__main__":
     # メインスレッドは生存維持だけ
     try:
         while gs["running"]:
-            time.sleep(1)
+            if director_hud is not None:
+                director_hud.pump()
+            time.sleep(0.01)
     except SystemExit:
         pass                        # どこかのスレッドで raise SystemExit 渡ってきたら即終了
 

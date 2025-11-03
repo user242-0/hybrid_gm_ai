@@ -130,8 +130,14 @@ class DirectorHUD:
 
     def run_async(self) -> None:
         # Tkの内部タイマーで自走。mainloopは使わない（協調ループ）
+        # 1度だけ即座にフレーム処理しておくとウインドウが早く表示される。
+        try:
+            if threading.current_thread() is self._ui_thread:
+                self._process_frame()
+        except tk.TclError:
+            return
         self.root.after(0, self._tick)
-
+        
     def destroy(self) -> None:
         def tear_down() -> None:
             try:
@@ -150,19 +156,11 @@ class DirectorHUD:
     def pump(self) -> None:
         """メインループ側から1ステップだけイベントを捌く"""
         if threading.current_thread() is self._ui_thread:
-            self._process_frame()
             return
-
-        done = threading.Event()
-
-        def request() -> None:
-            try:
-                self._process_frame()
-            finally:
-                done.set()
-
-        self._pending_calls.put(request)
-        done.wait(timeout=0.05)
+        try:
+            self._process_frame()
+        except tk.TclError:
+            pass
 
     def _process_frame(self) -> bool:
         self._drain_pending_calls()
