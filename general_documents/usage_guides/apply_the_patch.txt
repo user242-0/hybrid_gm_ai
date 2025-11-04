@@ -9,3 +9,15 @@ git apply -v --reject patch1.patch
 
 git diff --staged
 
+===別パターン（こっちのが楽かも）==========================
+# 念のため最新を取り込む（追従先があるなら）
+git pull --rebase --autostash || true
+
+# パッチ適用：まずは 3-way + 再カウント + 空白差無視 を試す
+git apply --3way --recount --ignore-space-change --index patch1.patch
+#これで何も出ずに戻ってきたら 成功（git status に変更が載る）。
+
+#失敗したら、コンフリクトが付いたファイルを開いて <<<<<<< マーカーを解消し、下を実行：
+# 競合解消後
+git add -A
+git commit -m "apply: patch1 (3-way merge from Codex diff)"

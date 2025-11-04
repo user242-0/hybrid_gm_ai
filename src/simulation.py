@@ -128,6 +128,13 @@ def _pump_director_hud() -> None:
     else:
         director_hud.request_update()
 
+
+def ui_show_micro(micro_goal, gs):
+    gs["director_micro_goal"] = micro_goal
+    if director_hud is not None:
+        director_hud.set_microgoal(micro_goal)
+
+
 if director_enabled and director_hud is not None:
 
     def _hud_adjust_value(path, delta, *, minimum=None, maximum=None):
@@ -154,21 +161,33 @@ if director_enabled and director_hud is not None:
 
     def on_mode_change(new_mode: str) -> None:
         director.mode = new_mode
+<<<<<<< ours
         director.clear_micro_goal(new_mode)
         director_hud.set_mode(new_mode)
         print(f"[Director] mode -> {new_mode}")
         on_show_micro()
+=======
+        director.clear_micro_goal(new_mode)
+        director_hud.set_mode(new_mode)
+        print(f"[Director] mode -> {new_mode}")
+        on_show_micro()
+>>>>>>> theirs
 
 
     def on_show_micro() -> None:
         if director_world is None:
             return
+<<<<<<< ours
         micro = director.get_micro_goal(director_world, reroll=False)
+=======
+        micro = director.get_micro_goal(director_world, reroll=False)
+>>>>>>> theirs
         ui_show_micro(micro, game_state)
         micro_text = micro or "(MicroGoal なし)"
         print(f"[UI] MicroGoal: {micro_text}")
 
 
+<<<<<<< ours
     def on_reroll() -> None:
         if director_world is None:
             return
@@ -182,6 +201,21 @@ if director_enabled and director_hud is not None:
         if director_world is None:
             return
         director.apply_auto_step(director_world)
+=======
+    def on_reroll() -> None:
+        if director_world is None:
+            return
+        micro = director.get_micro_goal(director_world, reroll=True)
+        ui_show_micro(micro, game_state)
+        micro_text = micro or "(MicroGoal なし)"
+        print(f"[UI] MicroGoal (reroll): {micro_text}")
+
+
+    def on_auto_action() -> None:
+        if director_world is None:
+            return
+        director.apply_auto_step(director_world)
+>>>>>>> theirs
         scenes = director.tick(director_world)
         if scenes:
             write_scenes_to_scene_graph(scenes)
@@ -191,8 +225,13 @@ if director_enabled and director_hud is not None:
                     f"salience={scene.get('salience')}"
                 )
         director_hud.set_clock(_director_clock_string(director_world))
+<<<<<<< ours
         if director.is_micro_goal_done(director_world):
             director.clear_micro_goal()
+=======
+        if director.is_micro_goal_done(director_world):
+            director.clear_micro_goal()
+>>>>>>> theirs
         on_show_micro()
 
 
@@ -213,7 +252,11 @@ if director_enabled and director_hud is not None:
             director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
         game_state["director_world"] = director_world
         director_hud.set_clock(_director_clock_string(director_world))
+<<<<<<< ours
         director.clear_micro_goal()
+=======
+        director.clear_micro_goal()
+>>>>>>> theirs
         on_show_micro()
         reload_epoch = (
             director_world.get("reload_epoch") if isinstance(director_world, dict) else None
@@ -223,11 +266,19 @@ if director_enabled and director_hud is not None:
 
     director_hud.on_mode_change = on_mode_change
     director_hud.on_auto_action = on_auto_action
+<<<<<<< ours
     director_hud.on_reroll = on_reroll
     director_hud.on_save = on_save
     director_hud.on_load = on_load
     director_hud.on_show_micro = on_show_micro
     on_show_micro()
+=======
+    director_hud.on_reroll = on_reroll
+    director_hud.on_save = on_save
+    director_hud.on_load = on_load
+    director_hud.on_show_micro = on_show_micro
+    on_show_micro()
+>>>>>>> theirs
 
 """
 # Luna への参照を取得
@@ -245,12 +296,6 @@ print("id in map  :", id(luna_from_map))
 
 def record(msg):
     log_q.put(msg)          # ← 旧 logger と二重にしても OK
-
-
-def ui_show_micro(micro_goal, gs):
-    gs["director_micro_goal"] = micro_goal
-    if director_hud is not None:
-        director_hud.set_microgoal(micro_goal)
 
 
 def write_scenes_to_scene_graph(scenes):
@@ -371,7 +416,11 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         actor = gs["active_char"]
         director_world = gs.get("director_world")
         if director is not None and director_world is not None:
+<<<<<<< ours
             micro_goal = director.get_micro_goal(director_world, reroll=False)
+=======
+            micro_goal = director.get_micro_goal(director_world, reroll=False)
+>>>>>>> theirs
             ui_show_micro(micro_goal, gs)
             if director_hud is not None:
                 director_hud.set_mode(director.mode)

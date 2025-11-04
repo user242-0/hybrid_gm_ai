@@ -24,6 +24,7 @@ class DirectorHUD:
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
         self.on_auto_action: Optional[Callable[[], None]] = None
+        self.on_reroll: Optional[Callable[[], None]] = None
         self.on_save: Optional[Callable[[], None]] = None
         self.on_load: Optional[Callable[[], None]] = None
         self.on_show_micro: Optional[Callable[[], None]] = None
@@ -79,7 +80,10 @@ class DirectorHUD:
         row3.pack(fill="x", **pad)
         tk.Label(
             row3,
-            text="[Keys] 1:FREEZE 2:FLEE 3:PURSUE 4:WITNESS | G:Show Micro | A:Auto | S:Save L:Load",
+            text=(
+                "[Keys] 1:FREEZE 2:FLEE 3:PURSUE 4:WITNESS | G:Show Micro | R:Reroll Micro "
+                "| A:Auto | S:Save L:Load"
+            ),
             fg="white",
             bg=frame["bg"],
         ).pack(side="left")
@@ -88,6 +92,8 @@ class DirectorHUD:
         root = self.root
         root.bind("<Key-g>", lambda _: self.on_show_micro and self.on_show_micro())
         root.bind("<Key-G>", lambda _: self.on_show_micro and self.on_show_micro())
+        root.bind("<Key-r>", lambda _: self.on_reroll and self.on_reroll())
+        root.bind("<Key-R>", lambda _: self.on_reroll and self.on_reroll())
         root.bind("<Key-1>", lambda _: self._emit_mode("FREEZE"))
         root.bind("<Key-2>", lambda _: self._emit_mode("FLEE"))
         root.bind("<Key-3>", lambda _: self._emit_mode("PURSUE"))
