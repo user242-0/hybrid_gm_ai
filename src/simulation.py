@@ -152,50 +152,36 @@ if director_enabled and director_hud is not None:
         node[leaf_key] = new_value
 
 
-    def _hud_get(path):
-        node = director_world
-        if node is None:
-            return None
-        for key in path:
-            if not isinstance(node, dict):
-                return None
-            node = node.get(key)
-        return node
-
-
     def on_mode_change(new_mode: str) -> None:
         director.mode = new_mode
+        director.clear_micro_goal(new_mode)
         director_hud.set_mode(new_mode)
         print(f"[Director] mode -> {new_mode}")
+        on_show_micro()
 
 
     def on_show_micro() -> None:
         if director_world is None:
             return
-        micro = director.next_micro_goal(director_world)
+        micro = director.get_micro_goal(director_world, reroll=False)
         ui_show_micro(micro, game_state)
         micro_text = micro or "(MicroGoal なし)"
         print(f"[UI] MicroGoal: {micro_text}")
 
 
+    def on_reroll() -> None:
+        if director_world is None:
+            return
+        micro = director.get_micro_goal(director_world, reroll=True)
+        ui_show_micro(micro, game_state)
+        micro_text = micro or "(MicroGoal なし)"
+        print(f"[UI] MicroGoal (reroll): {micro_text}")
+
+
     def on_auto_action() -> None:
         if director_world is None:
             return
-        if director.mode == "FREEZE":
-            _hud_adjust_value(["entropy", "value"], -1, minimum=0)
-            if isinstance(director_world, dict):
-                director_world["sobriety_days"] = director_world.get("sobriety_days", 0) + 1
-        elif director.mode == "PURSUE":
-            max_heat = _hud_get(["case_heat", "max"])
-            _hud_adjust_value(["case_heat", "value"], 1, maximum=max_heat)
-            if isinstance(director_world, dict):
-                director_world["evidence_score"] = director_world.get("evidence_score", 0) + 10
-        elif director.mode == "FLEE":
-            _hud_adjust_value(["suspicion", "value"], -1, minimum=0)
-        elif director.mode == "WITNESS":
-            if isinstance(director_world, dict):
-                director_world["report_submitted"] = director_world.get("report_submitted", 0) + 1
-
+        director.apply_auto_step(director_world)
         scenes = director.tick(director_world)
         if scenes:
             write_scenes_to_scene_graph(scenes)
@@ -205,6 +191,8 @@ if director_enabled and director_hud is not None:
                     f"salience={scene.get('salience')}"
                 )
         director_hud.set_clock(_director_clock_string(director_world))
+        if director.is_micro_goal_done(director_world):
+            director.clear_micro_goal()
         on_show_micro()
 
 
@@ -225,6 +213,7 @@ if director_enabled and director_hud is not None:
             director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
         game_state["director_world"] = director_world
         director_hud.set_clock(_director_clock_string(director_world))
+        director.clear_micro_goal()
         on_show_micro()
         reload_epoch = (
             director_world.get("reload_epoch") if isinstance(director_world, dict) else None
@@ -234,9 +223,11 @@ if director_enabled and director_hud is not None:
 
     director_hud.on_mode_change = on_mode_change
     director_hud.on_auto_action = on_auto_action
+    director_hud.on_reroll = on_reroll
     director_hud.on_save = on_save
     director_hud.on_load = on_load
     director_hud.on_show_micro = on_show_micro
+    on_show_micro()
 
 """
 # Luna への参照を取得
@@ -380,7 +371,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         actor = gs["active_char"]
         director_world = gs.get("director_world")
         if director is not None and director_world is not None:
-            micro_goal = director.next_micro_goal(director_world)
+            micro_goal = director.get_micro_goal(director_world, reroll=False)
             ui_show_micro(micro_goal, gs)
             if director_hud is not None:
                 director_hud.set_mode(director.mode)
