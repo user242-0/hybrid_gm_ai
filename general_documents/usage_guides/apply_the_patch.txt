@@ -21,3 +21,34 @@ git apply --3way --recount --ignore-space-change --index patch1.patch
 # 競合解消後
 git add -A
 git commit -m "apply: patch1 (3-way merge from Codex diff)"
+
+(補足)
+結論だけ先に👇
+**「Current change（現在/ours）」＝いま手元にあるコード**
+**「Incoming change（受け入れ/theirs）」＝パッチ（patch1.patch）側の変更**
+
+なので、**“新しいパッチの内容”は Incoming change** です。
+パッチをそのまま反映したいなら「Accept Incoming Change」。両方必要なら「Accept Both」。
+
+---
+
+### もう少しだけ補足
+
+* 生のコンフリクトマーカーではこう見えます：
+
+  ```
+  <<<<<<< CURRENT (ours)
+  # 手元のコード
+  =======
+  # パッチ（incoming/theirs）
+  >>>>>>> INCOMING (theirs)
+  ```
+* `git apply --reject` を使った場合は本来 `.rej` に“当てられなかった（＝incoming）差分”が落ちます。エディタが「Current/Incoming」を出しているのは、以前の `--3way` の結果や別のマージで**コンフリクトマーカーが入った状態**だからです。
+  その場合は、**Incoming がパッチ側**だと覚えておけばOK。
+
+### どちらを採るべき？
+
+* **基本は Incoming（パッチ）を採用** → その後で必要な手元の改変を再適用 or 手でマージ。
+* 手元の変更も重要なら **Accept Both** → 重複やロジックの齟齬を手で整えてから `git add` → `git commit`。
+
+必要なら、その衝突箇所を貼ってくれれば、どこを残すかまで具体的に指示するよ。
