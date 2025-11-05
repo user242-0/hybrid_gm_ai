@@ -30,6 +30,10 @@ class Director:
         self._micro_baseline: Dict[str, Dict[str, Any]] = {
             key: {} for key in self._micro_cache.keys()
         }
+        self._recent_micro_ids: Dict[str, List[str]] = {
+            key: [] for key in self._micro_cache.keys()
+        }
+        self._recent_k: int = 3
 
     def synthesize_world(self) -> Dict[str, Any]:
         """最小の初期ワールド。数値は演出・分岐用（難度は弄らない）。"""
@@ -55,14 +59,33 @@ class Director:
         """Backwards compatible helper that always re-rolls."""
         return self.get_micro_goal(world, reroll=True)
 
+    def _micro_id(self, value: str) -> str:
+        import hashlib
+
+        return hashlib.md5(value.encode("utf-8")).hexdigest()[:8]
+
     def get_micro_goal(self, world: Dict[str, Any], reroll: bool = False) -> str:
         mode = self.mode
         if reroll or not self._micro_cache.get(mode):
             bucket = self.goals_dict.get("modes", {}).get(mode, {})
             items = bucket.get("micro", [])
-            choice = self.rng.choice(items) if items else "(MicroGoal なし)"
+            history = self._recent_micro_ids.setdefault(mode, [])
+            recent = set(history)
+            pool = [item for item in items if self._micro_id(item) not in recent]
+            if not pool and items:
+                last_id = history[-1] if history else None
+                pool = [item for item in items if self._micro_id(item) != last_id]
+            pool = pool or items
+            choice = self.rng.choice(pool) if pool else "(MicroGoal なし)"            
             self._micro_cache[mode] = choice
             self._micro_baseline[mode] = self._capture_micro_baseline(world, mode)
+
+            choice_id = self._micro_id(choice)
+            history.append(choice_id)
+            if len(history) > self._recent_k:
+                del history[0 : len(history) - self._recent_k]
+
+
         return self._micro_cache[mode] or "(MicroGoal なし)"
 
     def clear_micro_goal(self, mode: Optional[str] = None) -> None:
