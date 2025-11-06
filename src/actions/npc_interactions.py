@@ -156,5 +156,5 @@ def npc_speak_and_log(npc_name, dialogue_key, location, game_state):
         target=None,
         location=location,
         result=dialogue,
-        game_state=game_state
+        #game_state=game_state
     )

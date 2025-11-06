@@ -105,6 +105,7 @@ class GridWorld:
 
 ###
 ###[deBug]
+"""
 game_state["position"] = {"x":0, "y":0}
 game_state["direction"] = "N"
 game_state["world"] = GridWorld(
@@ -112,7 +113,7 @@ game_state["world"] = GridWorld(
     dt_per_action = 30,
     clock = {"minute": 0, "hour": 8, "day": 1},
 )
-
+"""
 ###
 def _director_clock_string(world: dict | None) -> str:
     if not world:

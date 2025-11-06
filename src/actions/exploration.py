@@ -108,7 +108,7 @@ def generate_flavor_text(action, talk_situation, location):
     return f"{action}。{loc}の空気がかすかに揺れる。"
 """
 def explore_location(character_status, game_state):
-    location = game_state.get('location', '未知の場所')
+    location = game_state.get('current_location', '未知の場所')
     has_enemy = game_state.get('has_enemy', False)
 
     print(f"{character_status.name}が{location}を探索しています……")
@@ -199,7 +199,7 @@ def move_forward(character_status, game_state, *args):
 
 def rest_with_event(character_status, game_state):
     action = "休む"
-    location = game_state.get('location', '未知の場所')
+    location = game_state.get('current_location', '未知の場所')
     talk_situation = game_state.get('talk_situation', ['normal'])
 
     flavor_text = generate_flavor_text(action, talk_situation, location)
