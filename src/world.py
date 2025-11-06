@@ -122,7 +122,8 @@ def world_tick(game_state: Dict, dt: float | None = None) -> List[str]:
         init_world(game_state)
 
     world = game_state["world"]
-    minutes = dt if dt is not None else world.get("dt_per_action", 30)
+    #minutes = dt if dt is not None else world.get("dt_per_action", 30)
+    minutes = dt if dt is not None else _wget(world, "dt_per_action", 30)
     messages: List[str] = []
 
     previous_clock, new_clock = _advance_minutes(world, minutes)
@@ -144,3 +145,6 @@ def world_tick(game_state: Dict, dt: float | None = None) -> List[str]:
 
     game_state["time_of_day"] = world["time_of_day"]
     return messages
+###
+def _wget(world, key, default=None):
+    return world.get(key, default) if hasattr(world, "get") else getattr(world, key, default)

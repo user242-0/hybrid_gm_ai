@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import os
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -7,3 +8,5 @@ if str(ROOT) not in sys.path:
 SRC_DIR = ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
+
+os.environ["GM_USE_STUB"] = "1" #testでトークン0にする場合
