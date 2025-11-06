@@ -1,5 +1,5 @@
 # config.yml（提案）
-profile: lab  # prod | lab
+profile: prod  # prod | lab
 
 datalab:
   emit_scene_graph: true
@@ -14,6 +14,6 @@ datalab:
     red_impulse_min: 0.50
 
 director:
-  enabled: false
+  enabled: true
   seed: 41
   premise_path: "data/director/premise.yml"
