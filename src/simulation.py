@@ -373,7 +373,7 @@ def world_tick_cb(gs):
 # ---------------- RC Tick コールバック ----------------
 def rc_tick(rc_char, game_state):
     #[DEBUG]
-    print('[TICK]', rc_char.name, rc_char.is_npc)
+    #print('[TICK]', rc_char.name, rc_char.is_npc)
     #END[DEBUG]
     if not rc_char.is_npc:       # ← 手動キャラなら
         return                   #    AI ロジックを完全スキップ

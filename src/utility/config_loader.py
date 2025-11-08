@@ -39,13 +39,18 @@ def job_root_from_cfg():
     if override:
         return Path(override).expanduser()
 
-    pat = datalab_cfg.get("job_dir_pattern", "jobs/%Y%m%d_quick")
-    dated_path = Path(dt.datetime.now().strftime(pat))
-    if dated_path.exists():
-        return dated_path
+    pat = datalab_cfg.get("job_dir_pattern")
+    if pat:
+        try:
+            return Path(dt.datetime.now().strftime(pat))
+        except ValueError:
+            # 無効な strftime パターン → 後段のデフォルト処理にフォールバック
+            pass
 
+    # パターンが未指定 or 無効な場合は旧仕様（jobs 配下の最新 or 既定パターン）に従う
     fallback = _latest_job_directory(Path("jobs"))
     if fallback is not None:
         return fallback
 
-    return dated_path
+    default_path = Path(dt.datetime.now().strftime("jobs/%Y%m%d_quick"))
+    return default_path
