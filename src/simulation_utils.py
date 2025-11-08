@@ -1,9 +1,10 @@
 # simulation_utils.py （場所は任意）
 import json
+import re
+from typing import Any, Dict
+
 from src.event_bus import log_q   # ※使わないなら削除可
 
-from src.choice_definitions   import choice_definitions
-from src.action_definitions   import actions
 from src.requirements_checker import RequirementsChecker
 from src.utility.args_parser    import parse_args            # 既にある util を想定
 from src.logger               import log_action
@@ -14,7 +15,6 @@ from src.character_status import CharacterStatus
 # from src.scheduler import Scheduler
 
 #以下、datalab用インポート
-import re
 from pathlib import Path
 from datalab.registry.action_registry import normalize_action
 from datalab.registry.scene_resolver import resolve
@@ -26,11 +26,70 @@ from datalab.emitters.emotion_emitter import emit_emotion_eval, summarize_why_no
 from utility.config_loader import get_cfg, job_root_from_cfg
 import difflib
 
+CLOCK_RE = re.compile(r"^Day(\d+)\s+(\d{1,2}):(\d{2})$")
+
+
+def minutes_to_clock(total_min: int) -> str:
+    """Convert elapsed minutes into a ``DayN HH:MM`` formatted string."""
+
+    if total_min is None:
+        total_min = 0
+    if total_min < 0:
+        total_min = 0
+    day = total_min // (24 * 60) + 1
+    remainder = total_min % (24 * 60)
+    hour = remainder // 60
+    minute = remainder % 60
+    return f"Day{day} {hour:02d}:{minute:02d}"
+
+
+def ensure_clock(world: Dict[str, Any] | None) -> None:
+    """Ensure ``world`` carries ``clock``/``clock_min`` entries in sync."""
+
+    if not isinstance(world, dict):
+        return
+    clock_min: int | None
+    raw_min = world.get("clock_min")
+    if isinstance(raw_min, int):
+        clock_min = max(0, raw_min)
+    else:
+        clock_min = None
+        clock_label = world.get("clock")
+        if isinstance(clock_label, str):
+            match = CLOCK_RE.match(clock_label.strip())
+            if match:
+                day = int(match.group(1))
+                hour = int(match.group(2))
+                minute = int(match.group(3))
+                clock_min = max(0, (day - 1) * 24 * 60 + hour * 60 + minute)
+    if clock_min is None:
+        clock_min = 0
+    world["clock_min"] = clock_min
+    world["clock"] = minutes_to_clock(clock_min)
+
+
+def add_minutes(world: Dict[str, Any] | None, delta_min: int) -> None:
+    """Advance the ``world`` clock by ``delta_min`` minutes (clamped to >= 0)."""
+
+    if not isinstance(world, dict):
+        return
+    ensure_clock(world)
+    try:
+        delta = int(delta_min)
+    except (TypeError, ValueError):
+        delta = 0
+    if delta < 0:
+        delta = 0
+    world["clock_min"] = world.get("clock_min", 0) + delta
+    world["clock"] = minutes_to_clock(world["clock_min"])
+
 CFG = get_cfg()
 SCENE_EMIT_ON = bool(CFG["datalab"].get("emit_scene_graph", True))
 SCENE_JOB_DIR = job_root_from_cfg()
 
 def _map_to_choice_key(raw_key: str):
+    from src.choice_definitions import choice_definitions
+
     if raw_key in choice_definitions:
         return raw_key
     canon = normalize_action(raw_key)
@@ -146,7 +205,10 @@ def execute_player_choice(player, cmd: str, game_state):
     2) 対応する action.function を呼び出す
     3) ログを残す（persist   + 画面用 log_q）
     """
-    # ---- (1) キー写像 ----  
+    # ---- (1) キー写像 ----
+    from src.choice_definitions import choice_definitions
+    from src.action_definitions import actions
+
     # 入力を解析
     parts = cmd.split()
     raw_key = parts[0] if parts else ""

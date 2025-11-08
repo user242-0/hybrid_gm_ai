@@ -1,6 +1,6 @@
 # src/schemas/scene_graph.py
 from typing import List, Optional, Literal, Dict, Any
-from pydantic import BaseModel, Field
+from my_pydantic import BaseModel, Field
 
 class Pose(BaseModel):
     kind: Literal["skeleton","text"] = "text"

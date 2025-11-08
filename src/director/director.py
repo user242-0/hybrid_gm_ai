@@ -1,10 +1,81 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import random
 import yaml
 import pathlib
+
+
+MICRO_RULES: Dict[str, Dict[str, Any]] = {
+    "未読の通報を1件だけ確認": {
+        "action": "check_tip",
+        "time_min": 5,
+        "done": lambda world, baseline: world.get("tips_checked", 0)
+        >= baseline.get("tips_checked", 0) + 1,
+    },
+    "本日の酒量を規定以下にする": {
+        "action": "limit_drink",
+        "time_min": 10,
+        "done": lambda world, baseline: world.get("sobriety_days", 0)
+        >= baseline.get("sobriety_days", 0) + 1,
+    },
+    "被害者の名前をノートに1人追記": {
+        "action": "log_victim",
+        "time_min": 3,
+        "done": lambda world, baseline: world.get("victim_names_logged", 0)
+        >= baseline.get("victim_names_logged", 0) + 1,
+    },
+    "現場で青い繊維を1点採取": {
+        "action": "collect_fiber",
+        "time_min": 15,
+        "done": lambda world, baseline: world.get("evidence_score", 0)
+        >= baseline.get("evidence_score", 0) + 10,
+    },
+    "監視カメラの時刻ズレを補正": {
+        "action": "fix_cam_clock",
+        "time_min": 12,
+        "done": lambda world, baseline: world.get("cams_fixed", 0)
+        >= baseline.get("cams_fixed", 0) + 1,
+    },
+    "元相棒に5分だけ電話": {
+        "action": "call_partner",
+        "time_min": 5,
+        "done": lambda world, baseline: world.get("partner_calls", 0)
+        >= baseline.get("partner_calls", 0) + 1,
+    },
+    "裏路地→高架下→駅裏へ移動": {
+        "action": "move_low_profile",
+        "time_min": 8,
+        "done": lambda world, baseline: _current_suspicion(world)
+        <= max(0, baseline.get("suspicion_value", _current_suspicion(world)) - 1),
+    },
+    "顔を見られた店を避ける（タグ付け）": {
+        "action": "mark_avoid_shop",
+        "time_min": 2,
+        "done": lambda world, baseline: world.get("avoid_tags", 0)
+        >= baseline.get("avoid_tags", 0) + 1,
+    },
+    "真実を1項だけ報告書に残す": {
+        "action": "file_report",
+        "time_min": 7,
+        "done": lambda world, baseline: world.get("report_submitted", 0)
+        > baseline.get("report_submitted", 0),
+    },
+}
+
+
+def _rule_for_micro(text: Optional[str]) -> Optional[Dict[str, Any]]:
+    return MICRO_RULES.get(text or "")
+
+
+def _current_suspicion(world: Dict[str, Any]) -> int:
+    suspicion = world.get("suspicion") if isinstance(world, dict) else None
+    if isinstance(suspicion, dict):
+        value = suspicion.get("value")
+        if isinstance(value, (int, float)):
+            return int(value)
+    return 0
 
 
 @dataclass
@@ -39,7 +110,8 @@ class Director:
         """最小の初期ワールド。数値は演出・分岐用（難度は弄らない）。"""
         self.rng.seed(self.premise.get("seed", 0))
         return {
-            "clock": "Day1 08:00",
+            "clock_min": 0,
+            "clock": "Day1 00:00",
             "harm": {"value": 0, "threshold_warn": 20},
             "entropy": {"value": 4, "threshold_warn": 10},
             "suspicion": {"value": 3, "max": 10},
@@ -48,6 +120,14 @@ class Director:
             "unlocks": set(),
             "rumors": [],
             "echoes": [],
+            "tips_checked": 0,
+            "sobriety_days": 0,
+            "victim_names_logged": 0,
+            "evidence_score": 0,
+            "cams_fixed": 0,
+            "partner_calls": 0,
+            "avoid_tags": 0,
+            "report_submitted": 0,
         }
 
     def next_goal(self, world: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -99,45 +179,66 @@ class Director:
 
     def is_micro_goal_done(self, world: Dict[str, Any]) -> bool:
         mode = self.mode
+        rule = _rule_for_micro(self._micro_cache.get(mode))
         baseline = self._micro_baseline.get(mode, {})
+        if rule:
+            done_callable = rule.get("done")
+            if callable(done_callable):
+                try:
+                    return bool(done_callable(world, baseline))
+                except TypeError:
+                    return bool(done_callable(world))  # type: ignore[misc]
+                except Exception:
+                    return False
         if mode == "FREEZE":
             if world.get("sobriety_days", 0) >= baseline.get("sobriety_days", 0) + 1:
                 return True
             if world.get("victim_names_logged", 0) > baseline.get("victim_names_logged", 0):
                 return True
+            if world.get("tips_checked", 0) > baseline.get("tips_checked", 0):
+                return True
             return False
         if mode == "PURSUE":
-            return world.get("evidence_score", 0) >= baseline.get("evidence_score", 0) + 10
+            if world.get("evidence_score", 0) >= baseline.get("evidence_score", 0) + 10:
+                return True
+            if world.get("cams_fixed", 0) > baseline.get("cams_fixed", 0):
+                return True
+            if world.get("partner_calls", 0) > baseline.get("partner_calls", 0):
+                return True
+            return False
         if mode == "FLEE":
-            suspicion = world.get("suspicion", {}) if isinstance(world, dict) else {}
-            current = suspicion.get("value", 0)
+            current = _current_suspicion(world)
             start = baseline.get("suspicion_value", current)
             target = max(0, start - 1)
-            return current <= target
+            if current <= target:
+                return True
+            if world.get("avoid_tags", 0) > baseline.get("avoid_tags", 0):
+                return True
+            return False
         if mode == "WITNESS":
             return world.get("report_submitted", 0) > baseline.get("report_submitted", 0)
         return False
 
-    def apply_auto_step(self, world: Dict[str, Any]) -> None:
+    def apply_auto_step(self, world: Dict[str, Any]) -> Tuple[Optional[str], int]:
         if not isinstance(world, dict):
-            return
-        if self.mode == "FREEZE":
-            entropy = world.setdefault("entropy", {})
-            value = max(0, int(entropy.get("value", 0)) - 1)
-            entropy["value"] = value
-            world["sobriety_days"] = world.get("sobriety_days", 0) + 1
-        elif self.mode == "PURSUE":
-            case_heat = world.setdefault("case_heat", {})
-            max_value = case_heat.get("max", 0)
-            new_value = min(max_value, int(case_heat.get("value", 0)) + 1)
-            case_heat["value"] = new_value
-            world["evidence_score"] = world.get("evidence_score", 0) + 10
-        elif self.mode == "FLEE":
-            suspicion = world.setdefault("suspicion", {})
-            value = max(0, int(suspicion.get("value", 0)) - 1)
-            suspicion["value"] = value
-        elif self.mode == "WITNESS":
-            world["report_submitted"] = world.get("report_submitted", 0) + 1
+            return None, 5
+        rule = _rule_for_micro(self._micro_cache.get(self.mode))
+        if rule:
+            action = rule.get("action")
+            try:
+                time_min = int(rule.get("time_min", 5))
+            except (TypeError, ValueError):
+                time_min = 5
+            if time_min < 0:
+                time_min = 0
+            return action, time_min
+        fallback: Dict[str, Tuple[Optional[str], int]] = {
+            "FREEZE": ("limit_drink", 5),
+            "PURSUE": ("collect_fiber", 10),
+            "FLEE": ("move_low_profile", 5),
+            "WITNESS": ("file_report", 5),
+        }
+        return fallback.get(self.mode, (None, 5))
 
     def _capture_micro_baseline(self, world: Dict[str, Any], mode: str) -> Dict[str, Any]:
         if not isinstance(world, dict):
@@ -146,14 +247,25 @@ class Director:
             return {
                 "sobriety_days": world.get("sobriety_days", 0),
                 "victim_names_logged": world.get("victim_names_logged", 0),
+                "tips_checked": world.get("tips_checked", 0),
             }
         if mode == "PURSUE":
-            return {"evidence_score": world.get("evidence_score", 0)}
+            return {
+                "evidence_score": world.get("evidence_score", 0),
+                "cams_fixed": world.get("cams_fixed", 0),
+                "partner_calls": world.get("partner_calls", 0),
+            }
         if mode == "FLEE":
             suspicion = world.get("suspicion", {})
             if isinstance(suspicion, dict):
-                return {"suspicion_value": suspicion.get("value")}
-            return {"suspicion_value": 0}
+                value = suspicion.get("value")
+                base = int(value) if isinstance(value, (int, float)) else 0
+            else:
+                base = 0
+            return {
+                "suspicion_value": base,
+                "avoid_tags": world.get("avoid_tags", 0),
+            }
         if mode == "WITNESS":
             return {"report_submitted": world.get("report_submitted", 0)}
         return {}

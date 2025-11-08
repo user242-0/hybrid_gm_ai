@@ -30,7 +30,7 @@ class DirectorHUD:
         self.on_show_micro: Optional[Callable[[], None]] = None
 
         self.mode_var = tk.StringVar(value="FREEZE")
-        self.clock_var = tk.StringVar(value="Day1 08:00")
+        self.clock_var = tk.StringVar(value="Day1 00:00")
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
 
         self._frame: Optional[tk.Frame] = None
@@ -82,7 +82,7 @@ class DirectorHUD:
             row3,
             text=(
                 "[Keys] 1:FREEZE 2:FLEE 3:PURSUE 4:WITNESS | G:Show Micro | R:Reroll Micro "
-                "| A:Auto | S:Save L:Load"
+                "| A:Auto(+time) | S:Save L:Load"
             ),
             fg="white",
             bg=frame["bg"],

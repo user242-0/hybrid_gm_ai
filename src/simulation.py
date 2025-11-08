@@ -37,8 +37,13 @@ except ImportError:  # pragma: no cover - optional dependency
     DirectorHUD = None  # type: ignore
 
 # execute_player_choice import
-from src.simulation_utils import execute_player_choice
+from src.simulation_utils import (
+    add_minutes,
+    ensure_clock,
+    execute_player_choice,
+)
 from src.choice_ui import present_choices
+from src.action_registry import execute_action
 
 # 安全に終了したい
 from src.quit_helper import handle_quit
@@ -116,8 +121,9 @@ game_state["world"] = GridWorld(
 """
 ###
 def _director_clock_string(world: dict | None) -> str:
-    if not world:
-        return "Day1 08:00"
+    if not isinstance(world, dict):
+        return "Day1 00:00"
+    ensure_clock(world)
     clock = world.get("clock")
     if isinstance(clock, str):
         return clock
@@ -129,7 +135,7 @@ def _director_clock_string(world: dict | None) -> str:
         time = clock.get("time")
         if day is not None and time is not None:
             return f"Day{day} {time}"
-    return "Day1 08:00"
+    return "Day1 00:00"
 
 if director_enabled:
     premise_path = Path(director_cfg.get("premise_path", "data/director/premise.yml"))
@@ -147,6 +153,7 @@ if director_enabled:
         director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
     else:
         director_world = director.synthesize_world()
+    ensure_clock(director_world)
 
     game_state["director_world"] = director_world
     game_state["director_micro_goal"] = None
@@ -240,7 +247,10 @@ if director_enabled and director_hud is not None:
     def on_auto_action() -> None:
         if director_world is None:
             return
-        director.apply_auto_step(director_world)
+        action_id, tmin = director.apply_auto_step(director_world)
+        if action_id:
+            execute_action(director_world, action_id)
+        add_minutes(director_world, tmin)
         scenes = director.tick(director_world)
         if scenes:
             write_scenes_to_scene_graph(scenes)
@@ -249,9 +259,12 @@ if director_enabled and director_hud is not None:
                     f"[SCENE] intent={scene.get('intent')} why_now={scene.get('why_now')} "
                     f"salience={scene.get('salience')}"
                 )
-        director_hud.set_clock(_director_clock_string(director_world))
+        clock_label = _director_clock_string(director_world)
+        if director_hud is not None:
+            director_hud.set_clock(clock_label)
         if director.is_micro_goal_done(director_world):
             director.clear_micro_goal()
+            print("[MICRO] completed -> next")
         on_show_micro()
 
 
@@ -268,10 +281,12 @@ if director_enabled and director_hud is not None:
         if loaded is None:
             return
         director_world = loaded
+        ensure_clock(director_world)
         if isinstance(director_world, dict):
             director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
         game_state["director_world"] = director_world
-        director_hud.set_clock(_director_clock_string(director_world))
+        if director_hud is not None:
+            director_hud.set_clock(_director_clock_string(director_world))
         director.clear_micro_goal()
         on_show_micro()
         reload_epoch = (
@@ -357,7 +372,10 @@ def load_director_world(fallback: dict | None) -> dict | None:
     except Exception as exc:  # pragma: no cover - logging only
         print(f"[LOAD] failed to restore director world: {exc}")
         return fallback
-    return loaded if isinstance(loaded, dict) else fallback
+    if isinstance(loaded, dict):
+        ensure_clock(loaded)
+        return loaded
+    return fallback
 
 
 # ---------------- ワールド Tick コールバック ----------------
