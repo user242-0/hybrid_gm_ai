@@ -1,5 +1,6 @@
 # simulation.py
 # ターゲット選択時に使う
+import argparse
 import random
 from pathlib import Path
 import yaml
@@ -24,6 +25,7 @@ from src.rc_ai import select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
 from src.utility.config_loader import job_root_from_cfg, load_config
+from director.registry import synthesize_from_text
 from director.director import Director, load_yaml
 
 try:
@@ -56,6 +58,10 @@ scheduler = Scheduler()
 game_state = init_game_state()    # ★ ここで一度だけ生成
 init_world(game_state)
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+cli_parser = argparse.ArgumentParser(add_help=False)
+cli_parser.add_argument("--premise-text", type=str, default=None)
+simulation_cli_args, _ = cli_parser.parse_known_args()
 
 cfg = load_config()
 director_cfg = cfg.get("director", {})
@@ -138,14 +144,22 @@ def _director_clock_string(world: dict | None) -> str:
     return "Day1 00:00"
 
 if director_enabled:
-    premise_path = Path(director_cfg.get("premise_path", "data/director/premise.yml"))
-    if not premise_path.is_absolute():
-        premise_path = BASE_DIR / premise_path
-    premise_doc = load_yaml(str(premise_path)) or {}
-    premise = premise_doc.get("premise", {})
-    goals_path = BASE_DIR / "data/director/cop_trickster_goals.yml"
-    goals = load_yaml(str(goals_path)) or {}
+    if simulation_cli_args.premise_text:
+        premise, goals, pack_id = synthesize_from_text(simulation_cli_args.premise_text)
+    else:
+        premise_path = Path(director_cfg.get("premise_path", "data/director/premise.yml"))
+        if not premise_path.is_absolute():
+            premise_path = BASE_DIR / premise_path
+        premise_doc = load_yaml(str(premise_path)) or {}
+        premise = premise_doc.get("premise", {})
+        goals_path = BASE_DIR / "data/director/cop_trickster_goals.yml"
+        goals = load_yaml(str(goals_path)) or {}
+        pack_id = "cop_trickster"
     director = Director(premise=premise, goals_dict=goals)
+    print(
+        f"[Director] enabled seed={premise.get('seed')} "
+        f"premise='{premise.get('title')}' pack={pack_id}"
+    )
 
     existing_world = game_state.get("director_world")
     if existing_world:
@@ -157,10 +171,6 @@ if director_enabled:
 
     game_state["director_world"] = director_world
     game_state["director_micro_goal"] = None
-
-    seed_value = premise.get("seed", director_cfg.get("seed"))
-    title = premise.get("title", "")
-    print(f"[Director] enabled seed={seed_value} premise='{title}'")
 
     if DirectorHUD is not None:
         try:

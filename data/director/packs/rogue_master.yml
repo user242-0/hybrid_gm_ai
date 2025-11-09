@@ -1,0 +1,87 @@
+title: "凡俗なる風来坊と最強の従者"
+seed: 73
+roles:
+  protagonist:
+    archetype: "drifter"
+    state: "petty"
+  companion:
+    archetype: "supreme_retainer"
+    state: "bound"
+  antagonist:
+    archetype: "lordling"
+    state: "proud"
+modes_enabled:
+  - "COERCE"
+  - "BOND"
+  - "FLEE"
+  - "WITNESS"
+tone:
+  - "sword-and-road"
+  - "ironic"
+
+modes:
+  COERCE:
+    goals:
+      - type: "Maintain"
+        id: "keep_chain"
+        condition: "binding_stability >= 70"
+      - type: "Reach"
+        id: "win_duel"
+        condition: "duel_score >= 3"
+    micro:
+      - text: "従者の弱点札を1枚だけ提示"
+        action: "show_weakness_card"
+        time_min: 4
+        done: "weakness_cards_used >= 1"
+      - text: "虚勢の命令を1回だけ通す"
+        action: "bluff_order"
+        time_min: 6
+        done: "bluffs_succeeded >= 1"
+
+  BOND:
+    goals:
+      - type: "Meaning"
+        id: "earn_respect"
+        condition: "respect >= 60"
+      - type: "Reach"
+        id: "shared_quest"
+        condition: "shared_tasks_completed >= 3"
+    micro:
+      - text: "食事を分け合う"
+        action: "share_meal"
+        time_min: 10
+        done: "meals_shared >= 1"
+      - text: "失敗を一つ告白する"
+        action: "admit_fault"
+        time_min: 5
+        done: "confessions >= 1"
+      - text: "小さな依頼を共にこなす"
+        action: "do_small_quest"
+        time_min: 15
+        done: "shared_tasks_completed >= 1"
+
+  FLEE:
+    goals:
+      - type: "Reach"
+        id: "leave_lordland"
+        condition: "distance_from_castle >= 3"
+    micro:
+      - text: "裏道→橋裏→宿場町へ移動"
+        action: "travel_waypoints"
+        time_min: 12
+        done: "distance_from_castle >= 1"
+      - text: "追手の視線を外す"
+        action: "shake_tail"
+        time_min: 8
+        done: "trace_level <= 3"
+
+  WITNESS:
+    goals:
+      - type: "Meaning"
+        id: "acknowledge_truth"
+        condition: "admit_motivation >= 1"
+    micro:
+      - text: "従者の本心を一行メモ"
+        action: "note_companion_truth"
+        time_min: 3
+        done: "companion_truth_notes >= 1"

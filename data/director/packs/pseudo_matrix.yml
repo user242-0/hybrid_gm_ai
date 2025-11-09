@@ -1,0 +1,88 @@
+title: "仮想都市の目覚め"
+seed: 108
+roles:
+  protagonist:
+    archetype: "ordinary_citizen"
+    state: "asleep"
+  mentor:
+    archetype: "glitch_messenger"
+    state: "hidden"
+  system:
+    archetype: "simulation_admin"
+    state: "omniscient"
+modes_enabled:
+  - "COMPLY"
+  - "GLITCH"
+  - "AWAKEN"
+  - "FLEE"
+  - "WITNESS"
+tone:
+  - "tech-noir"
+  - "surreal"
+
+modes:
+  COMPLY:
+    goals:
+      - type: "Avoid"
+        id: "avoid_flag"
+        condition: "suspicion < 6"
+    micro:
+      - text: "日常ルーチンを1つ完遂"
+        action: "complete_routine"
+        time_min: 5
+        done: "routines_done >= 1"
+
+  GLITCH:
+    goals:
+      - type: "Reach"
+        id: "find_glitch"
+        condition: "glitch_clues >= 3"
+    micro:
+      - text: "同じ猫が2回通るのを撮影"
+        action: "record_loop_cat"
+        time_min: 4
+        done: "glitch_clues >= 1"
+      - text: "時刻ズレの掲示板を記録"
+        action: "log_time_skew"
+        time_min: 4
+        done: "glitch_clues >= 2"
+
+  AWAKEN:
+    goals:
+      - type: "Reach"
+        id: "exit_room"
+        condition: "port_unlocked >= 1"
+      - type: "Meaning"
+        id: "choose_truth"
+        condition: "truth_choice_done >= 1"
+    micro:
+      - text: "師のメッセージを1つ解読"
+        action: "decode_mentor_msg"
+        time_min: 8
+        done: "mentor_msgs_decoded >= 1"
+      - text: "退路のポートを開く"
+        action: "unlock_port"
+        time_min: 12
+        done: "port_unlocked >= 1"
+
+  FLEE:
+    goals:
+      - type: "Maintain"
+        id: "evade_agents"
+        condition: "trace_level < 7"
+    micro:
+      - text: "監視の少ない経路へ移動"
+        action: "move_low_trace_route"
+        time_min: 6
+        done: "trace_level <= 6"
+
+  WITNESS:
+    goals:
+      - type: "Meaning"
+        id: "wake_others"
+        condition: "awakened_citizens >= 1"
+    micro:
+      - text: "窓辺の誰かに合図を送る"
+        action: "signal_neighbor"
+        time_min: 2
+        done: "awakened_citizens >= 1"
