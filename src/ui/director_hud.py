@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import queue
@@ -19,7 +20,7 @@ class DirectorHUD:
     def __init__(self, title: str = "Director HUD") -> None:
         self.root = tk.Tk()
         self.root.title(title)
-        self.root.geometry("420x180")
+        self.root.geometry("480x260")
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -28,10 +29,14 @@ class DirectorHUD:
         self.on_save: Optional[Callable[[], None]] = None
         self.on_load: Optional[Callable[[], None]] = None
         self.on_show_micro: Optional[Callable[[], None]] = None
+        self.on_action_select: Optional[Callable[[object], None]] = None
 
         self.mode_var = tk.StringVar(value="FREEZE")
         self.clock_var = tk.StringVar(value="Day1 00:00")
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
+        self.progress_var = tk.StringVar(value="")
+
+        self.actions_var: list[tuple[str, str, int]] = []
 
         self._frame: Optional[tk.Frame] = None
         self._ui_thread = threading.current_thread()
@@ -71,21 +76,50 @@ class DirectorHUD:
             textvariable=self.micro_var,
             fg="white",
             bg=frame["bg"],
-            wraplength=380,
+            wraplength=420,
             justify="left",
         )
         self.micro_lbl.pack(side="left", padx=6)
 
-        row3 = tk.Frame(frame, bg=frame["bg"])
-        row3.pack(fill="x", **pad)
+        rowp = tk.Frame(frame, bg=frame["bg"])
+        rowp.pack(fill="x", **pad)
+        tk.Label(rowp, text="Progress:", fg="white", bg=frame["bg"]).pack(side="left")
         tk.Label(
-            row3,
-            text=(
-                "[Keys] 1:FREEZE 2:FLEE 3:PURSUE 4:WITNESS | G:Show Micro | R:Reroll Micro "
-                "| A:Auto(+time) | S:Save L:Load"
-            ),
+            rowp,
+            textvariable=self.progress_var,
             fg="white",
             bg=frame["bg"],
+            wraplength=420,
+            justify="left",
+        ).pack(side="left", padx=6)
+
+        row_rec = tk.Frame(frame, bg=frame["bg"])
+        row_rec.pack(fill="x", **pad)
+        self.rec_btn = tk.Button(row_rec, text="(Recommended)", command=self._click_recommended)
+        self.rec_btn.pack(side="left")
+
+        row_actions = tk.Frame(frame, bg=frame["bg"])
+        row_actions.pack(fill="both", expand=True, **pad)
+        tk.Label(row_actions, text="Actions:", fg="white", bg=frame["bg"]).pack(anchor="w")
+        self.listbox = tk.Listbox(row_actions, height=7)
+        self.listbox.pack(fill="both", expand=True)
+        self.listbox.bind("<<ListboxSelect>>", self._on_list_select)
+        self.listbox.bind("<Double-Button-1>", self._on_list_activate)
+        self.listbox.bind("<Return>", self._on_list_activate)
+
+        row3 = tk.Frame(frame, bg=frame["bg"])
+        row3.pack(fill="x", **pad)
+        help_text = (
+            "[Keys] Alt+1:FREEZE Alt+2:FLEE Alt+3:PURSUE Alt+4:WITNESS | 1..9:Run Action | "
+            "G:Show Micro | R:Reroll Micro | A:Auto(+time) | S:Save L:Load"
+        )
+        tk.Label(
+            row3,
+            text=help_text,
+            fg="white",
+            bg=frame["bg"],
+            justify="left",
+            wraplength=440,
         ).pack(side="left")
 
     def _bind_keys(self) -> None:
@@ -94,16 +128,21 @@ class DirectorHUD:
         root.bind("<Key-G>", lambda _: self.on_show_micro and self.on_show_micro())
         root.bind("<Key-r>", lambda _: self.on_reroll and self.on_reroll())
         root.bind("<Key-R>", lambda _: self.on_reroll and self.on_reroll())
-        root.bind("<Key-1>", lambda _: self._emit_mode("FREEZE"))
-        root.bind("<Key-2>", lambda _: self._emit_mode("FLEE"))
-        root.bind("<Key-3>", lambda _: self._emit_mode("PURSUE"))
-        root.bind("<Key-4>", lambda _: self._emit_mode("WITNESS"))
+        root.bind("<Alt-Key-1>", lambda _: self._emit_mode("FREEZE"))
+        root.bind("<Alt-Key-2>", lambda _: self._emit_mode("FLEE"))
+        root.bind("<Alt-Key-3>", lambda _: self._emit_mode("PURSUE"))
+        root.bind("<Alt-Key-4>", lambda _: self._emit_mode("WITNESS"))
         root.bind("<Key-a>", lambda _: self.on_auto_action and self.on_auto_action())
         root.bind("<Key-A>", lambda _: self.on_auto_action and self.on_auto_action())
         root.bind("<Key-s>", lambda _: self.on_save and self.on_save())
         root.bind("<Key-S>", lambda _: self.on_save and self.on_save())
         root.bind("<Key-l>", lambda _: self.on_load and self.on_load())
         root.bind("<Key-L>", lambda _: self.on_load and self.on_load())
+        for idx, key in enumerate("123456789"):
+            root.bind(
+                f"<Key-{key}>",
+                lambda _evt, index=idx: self._run_index(index),
+            )
 
     def _emit_mode(self, mode: str) -> None:
         if self.on_mode_change:
@@ -134,6 +173,29 @@ class DirectorHUD:
     def set_microgoal(self, text: Optional[str]) -> None:
         self._run_or_enqueue(lambda: self.micro_var.set(text or "(MicroGoal なし)"))
 
+    def set_progress(self, text: Optional[str]) -> None:
+        self._run_or_enqueue(lambda: self.progress_var.set(text or ""))
+
+    def set_recommended(self, label: Optional[str], *, enabled: bool = True) -> None:
+        def apply() -> None:
+            state = tk.NORMAL if enabled else tk.DISABLED
+            self.rec_btn.configure(text=label or "(Recommended)", state=state)
+
+        self._run_or_enqueue(apply)
+
+    def set_actions(self, actions: list[tuple[str, str, int]]) -> None:
+        def apply() -> None:
+            self.actions_var = actions
+            self.listbox.delete(0, tk.END)
+            if not actions:
+                self.listbox.insert(tk.END, "(no actions)")
+                return
+            for idx, (_, label, minutes) in enumerate(actions, start=1):
+                suffix = f" (+{minutes}m)" if minutes else ""
+                self.listbox.insert(tk.END, f"{idx}. {label}{suffix}")
+
+        self._run_or_enqueue(apply)
+
     def run_async(self) -> None:
         # Tkの内部タイマーで自走。mainloopは使わない（協調ループ）
         # 1度だけ即座にフレーム処理しておくとウインドウが早く表示される。
@@ -143,7 +205,7 @@ class DirectorHUD:
         except tk.TclError:
             return
         self.root.after(0, self._tick)
-        
+
     def destroy(self) -> None:
         def tear_down() -> None:
             try:
@@ -188,7 +250,7 @@ class DirectorHUD:
         except tk.TclError:
             return False
         return True
-                
+
     def _run_or_enqueue(self, func: Callable[[], None]) -> None:
         if threading.current_thread() is self._ui_thread:
             func()
@@ -206,3 +268,23 @@ class DirectorHUD:
             except Exception:
                 # Avoid crashing the UI loop due to background errors.
                 pass
+
+    def _click_recommended(self) -> None:
+        if self.on_action_select:
+            self.on_action_select("__recommended__")
+
+    def _on_list_select(self, _event: object) -> None:
+        selection = self.listbox.curselection()
+        if not selection:
+            return
+        if self.on_action_select:
+            self.on_action_select(selection[0])
+
+    def _on_list_activate(self, _event: object) -> None:
+        selection = self.listbox.curselection()
+        if selection:
+            self._run_index(selection[0])
+
+    def _run_index(self, idx: int) -> None:
+        if self.on_action_select:
+            self.on_action_select(idx)

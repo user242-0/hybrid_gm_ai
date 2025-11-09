@@ -196,6 +196,39 @@ def ui_show_micro(micro_goal, gs):
 
 if director_enabled and director_hud is not None:
 
+    current_actions: list[tuple[str, str, int]] = []
+
+    def refresh_hud() -> None:
+        if director_hud is None:
+            return
+        if director_world is None:
+            director_hud.set_progress(None)
+            director_hud.set_recommended(None, enabled=False)
+            director_hud.set_actions([])
+            return
+
+        director_hud.set_progress(director.progress_text(director_world))
+
+        rec_action, rec_minutes, rec_label = director.recommended_action(director_world)
+        if rec_action:
+            label = f"★ {rec_label or rec_action} (+{rec_minutes}m)"
+            director_hud.set_recommended(label, enabled=True)
+        else:
+            director_hud.set_recommended("(Recommended)", enabled=False)
+
+        current_actions.clear()
+        for record in director.list_actions_for_mode(director.mode):
+            action_id = record.get("action")
+            if not action_id:
+                continue
+            label = record.get("text") or action_id
+            try:
+                minutes = int(record.get("time_min", 5))
+            except (TypeError, ValueError):
+                minutes = 5
+            current_actions.append((action_id, label, max(0, minutes)))
+        director_hud.set_actions(current_actions.copy())
+
     def _hud_adjust_value(path, delta, *, minimum=None, maximum=None):
         node = director_world
         if node is None:
@@ -217,14 +250,12 @@ if director_enabled and director_hud is not None:
             new_value = min(maximum, new_value)
         node[leaf_key] = new_value
 
-
     def on_mode_change(new_mode: str) -> None:
         director.mode = new_mode
         director.clear_micro_goal(new_mode)
         director_hud.set_mode(new_mode)
         print(f"[Director] mode -> {new_mode}")
         on_show_micro()
-
 
     def on_show_micro() -> None:
         if director_world is None:
@@ -233,7 +264,7 @@ if director_enabled and director_hud is not None:
         ui_show_micro(micro, game_state)
         micro_text = micro or "(MicroGoal なし)"
         print(f"[UI] MicroGoal: {micro_text}")
-
+        refresh_hud()
 
     def on_reroll() -> None:
         if director_world is None:
@@ -242,7 +273,7 @@ if director_enabled and director_hud is not None:
         ui_show_micro(micro, game_state)
         micro_text = micro or "(MicroGoal なし)"
         print(f"[UI] MicroGoal (reroll): {micro_text}")
-
+        refresh_hud()
 
     def on_auto_action() -> None:
         if director_world is None:
@@ -267,13 +298,11 @@ if director_enabled and director_hud is not None:
             print("[MICRO] completed -> next")
         on_show_micro()
 
-
     def on_save() -> None:
         if director_world is None:
             return
         save_director_world(director_world)
         print("[SAVE] world saved")
-
 
     def on_load() -> None:
         global director_world
@@ -294,6 +323,34 @@ if director_enabled and director_hud is not None:
         )
         print(f"[LOAD] world loaded; reload_epoch={reload_epoch}")
 
+    def on_action_select(which: object) -> None:
+        if director_world is None:
+            return
+        action_id = None
+        time_min = 0
+        if which == "__recommended__":
+            action_id, time_min, _ = director.recommended_action(director_world)
+        elif isinstance(which, int) and 0 <= which < len(current_actions):
+            action_id, _, time_min = current_actions[which]
+        if not action_id:
+            return
+        execute_action(director_world, action_id)
+        add_minutes(director_world, time_min)
+        scenes = director.tick(director_world)
+        if scenes:
+            write_scenes_to_scene_graph(scenes)
+            for scene in scenes:
+                print(
+                    f"[SCENE] intent={scene.get('intent')} why_now={scene.get('why_now')} "
+                    f"salience={scene.get('salience')}"
+                )
+        clock_label = _director_clock_string(director_world)
+        if director_hud is not None:
+            director_hud.set_clock(clock_label)
+        if director.is_micro_goal_done(director_world):
+            director.clear_micro_goal()
+            print("[MICRO] completed -> next")
+        on_show_micro()
 
     director_hud.on_mode_change = on_mode_change
     director_hud.on_auto_action = on_auto_action
@@ -301,6 +358,7 @@ if director_enabled and director_hud is not None:
     director_hud.on_save = on_save
     director_hud.on_load = on_load
     director_hud.on_show_micro = on_show_micro
+    director_hud.on_action_select = on_action_select
     on_show_micro()
 
 """

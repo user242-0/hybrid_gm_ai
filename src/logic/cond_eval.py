@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Tuple
 import operator
 import re
 
@@ -65,3 +65,20 @@ def eval_cond(
         return bool(_OPS[op](lval, rval))
     except Exception:
         return False
+
+
+def parse_cond(expr: str) -> Tuple[Optional[str], Optional[str], Optional[Any]]:
+    """Parse a simple comparison expression into its components."""
+
+    tokens = expr.strip().split()
+    if len(tokens) != 3:
+        return (None, None, None)
+    left, op, right = tokens
+    if op not in _OPS:
+        return (None, None, None)
+    try:
+        right_val: Optional[Any]
+        right_val = float(right) if "." in right else int(right)
+    except Exception:
+        right_val = None
+    return (left, op, right_val)

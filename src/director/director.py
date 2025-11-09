@@ -6,7 +6,7 @@ import random
 import yaml
 import pathlib
 
-from logic.cond_eval import eval_cond
+from logic.cond_eval import eval_cond, parse_cond, _get_path as get_path
 
 
 LEGACY_MICRO_RULES: Dict[str, Dict[str, Any]] = {
@@ -284,6 +284,66 @@ class Director:
             "WITNESS": ("file_report", 5),
         }
         return fallback.get(self.mode, (None, 5))
+
+    def list_actions_for_mode(self, mode: str) -> List[Dict[str, Any]]:
+        """Return unique actions available for a mode."""
+
+        seen: set[str] = set()
+        actions: List[Dict[str, Any]] = []
+        for record in self._micro_bank(mode):
+            action_id = record.get("action")
+            if not action_id or action_id in seen:
+                continue
+            seen.add(action_id)
+            try:
+                time_min = int(record.get("time_min", 5))
+            except (TypeError, ValueError):
+                time_min = 5
+            actions.append(
+                {
+                    "action": action_id,
+                    "time_min": max(0, time_min),
+                    "text": record.get("text"),
+                }
+            )
+        return actions
+
+    def progress_text(self, world: Dict[str, Any]) -> str:
+        """Return a compact description of the current micro-goal progress."""
+
+        micro = self._micro_cache.get(self.mode)
+        rule = self._lookup_rule(micro, self.mode)
+        if rule:
+            done_expr = rule.get("done")
+            if isinstance(done_expr, str):
+                left, op, target = parse_cond(done_expr)
+                if left and op and target is not None:
+                    current = get_path(world, left)
+                    if isinstance(current, (int, float)) and isinstance(target, (int, float)):
+                        current_int = int(current)
+                        target_int = int(target)
+                        if op in (">", ">="):
+                            return f"Micro: {micro} ({current_int}/{target_int})"
+                        if op in ("<", "<="):
+                            return f"Micro: {micro} (≤{target_int} | now {current_int})"
+                        if op == "==":
+                            return f"Micro: {micro} ({current_int}/{target_int})"
+        return f"Micro: {micro or '(なし)'}"
+
+    def recommended_action(self, world: Dict[str, Any]) -> Tuple[Optional[str], int, Optional[str]]:
+        """Return (action_id, time_min, label) for the current micro-goal."""
+
+        micro = self._micro_cache.get(self.mode)
+        rule = self._lookup_rule(micro, self.mode)
+        if rule:
+            action_id = rule.get("action")
+            if action_id:
+                try:
+                    time_min = int(rule.get("time_min", 5))
+                except (TypeError, ValueError):
+                    time_min = 5
+                return action_id, max(0, time_min), micro
+        return None, 0, micro
 
     def _capture_micro_baseline(self, world: Dict[str, Any], mode: str) -> Dict[str, Any]:
         if not isinstance(world, dict):
