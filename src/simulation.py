@@ -207,6 +207,9 @@ def ui_show_micro(micro_goal, gs):
 if director_enabled and director_hud is not None:
 
     current_actions: list[tuple[str, str, int]] = []
+    available_modes = director.available_modes()
+    if not available_modes:
+        print("[Director] warning: no modes found in goals_dict")
 
     def refresh_hud() -> None:
         if director_hud is None:
@@ -259,13 +262,6 @@ if director_enabled and director_hud is not None:
         if maximum is not None:
             new_value = min(maximum, new_value)
         node[leaf_key] = new_value
-
-    def on_mode_change(new_mode: str) -> None:
-        director.mode = new_mode
-        director.clear_micro_goal(new_mode)
-        director_hud.set_mode(new_mode)
-        print(f"[Director] mode -> {new_mode}")
-        on_show_micro()
 
     def on_show_micro() -> None:
         if director_world is None:
@@ -362,13 +358,23 @@ if director_enabled and director_hud is not None:
             print("[MICRO] completed -> next")
         on_show_micro()
 
-    director_hud.on_mode_change = on_mode_change
     director_hud.on_auto_action = on_auto_action
     director_hud.on_reroll = on_reroll
     director_hud.on_save = on_save
     director_hud.on_load = on_load
     director_hud.on_show_micro = on_show_micro
     director_hud.on_action_select = on_action_select
+
+    def on_mode_dropdown(new_mode: str) -> None:
+        if not director.set_mode(new_mode):
+            return
+        director_hud.set_mode(director.mode)
+        print(f"[Director] mode -> {new_mode}")
+        on_show_micro()
+        refresh_hud()
+
+    director_hud.set_modes(available_modes, on_change=on_mode_dropdown)
+    director_hud.set_mode(director.mode)
     on_show_micro()
 
 """

@@ -24,13 +24,13 @@ def test_director_hud_exposes_callbacks():
     load_calls = []
     micro_calls = []
 
-    hud.on_mode_change = lambda mode: mode_calls.append(mode)
+    hud.set_modes(["FREEZE", "FLEE"], on_change=lambda mode: mode_calls.append(mode))
     hud.on_auto_action = lambda: auto_calls.append(True)
     hud.on_save = lambda: save_calls.append(True)
     hud.on_load = lambda: load_calls.append(True)
     hud.on_show_micro = lambda: micro_calls.append(True)
 
-    hud._emit_mode("FLEE")
+    hud._select_mode("FLEE", hud.on_mode_change)
     assert mode_calls == ["FLEE"]
 
     if hud.on_auto_action:

@@ -95,7 +95,20 @@ class Director:
     )
 
     def __post_init__(self) -> None:
-        modes = self.goals_dict.get("modes", {})
+        modes_from_premise = self.premise.get("modes_enabled") or []
+        if isinstance(modes_from_premise, str):
+            modes_from_premise = [modes_from_premise]
+        elif not isinstance(modes_from_premise, list):
+            modes_from_premise = list(modes_from_premise)
+        modes_from_yaml = list((self.goals_dict or {}).get("modes", {}).keys())
+        available = [m for m in modes_from_premise if m in modes_from_yaml] or modes_from_yaml
+        self._available_modes: List[str] = available
+        if self._available_modes:
+            self.mode = self._available_modes[0]
+        else:
+            self.mode = "FREEZE"
+
+        modes = (self.goals_dict or {}).get("modes", {})
         self._micro_cache: Dict[str, Optional[str]] = {key: None for key in modes.keys()}
         for fallback in ("FREEZE", "FLEE", "PURSUE", "WITNESS"):
             self._micro_cache.setdefault(fallback, None)
@@ -106,6 +119,18 @@ class Director:
             key: [] for key in self._micro_cache.keys()
         }
         self._recent_k: int = 3
+
+    def available_modes(self) -> List[str]:
+        """Return the list of modes enabled for the current scenario."""
+
+        return list(self._available_modes)
+
+    def set_mode(self, mode: str) -> bool:
+        if mode in self._available_modes or not self._available_modes:
+            self.mode = mode
+            self.clear_micro_goal(mode)
+            return True
+        return False
 
     def synthesize_world(self) -> Dict[str, Any]:
         """最小の初期ワールド。数値は演出・分岐用（難度は弄らない）。"""

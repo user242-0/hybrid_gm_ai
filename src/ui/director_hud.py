@@ -31,12 +31,13 @@ class DirectorHUD:
         self.on_show_micro: Optional[Callable[[], None]] = None
         self.on_action_select: Optional[Callable[[object], None]] = None
 
-        self.mode_var = tk.StringVar(value="FREEZE")
+        self.mode_var = tk.StringVar(value="")
         self.clock_var = tk.StringVar(value="Day1 00:00")
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
         self.progress_var = tk.StringVar(value="")
 
         self.actions_var: list[tuple[str, str, int]] = []
+        self.modes: list[str] = []
 
         self._frame: Optional[tk.Frame] = None
         self._ui_thread = threading.current_thread()
@@ -56,13 +57,9 @@ class DirectorHUD:
         row1 = tk.Frame(frame, bg=frame["bg"])
         row1.pack(fill="x", **pad)
         tk.Label(row1, text="Mode:", fg="white", bg=frame["bg"]).pack(side="left")
-        tk.Label(
-            row1,
-            textvariable=self.mode_var,
-            fg="white",
-            bg=frame["bg"],
-            font=("Segoe UI", 12, "bold"),
-        ).pack(side="left", padx=6)
+        self.mode_menu = tk.OptionMenu(row1, self.mode_var, "")
+        self.mode_menu.configure(highlightthickness=0)
+        self.mode_menu.pack(side="left")
         tk.Label(row1, text="Clock:", fg="white", bg=frame["bg"]).pack(side="left", padx=12)
         tk.Label(row1, textvariable=self.clock_var, fg="white", bg=frame["bg"]).pack(
             side="left", padx=6
@@ -110,8 +107,8 @@ class DirectorHUD:
         row3 = tk.Frame(frame, bg=frame["bg"])
         row3.pack(fill="x", **pad)
         help_text = (
-            "[Keys] Alt+1:FREEZE Alt+2:FLEE Alt+3:PURSUE Alt+4:WITNESS | 1..9:Run Action | "
-            "G:Show Micro | R:Reroll Micro | A:Auto(+time) | S:Save L:Load"
+            "[Keys] Use Mode dropdown | 1..9:Run Action | G:Show Micro | R:Reroll Micro | "
+            "A:Auto(+time) | S:Save L:Load"
         )
         tk.Label(
             row3,
@@ -128,10 +125,6 @@ class DirectorHUD:
         root.bind("<Key-G>", lambda _: self.on_show_micro and self.on_show_micro())
         root.bind("<Key-r>", lambda _: self.on_reroll and self.on_reroll())
         root.bind("<Key-R>", lambda _: self.on_reroll and self.on_reroll())
-        root.bind("<Alt-Key-1>", lambda _: self._emit_mode("FREEZE"))
-        root.bind("<Alt-Key-2>", lambda _: self._emit_mode("FLEE"))
-        root.bind("<Alt-Key-3>", lambda _: self._emit_mode("PURSUE"))
-        root.bind("<Alt-Key-4>", lambda _: self._emit_mode("WITNESS"))
         root.bind("<Key-a>", lambda _: self.on_auto_action and self.on_auto_action())
         root.bind("<Key-A>", lambda _: self.on_auto_action and self.on_auto_action())
         root.bind("<Key-s>", lambda _: self.on_save and self.on_save())
@@ -144,11 +137,6 @@ class DirectorHUD:
                 lambda _evt, index=idx: self._run_index(index),
             )
 
-    def _emit_mode(self, mode: str) -> None:
-        if self.on_mode_change:
-            self.on_mode_change(mode)
-        self.set_mode(mode)
-
     def set_mode(self, mode: str) -> None:
         def apply() -> None:
             self.mode_var.set(mode)
@@ -156,6 +144,35 @@ class DirectorHUD:
             if not self._frame:
                 return
             self._update_widget_bg(self._frame, color)
+
+        self._run_or_enqueue(apply)
+
+    def set_modes(self, modes, on_change: Optional[Callable[[str], None]]) -> None:
+        def apply() -> None:
+            self.modes = list(modes or [])
+            self.on_mode_change = on_change
+            menu = self.mode_menu["menu"]
+            menu.delete(0, "end")
+            for mode in self.modes:
+                menu.add_command(
+                    label=mode,
+                    command=lambda value=mode: self._select_mode(value, on_change),
+                )
+            if self.mode_var.get() not in self.modes:
+                if self.modes:
+                    self.mode_var.set(self.modes[0])
+                else:
+                    self.mode_var.set("")
+
+        self._run_or_enqueue(apply)
+
+    def _select_mode(
+        self, value: str, on_change: Optional[Callable[[str], None]]
+    ) -> None:
+        def apply() -> None:
+            self.mode_var.set(value)
+            if on_change:
+                on_change(value)
 
         self._run_or_enqueue(apply)
 
