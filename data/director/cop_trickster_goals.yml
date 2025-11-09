@@ -3,14 +3,23 @@ modes:
     goals:
       - type: "Avoid"
         id: "keep_job"
-        condition: "entropy < 12 for 3d"
+        condition: "entropy.value < 12 for 3d"
       - type: "Meaning"
         id: "witness_log"
         condition: "victim_names_logged >= 3"
     micro:
-      - "未読の通報を1件だけ確認"
-      - "本日の酒量を規定以下にする"
-      - "被害者の名前をノートに1人追記"
+      - text: "未読の通報を1件だけ確認"
+        action: "check_tip"
+        time_min: 5
+        done: "tips_checked >= 1"
+      - text: "本日の酒量を規定以下にする"
+        action: "limit_drink"
+        time_min: 10
+        done: "sobriety_days >= 1"
+      - text: "被害者の名前をノートに1人追記"
+        action: "log_victim"
+        time_min: 3
+        done: "victim_names_logged >= 1"
 
   PURSUE:
     goals:
@@ -21,9 +30,18 @@ modes:
         id: "witness"
         condition: "witness_value >= 3"
     micro:
-      - "現場で青い繊維を1点採取"
-      - "監視カメラの時刻ズレを補正"
-      - "元相棒に5分だけ電話"
+      - text: "現場で青い繊維を1点採取"
+        action: "collect_fiber"
+        time_min: 15
+        done: "evidence_score >= 10"
+      - text: "監視カメラの時刻ズレを補正"
+        action: "fix_cam_clock"
+        time_min: 12
+        done: "cams_fixed >= 1"
+      - text: "元相棒に5分だけ電話"
+        action: "call_partner"
+        time_min: 5
+        done: "partner_calls >= 1"
 
   FLEE:
     goals:
@@ -32,15 +50,24 @@ modes:
         condition: "clock >= Day2 06:00"
       - type: "Maintain"
         id: "low_profile"
-        condition: "suspicion < 7 for 2d"
+        condition: "suspicion.value < 7 for 2d"
     micro:
-      - "裏路地→高架下→駅裏へ移動"
-      - "顔を見られた店を避ける（タグ付け）"
+      - text: "裏路地→高架下→駅裏へ移動"
+        action: "move_low_profile"
+        time_min: 8
+        done: "suspicion.value <= 2"
+      - text: "顔を見られた店を避ける（タグ付け）"
+        action: "mark_avoid_shop"
+        time_min: 2
+        done: "avoid_tags >= 1"
 
   WITNESS:
     goals:
       - type: "Meaning"
-        id: "testimony"
-        condition: "witness_value >= 5"
+        id: "truth_told"
+        condition: "report_submitted >= 1"
     micro:
-      - "聞き込みで共通する手がかりを1つ見つける"
+      - text: "真実を1項だけ報告書に残す"
+        action: "file_report"
+        time_min: 7
+        done: "report_submitted >= 1"

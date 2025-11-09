@@ -6,8 +6,10 @@ import random
 import yaml
 import pathlib
 
+from logic.cond_eval import eval_cond
 
-MICRO_RULES: Dict[str, Dict[str, Any]] = {
+
+LEGACY_MICRO_RULES: Dict[str, Dict[str, Any]] = {
     "未読の通報を1件だけ確認": {
         "action": "check_tip",
         "time_min": 5,
@@ -64,9 +66,8 @@ MICRO_RULES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-
-def _rule_for_micro(text: Optional[str]) -> Optional[Dict[str, Any]]:
-    return MICRO_RULES.get(text or "")
+# Backwards compatible alias for legacy imports/tests.
+MICRO_RULES = LEGACY_MICRO_RULES
 
 
 def _current_suspicion(world: Dict[str, Any]) -> int:
@@ -144,11 +145,54 @@ class Director:
 
         return hashlib.md5(value.encode("utf-8")).hexdigest()[:8]
 
+    def _micro_bank(self, mode: str) -> List[Dict[str, Any]]:
+        bucket = self.goals_dict.get("modes", {}).get(mode, {})
+        raw = bucket.get("micro", [])
+        bank: List[Dict[str, Any]] = []
+        for item in raw:
+            if isinstance(item, str):
+                fallback = LEGACY_MICRO_RULES.get(item, {})
+                bank.append(
+                    {
+                        "text": item,
+                        "action": fallback.get("action"),
+                        "time_min": fallback.get("time_min", 5),
+                        "done": fallback.get("done"),
+                    }
+                )
+            elif isinstance(item, dict):
+                text = item.get("text")
+                if not text:
+                    continue
+                raw_time = item.get("time_min", 5)
+                try:
+                    time_min = int(raw_time)
+                except (TypeError, ValueError):
+                    time_min = 5
+                bank.append(
+                    {
+                        "text": text,
+                        "action": item.get("action"),
+                        "time_min": time_min,
+                        "done": item.get("done"),
+                    }
+                )
+        return bank
+
+    def _lookup_rule(self, text: Optional[str], mode: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        if not text:
+            return None
+        target_mode = mode or self.mode
+        for rule in self._micro_bank(target_mode):
+            if rule.get("text") == text:
+                return rule
+        return LEGACY_MICRO_RULES.get(text)
+
     def get_micro_goal(self, world: Dict[str, Any], reroll: bool = False) -> str:
         mode = self.mode
         if reroll or not self._micro_cache.get(mode):
-            bucket = self.goals_dict.get("modes", {}).get(mode, {})
-            items = bucket.get("micro", [])
+            bank = self._micro_bank(mode)
+            items = [entry["text"] for entry in bank if entry.get("text")]
             history = self._recent_micro_ids.setdefault(mode, [])
             recent = set(history)
             pool = [item for item in items if self._micro_id(item) not in recent]
@@ -156,7 +200,7 @@ class Director:
                 last_id = history[-1] if history else None
                 pool = [item for item in items if self._micro_id(item) != last_id]
             pool = pool or items
-            choice = self.rng.choice(pool) if pool else "(MicroGoal なし)"            
+            choice = self.rng.choice(pool) if pool else "(MicroGoal なし)"
             self._micro_cache[mode] = choice
             self._micro_baseline[mode] = self._capture_micro_baseline(world, mode)
 
@@ -164,7 +208,6 @@ class Director:
             history.append(choice_id)
             if len(history) > self._recent_k:
                 del history[0 : len(history) - self._recent_k]
-
 
         return self._micro_cache[mode] or "(MicroGoal なし)"
 
@@ -179,15 +222,17 @@ class Director:
 
     def is_micro_goal_done(self, world: Dict[str, Any]) -> bool:
         mode = self.mode
-        rule = _rule_for_micro(self._micro_cache.get(mode))
+        rule = self._lookup_rule(self._micro_cache.get(mode), mode)
         baseline = self._micro_baseline.get(mode, {})
         if rule:
-            done_callable = rule.get("done")
-            if callable(done_callable):
+            done_expr = rule.get("done")
+            if isinstance(done_expr, str) and done_expr.strip():
+                return eval_cond(done_expr, world, prev_world=None)
+            if callable(done_expr):
                 try:
-                    return bool(done_callable(world, baseline))
+                    return bool(done_expr(world, baseline))
                 except TypeError:
-                    return bool(done_callable(world))  # type: ignore[misc]
+                    return bool(done_expr(world))  # type: ignore[misc]
                 except Exception:
                     return False
         if mode == "FREEZE":
@@ -222,7 +267,7 @@ class Director:
     def apply_auto_step(self, world: Dict[str, Any]) -> Tuple[Optional[str], int]:
         if not isinstance(world, dict):
             return None, 5
-        rule = _rule_for_micro(self._micro_cache.get(self.mode))
+        rule = self._lookup_rule(self._micro_cache.get(self.mode))
         if rule:
             action = rule.get("action")
             try:
