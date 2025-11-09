@@ -47,6 +47,11 @@ def test_director_hud_exposes_callbacks():
     assert load_calls == [True]
     assert micro_calls == [True]
 
+    second_mode_calls = []
+    hud.set_modes(["FREEZE", "FLEE"], on_change=lambda mode: second_mode_calls.append(mode))
+    hud._select_mode("FREEZE", hud.on_mode_change)
+    assert second_mode_calls == ["FREEZE"]
+    
     hud.set_clock("Day2 12:00")
     hud.set_microgoal("Test objective")
     assert hud.clock_var.get() == "Day2 12:00"

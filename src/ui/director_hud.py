@@ -39,6 +39,9 @@ class DirectorHUD:
         self.actions_var: list[tuple[str, str, int]] = []
         self.modes: list[str] = []
 
+        self._last_modes: Optional[tuple[str, ...]] = None
+        self._last_mode_value: Optional[str] = None
+
         self._frame: Optional[tk.Frame] = None
         self._ui_thread = threading.current_thread()
         self._pending_calls: "queue.Queue[Callable[[], None]]" = queue.Queue()
@@ -138,18 +141,29 @@ class DirectorHUD:
             )
 
     def set_mode(self, mode: str) -> None:
+        if mode == self._last_mode_value:
+            return
+        self._last_mode_value = mode
+
         def apply() -> None:
             self.mode_var.set(mode)
             color = MODE_COLORS.get(mode, MODE_COLORS["FREEZE"])
-            if not self._frame:
-                return
-            self._update_widget_bg(self._frame, color)
+            if self._frame:
+                self._update_widget_bg(self._frame, color)
+            self._last_mode_value = self.mode_var.get()
 
         self._run_or_enqueue(apply)
 
     def set_modes(self, modes, on_change: Optional[Callable[[str], None]]) -> None:
+        modes_list = list(modes or [])
+        modes_tuple = tuple(modes_list)
+        self.on_mode_change = on_change
+        if self._last_modes == modes_tuple:
+            return
+        self._last_modes = modes_tuple
+
         def apply() -> None:
-            self.modes = list(modes or [])
+            self.modes = modes_list
             self.on_mode_change = on_change
             menu = self.mode_menu["menu"]
             menu.delete(0, "end")
@@ -163,6 +177,7 @@ class DirectorHUD:
                     self.mode_var.set(self.modes[0])
                 else:
                     self.mode_var.set("")
+            self._last_mode_value = self.mode_var.get()
 
         self._run_or_enqueue(apply)
 
@@ -171,6 +186,7 @@ class DirectorHUD:
     ) -> None:
         def apply() -> None:
             self.mode_var.set(value)
+            self._last_mode_value = value
             if on_change:
                 on_change(value)
 
