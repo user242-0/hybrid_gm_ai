@@ -2,3 +2,7 @@ python -m src.simulation
 
 ### Quit / Exit
 立ち上がった"GUI"コンソール(not CLI)にいつでも `q`, `quit`, `exit` を入力  すると、安全にシャットダウンします。
+
+### other scenario
+python -m src.simulation --premise-text "従者"
+python -m src.simulation --premise-text "マトリックス"

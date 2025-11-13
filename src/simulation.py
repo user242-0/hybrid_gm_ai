@@ -21,7 +21,7 @@ from queue import Empty        # ← 追加
 # 追加import
 from src.scheduler import Scheduler
 from src.world import init_world, world_tick
-from src.rc_ai import select_action
+from src.rc_ai import pick_action, select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
 from src.utility.config_loader import job_root_from_cfg, load_config
@@ -71,6 +71,23 @@ director = None
 director_world = None
 director_hud = None
 director_hud = None
+
+auto_enabled = False
+_last_auto_step_ts = 0.0
+AUTO_STEP_INTERVAL_SECONDS = 0.5
+
+
+def ai_step_once() -> None:
+    """Fallback no-op when director HUD is unavailable."""
+
+
+def set_auto(enabled: bool) -> None:
+    global auto_enabled
+    auto_enabled = bool(enabled)
+
+
+def maybe_run_auto() -> None:
+    """Fallback no-op."""
 
 ###[deBug]
 # simulation.py 等で定義している GridWorld に追記/調整
@@ -223,6 +240,11 @@ if director_enabled and director_hud is not None:
         director_hud.set_progress(director.progress_text(director_world))
 
         rec_action, rec_minutes, rec_label = director.recommended_action(director_world)
+        if isinstance(director_world, dict):
+            if rec_action:
+                director_world["_recommended_action_id"] = rec_action
+            else:
+                director_world.pop("_recommended_action_id", None)
         if rec_action:
             label = f"★ {rec_label or rec_action} (+{rec_minutes}m)"
             director_hud.set_recommended(label, enabled=True)
@@ -281,12 +303,27 @@ if director_enabled and director_hud is not None:
         print(f"[UI] MicroGoal (reroll): {micro_text}")
         refresh_hud()
 
-    def on_auto_action() -> None:
+    def ai_step_once() -> None:
+        global _last_auto_step_ts
+
         if director_world is None:
             return
-        action_id, tmin = director.apply_auto_step(director_world)
-        if action_id:
-            execute_action(director_world, action_id)
+
+        actions = director.list_actions_for_mode(director.mode) or []
+        micro = director.get_micro_goal(director_world, reroll=False)
+        action_id, tmin, _ = pick_action(director_world, director.mode, actions, micro)
+        _last_auto_step_ts = time.monotonic()
+
+        if not action_id:
+            director.clear_micro_goal()
+            on_show_micro()
+            refresh_hud()
+            print("[RC_AI] no action; rerolled micro")
+            return
+
+        execute_action(director_world, action_id)
+        if isinstance(director_world, dict):
+            director_world["_last_action_id"] = action_id
         add_minutes(director_world, tmin)
         scenes = director.tick(director_world)
         if scenes:
@@ -303,6 +340,27 @@ if director_enabled and director_hud is not None:
             director.clear_micro_goal()
             print("[MICRO] completed -> next")
         on_show_micro()
+        refresh_hud()
+
+    def set_auto(enabled: bool) -> None:
+        global auto_enabled, _last_auto_step_ts
+
+        auto_enabled = bool(enabled)
+        if auto_enabled:
+            _last_auto_step_ts = time.monotonic() - AUTO_STEP_INTERVAL_SECONDS
+        if director_hud is not None:
+            director_hud.set_auto_enabled(auto_enabled)
+        state = "on" if auto_enabled else "off"
+        print(f"[RC_AI] auto={state}")
+
+    def maybe_run_auto() -> None:
+        if not auto_enabled:
+            return
+        if director_world is None:
+            return
+        if time.monotonic() - _last_auto_step_ts < AUTO_STEP_INTERVAL_SECONDS:
+            return
+        ai_step_once()
 
     def on_save() -> None:
         if director_world is None:
@@ -358,7 +416,9 @@ if director_enabled and director_hud is not None:
             print("[MICRO] completed -> next")
         on_show_micro()
 
-    director_hud.on_auto_action = on_auto_action
+    director_hud.on_auto_action = ai_step_once
+    director_hud.on_ai_step = ai_step_once
+    director_hud.on_toggle_auto = set_auto
     director_hud.on_reroll = on_reroll
     director_hud.on_save = on_save
     director_hud.on_load = on_load
@@ -375,6 +435,7 @@ if director_enabled and director_hud is not None:
 
     director_hud.set_modes(available_modes, on_change=on_mode_dropdown)
     director_hud.set_mode(director.mode)
+    director_hud.set_auto_enabled(auto_enabled)
     on_show_micro()
 
 """
@@ -510,9 +571,11 @@ def player_loop(gs):              # ← 引数で参照を受け取る
 
     # ② メインループ
     while gs["running"]:
+        maybe_run_auto()
         while scheduler.run_once():          # due を全部消化
             if director_hud is not None:
                 director_hud.pump()
+            maybe_run_auto()
         actor = gs["active_char"]
         director_world = gs.get("director_world")
         if director is not None and director_world is not None:
@@ -540,6 +603,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
                 cmd = event_q.get(timeout=0.05)
                 command_ready = True
             except Empty:
+                maybe_run_auto()
                 if director_hud is not None:
                     director_hud.pump()
                 time.sleep(0.01)
@@ -551,6 +615,7 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         if not command_ready:
             if director_hud is not None:
                 _pump_director_hud()
+            maybe_run_auto()
             time.sleep(0.01)
             continue
 
@@ -588,11 +653,13 @@ def player_loop(gs):              # ← 引数で参照を受け取る
         while scheduler.run_once() is not None:
             if director_hud is not None:
                 _pump_director_hud()
+            maybe_run_auto()
 
         # 操作キャラが変わっている可能性があるので再表示
         present_choices(gs["active_char"], gs)
         if director_hud is not None:
             _pump_director_hud()
+        maybe_run_auto()
         time.sleep(0.01)
 
 def choose_target_for_switch(rc_char, game_state):

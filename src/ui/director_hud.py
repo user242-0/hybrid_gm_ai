@@ -20,7 +20,10 @@ class DirectorHUD:
     def __init__(self, title: str = "Director HUD") -> None:
         self.root = tk.Tk()
         self.root.title(title)
-        self.root.geometry("480x260")
+        # The HUD shows multiple stacked rows; ensure the window is tall enough so the
+        # Auto/Next controls and help text are visible without manual resizing.
+        self.root.geometry("520x360")
+        self.root.minsize(520, 320)
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -30,11 +33,14 @@ class DirectorHUD:
         self.on_load: Optional[Callable[[], None]] = None
         self.on_show_micro: Optional[Callable[[], None]] = None
         self.on_action_select: Optional[Callable[[object], None]] = None
+        self.on_toggle_auto: Optional[Callable[[bool], None]] = None
+        self.on_ai_step: Optional[Callable[[], None]] = None
 
         self.mode_var = tk.StringVar(value="")
         self.clock_var = tk.StringVar(value="Day1 00:00")
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
         self.progress_var = tk.StringVar(value="")
+        self.auto_var = tk.BooleanVar(value=False)
 
         self.actions_var: list[tuple[str, str, int]] = []
         self.modes: list[str] = []
@@ -107,20 +113,37 @@ class DirectorHUD:
         self.listbox.bind("<Double-Button-1>", self._on_list_activate)
         self.listbox.bind("<Return>", self._on_list_activate)
 
+        row_auto = tk.Frame(frame, bg=frame["bg"])
+        row_auto.pack(fill="x", **pad)
+        tk.Checkbutton(
+            row_auto,
+            text="Auto",
+            variable=self.auto_var,
+            command=lambda: self.on_toggle_auto
+            and self.on_toggle_auto(self.auto_var.get()),
+        ).pack(side="left")
+        tk.Button(
+            row_auto,
+            text="Next (AI)",
+            command=lambda: self.on_ai_step and self.on_ai_step(),
+        ).pack(side="left", padx=8)
+
         row3 = tk.Frame(frame, bg=frame["bg"])
         row3.pack(fill="x", **pad)
         help_text = (
             "[Keys] Use Mode dropdown | 1..9:Run Action | G:Show Micro | R:Reroll Micro | "
-            "A:Auto(+time) | S:Save L:Load"
+            "A:Next(AI) | S:Save L:Load"
         )
-        tk.Label(
+        self.help_text = help_text
+        self.help_label = tk.Label(
             row3,
             text=help_text,
             fg="white",
             bg=frame["bg"],
             justify="left",
-            wraplength=440,
-        ).pack(side="left")
+            wraplength=460,
+        )
+        self.help_label.pack(side="left")
 
     def _bind_keys(self) -> None:
         root = self.root
@@ -128,8 +151,8 @@ class DirectorHUD:
         root.bind("<Key-G>", lambda _: self.on_show_micro and self.on_show_micro())
         root.bind("<Key-r>", lambda _: self.on_reroll and self.on_reroll())
         root.bind("<Key-R>", lambda _: self.on_reroll and self.on_reroll())
-        root.bind("<Key-a>", lambda _: self.on_auto_action and self.on_auto_action())
-        root.bind("<Key-A>", lambda _: self.on_auto_action and self.on_auto_action())
+        root.bind("<Key-a>", lambda _: self._trigger_ai_step())
+        root.bind("<Key-A>", lambda _: self._trigger_ai_step())
         root.bind("<Key-s>", lambda _: self.on_save and self.on_save())
         root.bind("<Key-S>", lambda _: self.on_save and self.on_save())
         root.bind("<Key-l>", lambda _: self.on_load and self.on_load())
@@ -216,6 +239,9 @@ class DirectorHUD:
 
         self._run_or_enqueue(apply)
 
+    def set_auto_enabled(self, enabled: bool) -> None:
+        self._run_or_enqueue(lambda: self.auto_var.set(bool(enabled)))
+
     def set_actions(self, actions: list[tuple[str, str, int]]) -> None:
         def apply() -> None:
             self.actions_var = actions
@@ -283,6 +309,12 @@ class DirectorHUD:
         except tk.TclError:
             return False
         return True
+
+    def _trigger_ai_step(self) -> None:
+        if self.on_ai_step:
+            self.on_ai_step()
+        elif self.on_auto_action:
+            self.on_auto_action()
 
     def _run_or_enqueue(self, func: Callable[[], None]) -> None:
         if threading.current_thread() is self._ui_thread:
