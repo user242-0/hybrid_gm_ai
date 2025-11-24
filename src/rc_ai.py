@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from random import choices as rnd_choices
 from typing import Dict, List, Optional, Tuple
 
+from src.action_definitions import get_action_def
 from src.requirements_checker import RequirementsChecker
 
 
@@ -22,8 +22,28 @@ def select_action(rc_char, game_state, available):
     if not green:
         return None
 
+    from random import choices as rnd_choices
+
     weights = [c.emotion_value for c in green]
     return rnd_choices(green, weights=weights, k=1)[0]
+
+
+def get_emotion(world: Dict) -> Dict[str, float]:
+    emo = world.get("emotion") if isinstance(world, dict) else {}
+    r = (emo or {}).get("R", 127) / 255.0
+    g = (emo or {}).get("G", 127) / 255.0
+    b = (emo or {}).get("B", 255) / 255.0
+    return {"R": r, "G": g, "B": b}
+
+
+def emotion_weights(emotion: Dict[str, float]) -> Dict[str, float]:
+    r, g, b = emotion["R"], emotion["G"], emotion["B"]
+    return {
+        "w_micro": 0.4 + 0.4 * g,
+        "w_relief": 0.3 + 0.5 * r,
+        "w_empathy": 0.2 + 0.6 * b,
+        "w_novelty": 0.2 + 0.5 * r - 0.2 * g,
+    }
 
 
 def pick_action(
@@ -37,48 +57,43 @@ def pick_action(
     if not actions:
         return None, 0, "no-actions"
 
-    def score(action: Dict) -> float:
+    emo = get_emotion(world)
+    w = emotion_weights(emo)
+
+    last = world.get("_last_action_id") if isinstance(world, dict) else None
+
+    def emo_score_for_action(aid: str) -> float:
+        adef = get_action_def(aid)
+        delta = adef.get("emotion_delta") or {}
+        dR = delta.get("R", 0)
+        dG = delta.get("G", 0)
+        dB = delta.get("B", 0)
+
+        s_relief = w["w_relief"] * max(0.0, emo["R"] * (-dR / 20.0))
+        s_control = w["w_micro"] * max(0.0, emo["G"] * (dG / 20.0))
+        s_empathy = w["w_empathy"] * max(0.0, emo["B"] * (dB / 20.0))
+        return s_relief + s_control + s_empathy
+
+    def base_score(a: Dict) -> float:
         s = 0.0
-        action_id = action.get("action")
+        aid = a.get("action")
+        t = int(a.get("time_min", 5)) if a.get("time_min") is not None else 5
 
-        # 1) MicroGoal priority
-        if micro_hint and isinstance(world, dict):
-            recommended_id = world.get("_recommended_action_id")
-            if recommended_id and action_id == recommended_id:
-                s += 100
+        if micro_hint and a.get("text") and micro_hint.split(" ")[0] in a["text"]:
+            s += 30
 
-        if micro_hint and action.get("text"):
-            first_word = micro_hint.split(" ")[0]
-            if first_word and first_word in action["text"]:
-                s += 50
+        s += max(0, 10 - min(t, 10)) * 0.5
 
-        # 2) Prefer feasible actions if ``can_do`` helper exists
-        try:
-            from src.action_registry import can_do  # type: ignore
-
-            if callable(can_do) and action_id and can_do(world, action_id):
-                s += 30
-        except Exception:
-            pass
-
-        # 3) Slight bias towards shorter actions
-        try:
-            duration = int(action.get("time_min", 5))
-        except (TypeError, ValueError):
-            duration = 5
-        s += max(0, 10 - min(duration, 10)) * 0.5
-
-        # 4) Avoid repeating the last action if possible
-        last = world.get("_last_action_id") if isinstance(world, dict) else None
-        if last and action_id == last:
+        if last and aid == last:
             s -= 10
 
+        s += emo_score_for_action(aid)
         return s
 
-    ranked = sorted(actions, key=score, reverse=True)
+    ranked = sorted(actions, key=base_score, reverse=True)
     best = ranked[0]
     try:
         minutes = int(best.get("time_min", 5))
     except (TypeError, ValueError):
         minutes = 5
-    return best.get("action"), max(0, minutes), "rc_ai-v0"
+    return best.get("action"), max(0, minutes), "rc_ai-rgb-v1"
