@@ -7,6 +7,7 @@ import yaml
 import pathlib
 
 from logic.cond_eval import eval_cond, parse_cond, _get_path as get_path
+from logic.emotion_traits import derived_traits
 
 
 LEGACY_MICRO_RULES: Dict[str, Dict[str, Any]] = {
@@ -433,6 +434,43 @@ class Director:
         sobriety_days = world.get("sobriety_days", 0)
         if sobriety_days >= 3:
             world.setdefault("unlocks", set()).add("SwitchToPURSUE")
+
+        try:
+            bold, kind, guilt = derived_traits(world)
+        except Exception:
+            bold = kind = guilt = 0.0
+
+        emo = world.get("emotion", {})
+        r = emo.get("R", 127)
+        g = emo.get("G", 127)
+        b = emo.get("B", 127)
+
+        flags = world.setdefault("flags", {})
+        near_miss_fired = flags.get("near_miss_victim_family", False)
+
+        if (
+            self.mode == "PURSUE"
+            and not near_miss_fired
+            and r >= 80
+            and b >= 160
+        ):
+            scene = {
+                "id": "near_miss_victim_family",
+                "intent": "NearMiss",
+                "why_now": "high_bold_and_kind_in_pursue",
+                "salience": 0.85,
+                "mode": self.mode,
+                "emotion_snapshot": {"R": r, "G": g, "B": b},
+                "traits": {"boldness": bold, "kindness": kind, "guilt": guilt},
+                "clock": world.get("clock", "Day1 00:00"),
+                "meta": {"type": "emotion_trigger", "once": True},
+            }
+            scenes.append(scene)
+            flags["near_miss_victim_family"] = True
+            print(
+                f"[Director] NearMiss scene injected (R={r}, B={b}, "
+                f"bold={bold:.2f}, kind={kind:.2f})"
+            )
 
         return scenes
 
