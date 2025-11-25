@@ -137,47 +137,47 @@ ACTIONS: Dict[str, Dict[str, Any]] = {
         "label": "酒量を抑える",
         "time_min": 10,
         # R=衝動, G=自己制御, B=優しさ
-        "emotion_delta": {"R": -20, "G": +15, "B": 0},
+        "emotion_delta": {"R": -10, "G": +7, "B": 0},
     },
     "check_tip": {
         "label": "未読の通報を1件だけ確認",
         "time_min": 5,
-        "emotion_delta": {"R": -5, "G": +10, "B": +5},
+        "emotion_delta": {"R": -2, "G": +5, "B": +2},
     },
     "log_victim": {
         "label": "被害者の名前をノートに1人追記",
         "time_min": 3,
-        "emotion_delta": {"R": 0, "G": +5, "B": +10},
+        "emotion_delta": {"R": 0, "G": +3, "B": +5},
     },
     "collect_fiber": {
         "label": "現場で青い繊維を1点採取",
         "time_min": 15,
-        "emotion_delta": {"R": +5, "G": +10, "B": +5},
+        "emotion_delta": {"R": +2, "G": +5, "B": +2},
     },
     "fix_cam_clock": {
         "label": "監視カメラの時刻ズレを補正",
         "time_min": 12,
-        "emotion_delta": {"R": 0, "G": +10, "B": +10},
+        "emotion_delta": {"R": 0, "G": +5, "B": +5},
     },
     "call_partner": {
         "label": "元相棒に5分だけ電話",
         "time_min": 5,
-        "emotion_delta": {"R": -5, "G": 0, "B": +15},
+        "emotion_delta": {"R": -2, "G": 0, "B": +7},
     },
     "move_low_profile": {
         "label": "目立たず移動する",
         "time_min": 8,
-        "emotion_delta": {"R": -5, "G": +10, "B": 0},
+        "emotion_delta": {"R": -2, "G": +5, "B": 0},
     },
     "mark_avoid_shop": {
         "label": "立ち寄り危険な店を避けるタグを付ける",
         "time_min": 4,
-        "emotion_delta": {"R": -5, "G": +5, "B": +5},
+        "emotion_delta": {"R": -2, "G": +2, "B": +2},
     },
     "file_report": {
         "label": "報告書を提出する",
         "time_min": 20,
-        "emotion_delta": {"R": -10, "G": +15, "B": +10},
+        "emotion_delta": {"R": -5, "G": +7, "B": +5},
     },
 }
 

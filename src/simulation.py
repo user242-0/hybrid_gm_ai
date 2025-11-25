@@ -320,12 +320,24 @@ if director_enabled and director_hud is not None:
             refresh_hud()
             print("[RC_AI] no action; rerolled micro")
             return
-
+        ###↓
+        emo_before = director_world.get("emotion", {}).copy()
+        ###↑
         execute_action(director_world, action_id)
         if isinstance(director_world, dict):
             director_world["_last_action_id"] = action_id
         add_minutes(director_world, tmin)
         scenes = director.tick(director_world)
+
+        ###↓
+        emo_after = director_world.get("emotion", {})
+        print(
+            f"[RC_AI] picked={action_id} reason={_} "
+            f"emotion R:{emo_before.get('R')}→{emo_after.get('R')} "
+            f"G:{emo_before.get('G')}→{emo_after.get('G')} "
+            f"B:{emo_before.get('B')}→{emo_after.get('B')}"
+        )
+        ###↑
         if scenes:
             write_scenes_to_scene_graph(scenes)
             for scene in scenes:

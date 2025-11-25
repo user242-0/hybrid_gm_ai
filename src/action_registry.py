@@ -19,8 +19,14 @@ def ensure_emotion(world: Dict[str, Any]) -> None:
     emo = world.setdefault("emotion", {})
     emo.setdefault("R", 127)
     emo.setdefault("G", 127)
-    emo.setdefault("B", 255)
+    emo.setdefault("B", 127)
 
+def relax_emotion(world, rate=0.02):
+    emo = world.get("emotion", {})
+    for ch in ("R","G","B"):
+        v = emo.get(ch, 127)
+        v = v + (127 - v) * rate    # 2%だけ中庸へ
+        emo[ch] = int(v)
 
 def apply_emotion_delta(world: Dict[str, Any], action_id: str) -> None:
     ensure_emotion(world)
@@ -28,7 +34,21 @@ def apply_emotion_delta(world: Dict[str, Any], action_id: str) -> None:
     delta = get_action_def(action_id).get("emotion_delta") or {}
     for ch in ("R", "G", "B"):
         if ch in delta:
-            emo[ch] = int(max(0, min(255, emo.get(ch, 127) + delta[ch])))
+            v = emo.get(ch, 127)
+            d = delta.get(ch, 0)
+
+            # 中心(127)からの距離 0.0〜1.0
+            dist = abs(v - 127) / 127.0
+            # 端に近いほどスケールを小さく（中心1.0 → 端0.3くらい）
+            scale = 1.0 - 0.7 * dist
+            d_scaled = int(d * scale)
+
+            v = v + d_scaled
+            # ここでだけ clamp（80〜180 とか）
+            v = max(0, min(255, v))
+            emo[ch] = v
+            relax_emotion(world, rate=0.02)
+            #emo[ch] = int(max(80, min(180, emo.get(ch, 127) + delta[ch])))
 
 
 def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
@@ -38,7 +58,9 @@ def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
         return
 
     ensure_emotion(world)
-
+    ###↓
+    before = world["emotion"].copy()
+    ###↑
     if action_id == "check_tip":
         world["tips_checked"] = world.get("tips_checked", 0) + 1
     elif action_id == "limit_drink":
@@ -67,3 +89,13 @@ def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
         pass
 
     apply_emotion_delta(world, action_id)
+    ###↓
+    after = world["emotion"]
+
+    print(
+        f"[EMO] action={action_id} "
+        f"R:{before['R']}→{after['R']} "
+        f"G:{before['G']}→{after['G']} "
+        f"B:{before['B']}→{after['B']}"
+    )
+    ###↑
