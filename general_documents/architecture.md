@@ -40,3 +40,15 @@ Input → Director → HUD/GUI → Action → World update → Director → Scen
 ## 5. TODO (next sessions)
 - UI unification
 - World loader
+
+## Action pipeline (post “needle extraction”)
+- Actions are normalized into ActionSpec (legacy + new ACTIONS share the same model)
+- execute_action applies: requirements → time_min → emotion_delta → effects → function → legacy fallback
+- world defaults are provided by pack.world_defaults and merged at init
+
+Files:
+- src/action_model.py, src/action_effects.py, src/action_definitions.py, src/action_registry.py
+- src/world_defaults.py
+- pack: data/director/packs/cop_trickster.yml (world_defaults)
+Tests:
+- tests/test_action_effects.py
