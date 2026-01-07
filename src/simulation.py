@@ -10,7 +10,7 @@ from src.character_status import CharacterStatus
 from src.init_state  import init_game_state
 
 # dictionary import
-from src.action_definitions import actions
+from src.action_definitions import actions, get_action_spec, get_action_specs
 
 #gui import
 from src.event_bus import event_q, log_q
@@ -25,8 +25,9 @@ from src.rc_ai import pick_action, select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
 from src.utility.config_loader import job_root_from_cfg, load_config
-from director.registry import synthesize_from_text
+from director.registry import load_pack, synthesize_from_text
 from director.director import Director, load_yaml
+from src.world_defaults import apply_world_defaults
 
 try:
     from tkinter import TclError
@@ -172,6 +173,11 @@ if director_enabled:
         goals_path = BASE_DIR / "data/director/cop_trickster_goals.yml"
         goals = load_yaml(str(goals_path)) or {}
         pack_id = "cop_trickster"
+    pack_data = load_pack(pack_id) if pack_id else None
+    if isinstance(pack_data, dict):
+        pack_data = dict(pack_data)
+        pack_data.setdefault("id", pack_id)
+    get_action_specs(pack_data)
     director = Director(premise=premise, goals_dict=goals)
     print(
         f"[Director] enabled seed={premise.get('seed')} "
@@ -184,6 +190,7 @@ if director_enabled:
         director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
     else:
         director_world = director.synthesize_world()
+        director_world = apply_world_defaults(director_world, pack_data)
     ensure_clock(director_world)
 
     game_state["director_world"] = director_world
@@ -256,7 +263,8 @@ if director_enabled and director_hud is not None:
             action_id = record.get("action")
             if not action_id:
                 continue
-            label = record.get("text") or action_id
+            spec = get_action_spec(action_id)
+            label = record.get("text") or (spec.label if spec else action_id)
             try:
                 minutes = int(record.get("time_min", 5))
             except (TypeError, ValueError):
@@ -705,5 +713,4 @@ if __name__ == "__main__":
             time.sleep(0.01)
     except SystemExit:
         pass                        # どこかのスレッドで raise SystemExit 渡ってきたら即終了
-
 

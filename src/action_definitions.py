@@ -1,6 +1,8 @@
 """Action definitions for both runtime actions and RC auto actions."""
 
-from typing import Any, Dict
+from __future__ import annotations
+
+from typing import Any, Dict, Iterable, Optional
 
 from src.actions import (
     accept_attack,
@@ -18,6 +20,7 @@ from src.actions import (
 )
 from src.control_manager import switch_character_action
 from src.emotion_manager import set_emotion_color_action
+from src.action_model import ActionSpec
 
 
 actions = {
@@ -138,11 +141,16 @@ ACTIONS: Dict[str, Dict[str, Any]] = {
         "time_min": 10,
         # R=衝動, G=自己制御, B=優しさ
         "emotion_delta": {"R": -10, "G": +7, "B": 0},
+        "effects": [
+            {"op": "add", "path": "sobriety_days", "value": 1},
+            {"op": "add", "path": "entropy.value", "value": -1, "min": 0},
+        ],
     },
     "check_tip": {
         "label": "未読の通報を1件だけ確認",
         "time_min": 5,
         "emotion_delta": {"R": -2, "G": +5, "B": +2},
+        "effects": [{"op": "add", "path": "tips_checked", "value": 1}],
     },
     "log_victim": {
         "label": "被害者の名前をノートに1人追記",
@@ -153,6 +161,7 @@ ACTIONS: Dict[str, Dict[str, Any]] = {
         "label": "現場で青い繊維を1点採取",
         "time_min": 15,
         "emotion_delta": {"R": +2, "G": +5, "B": +2},
+        "effects": [{"op": "add", "path": "evidence_score", "value": 10}],
     },
     "fix_cam_clock": {
         "label": "監視カメラの時刻ズレを補正",
@@ -163,6 +172,7 @@ ACTIONS: Dict[str, Dict[str, Any]] = {
         "label": "元相棒に5分だけ電話",
         "time_min": 5,
         "emotion_delta": {"R": -2, "G": 0, "B": +7},
+        "effects": [{"op": "add", "path": "partner_calls", "value": 1}],
     },
     "move_low_profile": {
         "label": "目立たず移動する",
@@ -181,6 +191,106 @@ ACTIONS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+_ACTION_SPECS_CACHE: Dict[str, Dict[str, ActionSpec]] = {}
+_LATEST_PACK_KEY = "none"
+
+
+def _pack_key(pack: Optional[Dict[str, Any]]) -> str:
+    if not isinstance(pack, dict):
+        return "none"
+    return str(pack.get("id") or pack.get("title") or "pack")
+
+
+def _iter_pack_actions(pack: Optional[Dict[str, Any]]) -> Iterable[tuple[str, Dict[str, Any]]]:
+    if not isinstance(pack, dict):
+        return []
+    actions_data = pack.get("actions") or pack.get("action_specs")
+    if isinstance(actions_data, dict):
+        return list(actions_data.items())
+    if isinstance(actions_data, list):
+        pairs = []
+        for item in actions_data:
+            if isinstance(item, dict) and item.get("id"):
+                pairs.append((item["id"], item))
+        return pairs
+    return []
+
+
+def _spec_from_new(action_id: str, data: Dict[str, Any]) -> ActionSpec:
+    return ActionSpec(
+        id=action_id,
+        label=str(data.get("label") or action_id),
+        description=data.get("description"),
+        time_min=int(data.get("time_min") or 0),
+        emotion_delta=data.get("emotion_delta"),
+        tags=data.get("tags"),
+        requirements=data.get("requirements"),
+        args_template=data.get("args_template"),
+        available_to=data.get("available_to") or ["player", "npc"],
+        effects=data.get("effects"),
+        function=data.get("function"),
+        id_aliases=list(data.get("id_aliases") or []),
+    )
+
+
+def _spec_from_legacy(action_id: str, data: Dict[str, Any]) -> ActionSpec:
+    return ActionSpec(
+        id=action_id,
+        label=str(data.get("label") or action_id),
+        description=data.get("description"),
+        time_min=int(data.get("time_min") or 0),
+        emotion_delta=data.get("emotion_delta"),
+        tags=data.get("tags"),
+        requirements=data.get("requirements"),
+        args_template=data.get("args_template") or [],
+        available_to=data.get("available_to"),
+        effects=data.get("effects"),
+        function=data.get("function"),
+        id_aliases=list(data.get("id_aliases") or []),
+    )
+
+
+def get_action_specs(pack: Dict[str, Any] | None = None) -> Dict[str, ActionSpec]:
+    global _LATEST_PACK_KEY
+    pack_key = _pack_key(pack)
+    _LATEST_PACK_KEY = pack_key
+    if pack_key in _ACTION_SPECS_CACHE:
+        return _ACTION_SPECS_CACHE[pack_key]
+
+    specs: Dict[str, ActionSpec] = {}
+    legacy_count = 0
+    pack_count = 0
+    for action_id, data in actions.items():
+        if isinstance(data, dict):
+            specs[action_id] = _spec_from_legacy(action_id, data)
+            legacy_count += 1
+    for action_id, data in ACTIONS.items():
+        if isinstance(data, dict):
+            specs[action_id] = _spec_from_new(action_id, data)
+    for action_id, data in _iter_pack_actions(pack):
+        if isinstance(data, dict):
+            specs[action_id] = _spec_from_new(action_id, data)
+            pack_count += 1
+
+    _ACTION_SPECS_CACHE[pack_key] = specs
+    pack_name = pack_key if pack_key != "none" else "none"
+    print(f"[ACTIONS] loaded specs={len(specs)} legacy={legacy_count} pack={pack_name}")
+    return specs
+
+
+def get_action_spec(action_id: str) -> ActionSpec | None:
+    if not action_id:
+        return None
+    specs = _ACTION_SPECS_CACHE.get(_LATEST_PACK_KEY) or get_action_specs()
+    spec = specs.get(action_id)
+    if spec:
+        return spec
+    for candidate in specs.values():
+        if action_id in (candidate.id_aliases or []):
+            return candidate
+    return None
+
 
 def get_action_def(action_id: str) -> Dict[str, Any]:
-    return ACTIONS.get(action_id, {})
+    spec = get_action_spec(action_id)
+    return spec.to_dict() if spec else {}

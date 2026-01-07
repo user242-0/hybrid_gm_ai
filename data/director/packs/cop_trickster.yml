@@ -15,6 +15,14 @@ modes_enabled:
 tone:
   - "neo-noir"
   - "slow_burn"
+world_defaults:
+  sobriety_days: 0
+  victim_names_logged: 0
+  evidence_score: 0
+  flags: {}
+  harm:
+    value: 0
+    threshold_warn: 20
 
 modes:
   FREEZE:

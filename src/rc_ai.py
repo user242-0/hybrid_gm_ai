@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
-from src.action_definitions import get_action_def
+from src.action_definitions import get_action_spec
 from src.requirements_checker import RequirementsChecker
 
 
@@ -63,8 +63,8 @@ def pick_action(
     last = world.get("_last_action_id") if isinstance(world, dict) else None
 
     def emo_score_for_action(aid: str) -> float:
-        adef = get_action_def(aid)
-        delta = adef.get("emotion_delta") or {}
+        spec = get_action_spec(aid)
+        delta = spec.emotion_delta if spec else {}
         dR = delta.get("R", 0)
         dG = delta.get("G", 0)
         dB = delta.get("B", 0)

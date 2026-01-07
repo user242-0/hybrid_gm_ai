@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from src.action_definitions import get_action_def
+from src.action_definitions import get_action_spec
+from src.action_effects import apply_effects
 
 
 def _ensure_meter(world: Dict[str, Any], key: str) -> Dict[str, Any]:
@@ -31,7 +32,8 @@ def relax_emotion(world, rate=0.02):
 def apply_emotion_delta(world: Dict[str, Any], action_id: str) -> None:
     ensure_emotion(world)
     emo = world["emotion"]
-    delta = get_action_def(action_id).get("emotion_delta") or {}
+    spec = get_action_spec(action_id)
+    delta = spec.emotion_delta if spec else {}
     for ch in ("R", "G", "B"):
         if ch in delta:
             v = emo.get(ch, 127)
@@ -51,16 +53,26 @@ def apply_emotion_delta(world: Dict[str, Any], action_id: str) -> None:
             #emo[ch] = int(max(80, min(180, emo.get(ch, 127) + delta[ch])))
 
 
-def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
-    """Mutate ``world`` according to the requested ``action_id``."""
+def _requirements_met(world: Dict[str, Any], requirements: Any) -> bool:
+    if not requirements:
+        return True
+    if callable(requirements):
+        return bool(requirements(world))
+    if isinstance(requirements, list):
+        return all(bool(world.get(key)) for key in requirements)
+    if isinstance(requirements, dict):
+        for key, value in requirements.items():
+            current = world.get(key)
+            if isinstance(value, bool):
+                if bool(current) is not value:
+                    return False
+            elif current != value:
+                return False
+        return True
+    return True
 
-    if not isinstance(world, dict) or not action_id:
-        return
 
-    ensure_emotion(world)
-    ###↓
-    before = world["emotion"].copy()
-    ###↑
+def legacy_execute_action(world: Dict[str, Any], action_id: str) -> None:
     if action_id == "check_tip":
         world["tips_checked"] = world.get("tips_checked", 0) + 1
     elif action_id == "limit_drink":
@@ -84,9 +96,31 @@ def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
         world["avoid_tags"] = world.get("avoid_tags", 0) + 1
     elif action_id == "file_report":
         world["report_submitted"] = world.get("report_submitted", 0) + 1
-    else:
-        # Fallback – no direct mutation.
-        pass
+
+
+def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
+    """Mutate ``world`` according to the requested ``action_id``."""
+
+    if not isinstance(world, dict) or not action_id:
+        return
+
+    ensure_emotion(world)
+    ###↓
+    before = world["emotion"].copy()
+    ###↑
+    spec = get_action_spec(action_id)
+    if spec and not _requirements_met(world, spec.requirements):
+        return
+
+    if spec and spec.effects:
+        apply_effects(world, spec.effects)
+        print(f"[EFFECTS] action={action_id} applied={len(spec.effects)}")
+
+    if spec and spec.function:
+        spec.function(world)
+
+    if not spec or (not spec.effects and not spec.function):
+        legacy_execute_action(world, action_id)
 
     apply_emotion_delta(world, action_id)
     ###↓
