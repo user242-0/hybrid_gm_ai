@@ -1,0 +1,46 @@
+【セッション19+20 まとめ（diary）】
+
+■今回のテーマ
+- 「セーブ＆リロードの影響」を物語とシステムに織り込み、Director層＋HUD＋MicroGoal進行を実動させる。
+- さらに、RC_AI（行動選択）と感情（RGB）を接続し、「キャラの脈動」をシミュレーションの中で観測できる状態にする。
+
+■到達した大きな成果
+1) Director層＋HUDが実用段階に到達
+- HUD表示（MicroGoal / Progress / Actions / Recommended 等）が動作。
+- Aで自動進行、時間（Clock: DayN HH:MM）が進み、MicroGoalが切り替わる。
+- save/loadで reload_epoch を記録し、世界が「リロードした事実」を保持できるようになった。
+
+2) MicroGoalの安定化
+- 即時重複の抑制、最近N件クールダウンなどでMicroGoalが暴れないように調整。
+- R/A/モード切替までMicroGoalを固定し、手触りが「ゲーム」に寄った。
+
+3) シナリオパック化（複数シナリオ起動）
+- --premise-text などから pack を選べるレジストリ導入。
+- cop_trickster / rogue_master / pseudo_matrix など複数の世界でDirector/HUDが起動し、共通の仕組みで回せる土台ができた。
+- モードごとの表示や推奨アクションがパックに追従するようになり、シナリオ差し替えが現実味を帯びた。
+
+4) RC_AI × Emotion(RGB) の稼働
+- emotion_delta を導入し、行動実行でR/G/Bが変化するようになった。
+- 極端値への張り付き問題に対し「端でdeltaを弱める」「relax_emotionで中庸へ戻す」を実装し、振動（脈動）が観測可能に。
+- 特にPURSUEモードでRが鼓動するような挙動が現れ、「刑事がPURSUEの時だけ生きている」感覚が出た。
+
+5) 印象的なシーンの発火（詩が壊れない演出）
+- PURSUEでR高+B高の条件下で「被害者遺族とすれ違う」などの燃え上がるシーンが起き、Director層とRC_AIの噛み合いを実感。
+- 物語（演出）と数値（状態）が結びつき始めた。
+
+■今回の技術的ハイライト（針抜き）
+- ActionSpec + effects適用パイプライン + pack world_defaults を導入し、旧実装を壊さずに統合の基礎工事を完了。
+  - legacy/new action定義をActionSpecへ正規化（互換維持）
+  - execute_actionはeffects/function優先、無ければlegacy if/elifへfallback
+  - world defaults をpack側定義としてマージ
+  - RC_AI/registry/HUDのラベル参照もActionSpecに集約
+- テスト追加：pack defaults merge / effects apply のpytestが通過。
+
+■残課題（次へ）
+- is_micro_goal_done を pack側 done_condition（宣言的条件）へ移す（準備は整った）。
+- UI統合（HUD / 旧GUI / CLI を同一 request_action パイプに統合）＝セッション21のテーマ候補。
+- その後に世界ローダー（worldテンプレ、地形/マップ、役割セット）へ拡張して多ジャンル対応へ。
+
+■所感
+- 「セーブ＆リロード」→「世界が記憶する」→「感情が鼓動する」へ進み、ゲームマスターAIが“眺めてるだけでも進む”段階に到達。
+- RC_AIがただの選択器ではなく、キャラクターの心拍として感じられるところまで来た。
