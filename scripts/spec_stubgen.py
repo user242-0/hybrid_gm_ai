@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import inspect
 import re
 import sys
 import types
@@ -36,22 +35,18 @@ def load_pack(path: Path) -> Dict[str, Any]:
     return data or {}
 
 
+def dump_yaml_text(data: Dict[str, Any]) -> str:
+    rendered = yaml.safe_dump(data, allow_unicode=True)
+    if isinstance(rendered, tuple):
+        rendered = rendered[0]
+    if not isinstance(rendered, str):
+        rendered = str(rendered)
+    return rendered
+
+
 def dump_pack(path: Path, data: Dict[str, Any]) -> None:
-    with path.open("w", encoding="utf-8") as handle:
-        dump_kwargs = {
-            "data": data,
-            "allow_unicode": True,
-            "sort_keys": False,
-            "default_flow_style": False,
-        }
-        signature = inspect.signature(yaml.safe_dump)
-        if "stream" in signature.parameters:
-            dump_kwargs["stream"] = handle
-            yaml.safe_dump(**dump_kwargs)
-            return
-        rendered = yaml.safe_dump(**dump_kwargs)
-        if isinstance(rendered, str):
-            handle.write(rendered)
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(dump_yaml_text(data))
 
 
 def extract_condition_vars(text: str) -> Optional[str]:
@@ -167,10 +162,10 @@ def seed_world_defaults(
         pack["world_defaults"] = world_defaults
     if not isinstance(world_defaults, dict):
         return False
-    before = yaml.safe_dump(world_defaults, allow_unicode=True, sort_keys=True)
+    before = dump_yaml_text(world_defaults)
     for var in sorted(condition_vars | effect_paths):
         set_default_path(world_defaults, var, 0)
-    after = yaml.safe_dump(world_defaults, allow_unicode=True, sort_keys=True)
+    after = dump_yaml_text(world_defaults)
     return before != after
 
 
