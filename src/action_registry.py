@@ -33,7 +33,10 @@ def apply_emotion_delta(world: Dict[str, Any], action_id: str) -> None:
     ensure_emotion(world)
     emo = world["emotion"]
     spec = get_action_spec(action_id)
-    delta = spec.emotion_delta if spec else {}
+    raw = spec.emotion_delta if spec else {}
+    delta = raw if isinstance(raw, dict) else {}
+    if not delta:
+        return
     for ch in ("R", "G", "B"):
         if ch in delta:
             v = emo.get(ch, 127)
@@ -49,8 +52,8 @@ def apply_emotion_delta(world: Dict[str, Any], action_id: str) -> None:
             # ここでだけ clamp（80〜180 とか）
             v = max(0, min(255, v))
             emo[ch] = v
-            relax_emotion(world, rate=0.02)
             #emo[ch] = int(max(80, min(180, emo.get(ch, 127) + delta[ch])))
+    relax_emotion(world, rate=0.02)
 
 
 def _requirements_met(world: Dict[str, Any], requirements: Any) -> bool:
