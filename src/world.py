@@ -34,10 +34,35 @@ def _derive_time_of_day(clock: Dict[str, int]) -> str:
     return _phase_from_hour(hour)
 
 
+def _clock_from_label(label: str | None) -> Dict[str, int]:
+    if not label:
+        return _clock_from_minutes(0)
+    try:
+        day_part, time_part = label.split(maxsplit=1)
+        day = int(day_part.replace("Day", ""))
+        hour_str, minute_str = time_part.split(":", maxsplit=1)
+        hour = int(hour_str)
+        minute = int(minute_str)
+        return {"day": max(day, 1), "hour": max(hour, 0), "minute": max(minute, 0)}
+    except (ValueError, AttributeError):
+        return _clock_from_minutes(0)
+
+
 def _advance_minutes(world: Dict, minutes: float) -> Tuple[Dict[str, int], Dict[str, int]]:
     """Advance the internal clock by ``minutes`` and return old/new values."""
 
-    previous_clock = dict(world["clock"])
+    clock_value = world.get("clock")
+    if isinstance(clock_value, dict):
+        previous_clock = dict(clock_value)
+    else:
+        previous_clock = _clock_from_label(clock_value if isinstance(clock_value, str) else None)
+        world["clock"] = dict(previous_clock)
+    if world.get("t_min") is None:
+        world["t_min"] = (
+            (previous_clock["day"] - 1) * MINUTES_PER_DAY
+            + previous_clock["hour"] * MINUTES_PER_HOUR
+            + previous_clock["minute"]
+        )
     delta = int(round(minutes))
     world["t_min"] = max(world.get("t_min", 0) + delta, 0)
     world["clock"] = _clock_from_minutes(world["t_min"])

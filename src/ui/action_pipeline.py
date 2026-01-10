@@ -7,6 +7,7 @@ from src import action_registry
 from src.action_definitions import actions as legacy_actions, get_action_spec
 from src.requirements_checker import RequirementsChecker
 from src.simulation_utils import add_minutes, ensure_clock
+from src.world import world_tick
 
 
 @dataclass
@@ -64,8 +65,11 @@ class ActionPipeline:
         except (TypeError, ValueError):
             dt_value = 0
         if world is not None and dt_value > 0:
-            ensure_clock(world)
-            add_minutes(world, dt_value)
+            if world.get("t_min") is not None or isinstance(world.get("clock"), dict):
+                world_tick(self.game_state, dt=dt_value)
+            else:
+                ensure_clock(world)
+                add_minutes(world, dt_value)
 
         if world is not None:
             action_registry.ensure_emotion(world)
@@ -93,7 +97,11 @@ class ActionPipeline:
         if world is not None and self.hud_set_clock is not None:
             ensure_clock(world)
             clock_label = world.get("clock")
-            if isinstance(clock_label, str):
+            if isinstance(clock_label, dict):
+                self.hud_set_clock(
+                    f"Day{clock_label['day']} {clock_label['hour']:02d}:{clock_label['minute']:02d}"
+                )
+            elif isinstance(clock_label, str):
                 self.hud_set_clock(clock_label)
         if self.hud_set_microgoal is not None:
             self.hud_set_microgoal(self.game_state.get("director_micro_goal"))
