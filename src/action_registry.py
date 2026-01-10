@@ -133,3 +133,9 @@ def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
         f"B:{before['B']}→{after['B']}"
     )
     ###↑
+
+
+def execute_action_core(world: Dict[str, Any] | None, action_id: str | None) -> None:
+    """Core action execution for world actions (pack/world requirements handled later)."""
+
+    execute_action(world, action_id)
