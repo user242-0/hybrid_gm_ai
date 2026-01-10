@@ -98,16 +98,12 @@ def legacy_execute_action(world: Dict[str, Any], action_id: str) -> None:
         world["report_submitted"] = world.get("report_submitted", 0) + 1
 
 
-def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
-    """Mutate ``world`` according to the requested ``action_id``."""
+def execute_action_core(world: Dict[str, Any] | None, action_id: str | None) -> None:
+    """Core action execution for world actions (pack/world requirements handled later)."""
 
     if not isinstance(world, dict) or not action_id:
         return
 
-    ensure_emotion(world)
-    ###↓
-    before = world["emotion"].copy()
-    ###↑
     spec = get_action_spec(action_id)
     if spec and not _requirements_met(world, spec.requirements):
         return
@@ -121,6 +117,20 @@ def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
 
     if not spec or (not spec.effects and not spec.function):
         legacy_execute_action(world, action_id)
+
+
+def execute_action(world: Dict[str, Any] | None, action_id: str | None) -> None:
+    """Mutate ``world`` according to the requested ``action_id``."""
+
+    if not isinstance(world, dict) or not action_id:
+        return
+
+    ensure_emotion(world)
+    ###↓
+    before = world["emotion"].copy()
+    ###↑
+
+    execute_action_core(world, action_id)
 
     apply_emotion_delta(world, action_id)
     ###↓

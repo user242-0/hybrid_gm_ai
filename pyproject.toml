@@ -20,6 +20,14 @@ dev = [
   "numpy>=2.2.5"
 ]
 
+image = [
+  "diffusers",
+  "torch",
+  "transformers",
+  "accelerate",
+  "safetensors"
+]
+
 [tool.setuptools]
 
 [tool.setuptools.packages.find]

@@ -1,0 +1,16 @@
+PyYAML>=6.0
+
+[dev]
+pytest
+python-dotenv
+openai>=1.0
+colorama
+PyYAML>=6.0
+numpy>=2.2.5
+
+[image]
+diffusers
+torch
+transformers
+accelerate
+safetensors

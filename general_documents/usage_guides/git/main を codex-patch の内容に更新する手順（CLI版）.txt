@@ -1,0 +1,40 @@
+# main を codex-patch の内容に更新する手順（CLI版）
+# 前提：作業は codex-patch ブランチで進めている。main を追従させたい。
+
+(0) 事前確認：作業ツリーをクリーンにする
+    git status
+    ※変更が残っているなら先に commit する
+
+(1) codex-patch をリモートへ push（最新版を確定）
+    git checkout codex-patch
+    git push origin codex-patch
+
+(2) main を最新にしてから、codex-patch を merge する
+    git checkout main
+    git pull origin main
+    git merge --no-ff codex-patch
+    ※コンフリクトが出たら解消→ git add -A → git commit
+
+(3) ローカルで起動/テストして問題ないことを確認
+    python -m py_compile src/action_registry.py
+    python -m py_compile src/ui/action_pipeline.py
+    （普段の起動コマンドも実行）
+
+(4) main を push（これで GitHub の main が最新版になる）
+    git push origin main
+
+(5) 開発継続：codex-patch を main の最新に合わせる（任意だが推奨）
+    git checkout codex-patch
+    git merge main
+    git push origin codex-patch
+
+# 注意：
+# - main を更新するのに force push は基本不要。使わない。
+# - requirements.txt を消した変更も、(2) の merge で main に反映される。
+# - 古い venv フォルダなどは .gitignore 対象なら git には乗らない（ローカル削除は自由）。
+
+PR方式（もっと安全・おすすめ）
+
+GitHub上で
+Pull Request: codex-patch → main を作って、ボタンでマージするだけ。
+CIや差分も見えるので、初心者ほど事故りにくいです。

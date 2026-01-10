@@ -6,9 +6,9 @@ MicroGoal/Scene injection/Emotion(RGB)を伴うシミュレーションを回す
 
 ## Quick start
 ### Install
-- python -m venv venv
-- pip install -r requirements.txt
-(or pyproject.tomlに従う)
+- 開発環境：pip install -e ".[dev]"
+- 実行環境：pip install -e .
+- lock更新：pip freeze > requirement_lock.txt
 
 ### Run
 - python -m src.simulation

@@ -11,7 +11,7 @@ cd E:\hybrid_gm_ai
 
 
 仮想環境を有効化します:
-.\venv\Scripts\activate
+.\.venv\Scripts\activate
 
 これで、仮想環境が有効化され、コマンドプロンプトに (venv) という表示が付きます。
 その後，
