@@ -18,6 +18,13 @@ modes_enabled:
 tone:
   - "sword-and-road"
   - "ironic"
+world_defaults:
+  respect: 0
+  meals_shared: 0
+  confessions: 0
+  shared_tasks_completed: 0
+  distance_from_castle: 0
+  trace_level: 0
 
 modes:
   COERCE:

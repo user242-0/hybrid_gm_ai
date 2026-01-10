@@ -189,6 +189,52 @@ ACTIONS: Dict[str, Dict[str, Any]] = {
         "time_min": 20,
         "emotion_delta": {"R": -5, "G": +7, "B": +5},
     },
+    "share_meal": {
+        "label": "食事を分け合う",
+        "time_min": 10,
+        "emotion_delta": {"B": +10},
+        "effects": [
+            {"op": "add", "path": "meals_shared", "value": 1},
+            {"op": "add", "path": "respect", "value": 5},
+        ],
+    },
+    "admit_fault": {
+        "label": "失敗を告白する",
+        "time_min": 5,
+        "emotion_delta": {"G": +8},
+        "effects": [
+            {"op": "add", "path": "confessions", "value": 1},
+            {"op": "add", "path": "respect", "value": 3},
+            {"op": "add", "path": "trace_level", "value": -1, "min": 0},
+        ],
+    },
+    "do_small_quest": {
+        "label": "小さな依頼をこなす",
+        "time_min": 15,
+        "emotion_delta": {"R": +6, "B": +6},
+        "effects": [
+            {"op": "add", "path": "shared_tasks_completed", "value": 1},
+            {"op": "add", "path": "respect", "value": 7},
+        ],
+    },
+    "travel_waypoints": {
+        "label": "道標を辿って移動",
+        "time_min": 12,
+        "emotion_delta": {"R": +4},
+        "effects": [
+            {"op": "add", "path": "distance_from_castle", "value": 1},
+            {"op": "add", "path": "trace_level", "value": 1},
+        ],
+    },
+    "shake_tail": {
+        "label": "追手を撒く",
+        "time_min": 8,
+        "emotion_delta": {"G": +4},
+        "effects": [
+            {"op": "add", "path": "trace_level", "value": -2, "min": 0},
+            {"op": "add", "path": "respect", "value": 1},
+        ],
+    },
 }
 
 _ACTION_SPECS_CACHE: Dict[str, Dict[str, ActionSpec]] = {}
