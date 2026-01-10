@@ -262,15 +262,21 @@ if director_enabled and director_hud is not None:
 
         current_actions.clear()
         for record in director.list_actions_for_mode(director.mode):
-            action_id = record.get("action")
+            action_id = None
+            label = None
+            minutes = 5
+            if isinstance(record, dict):
+                action_id = record.get("action") or record.get("id") or record.get("action_id")
+                label = record.get("text") or record.get("label")
+                try:
+                    minutes = int(record.get("time_min", 5))
+                except (TypeError, ValueError):
+                    minutes = 5
             if not action_id:
                 continue
             spec = get_action_spec(action_id)
-            label = record.get("text") or (spec.label if spec else action_id)
-            try:
-                minutes = int(record.get("time_min", 5))
-            except (TypeError, ValueError):
-                minutes = 5
+            if not label:
+                label = spec.label if spec else action_id
             current_actions.append((action_id, label, max(0, minutes)))
         director_hud.set_actions(current_actions.copy())
 
@@ -419,7 +425,19 @@ if director_enabled and director_hud is not None:
             action_id, time_min, _ = director.recommended_action(director_world)
         elif isinstance(which, int) and 0 <= which < len(current_actions):
             action_id, _, time_min = current_actions[which]
-        if not action_id:
+        if not action_id or not isinstance(action_id, str) or not action_id.strip():
+            print(f"[HUD] invalid action_id={action_id!r} (empty)")
+            return
+        if any(not char.isascii() for char in action_id):
+            print(f"[HUD] invalid action_id={action_id!r} (non-ascii)")
+            return
+        spec = get_action_spec(action_id)
+        print(
+            f"[HUD] which={which} action_id={action_id} "
+            f"spec={'OK' if spec else 'NONE'}"
+        )
+        if spec is None:
+            print(f"[HUD] invalid action_id={action_id!r} (spec missing)")
             return
         if pipeline is None:
             return
