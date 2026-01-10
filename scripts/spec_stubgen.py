@@ -38,8 +38,8 @@ def load_pack(path: Path) -> Dict[str, Any]:
 def dump_pack(path: Path, data: Dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(
-            data,
-            handle,
+            data=data,
+            stream=handle,
             allow_unicode=True,
             sort_keys=False,
             default_flow_style=False,
