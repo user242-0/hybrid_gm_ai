@@ -2,3 +2,17 @@ Metadata-Version: 2.4
 Name: hybrid_gm_ai
 Version: 0.1.0
 Requires-Python: >=3.10
+Requires-Dist: PyYAML>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: python-dotenv; extra == "dev"
+Requires-Dist: openai>=1.0; extra == "dev"
+Requires-Dist: colorama; extra == "dev"
+Requires-Dist: PyYAML>=6.0; extra == "dev"
+Requires-Dist: numpy>=2.2.5; extra == "dev"
+Provides-Extra: image
+Requires-Dist: diffusers; extra == "image"
+Requires-Dist: torch; extra == "image"
+Requires-Dist: transformers; extra == "image"
+Requires-Dist: accelerate; extra == "image"
+Requires-Dist: safetensors; extra == "image"
