@@ -18,6 +18,7 @@ class ActionPipeline:
     ui_refresh: Callable[[], None] | None = None
     hud_set_clock: Callable[[str], None] | None = None
     hud_set_microgoal: Callable[[str | None], None] | None = None
+    advance_time: Callable[[int], None] | None = None
 
     def _resolve_world(self) -> dict | None:
         director_world = self.game_state.get("director_world")
@@ -27,6 +28,26 @@ class ActionPipeline:
         if isinstance(world, dict):
             return world
         return None
+
+    def _advance_time(self, world: dict | None, minutes: int) -> None:
+        if minutes <= 0:
+            return
+        if self.advance_time is not None:
+            self.advance_time(minutes)
+            return
+        if world is None:
+            return
+        if world.get("t_min") is not None or isinstance(world.get("clock"), dict):
+            if self.game_state.get("world") is world:
+                world_tick(self.game_state, dt=minutes)
+            else:
+                temp_state = {"world": world, "time_of_day": self.game_state.get("time_of_day")}
+                world_tick(temp_state, dt=minutes)
+                if "time_of_day" in temp_state:
+                    self.game_state["time_of_day"] = temp_state["time_of_day"]
+        else:
+            ensure_clock(world)
+            add_minutes(world, minutes)
 
     def request_action(
         self,
@@ -44,6 +65,7 @@ class ActionPipeline:
         spec = get_action_spec(action_id)
         arg_list = list(args) if args else []
         result: Any | None = None
+        action_executed = False
 
         if action_id in legacy_actions and actor_obj is not None:
             if spec and spec.requirements:
@@ -52,10 +74,12 @@ class ActionPipeline:
                     return None
             if spec and spec.function:
                 result = spec.function(actor_obj, self.game_state, *arg_list)
+                action_executed = True
         else:
             if world is not None:
                 if hasattr(action_registry, "execute_action_core"):
                     action_registry.execute_action_core(world, action_id)
+                    action_executed = True
                 else:  # TODO: implement execute_action_core in src.action_registry
                     return None
 
@@ -64,12 +88,8 @@ class ActionPipeline:
             dt_value = int(dt)
         except (TypeError, ValueError):
             dt_value = 0
-        if world is not None and dt_value > 0:
-            if world.get("t_min") is not None or isinstance(world.get("clock"), dict):
-                world_tick(self.game_state, dt=dt_value)
-            else:
-                ensure_clock(world)
-                add_minutes(world, dt_value)
+        if world is not None and dt_value > 0 and action_executed:
+            self._advance_time(world, dt_value)
 
         if world is not None:
             action_registry.ensure_emotion(world)
@@ -95,14 +115,29 @@ class ActionPipeline:
             self.game_state["director_micro_goal"] = micro_goal
 
         if world is not None and self.hud_set_clock is not None:
-            ensure_clock(world)
             clock_label = world.get("clock")
             if isinstance(clock_label, dict):
-                self.hud_set_clock(
-                    f"Day{clock_label['day']} {clock_label['hour']:02d}:{clock_label['minute']:02d}"
-                )
+                day = clock_label.get("day")
+                hour = clock_label.get("hour")
+                minute = clock_label.get("minute")
+                if day is not None and hour is not None and minute is not None:
+                    self.hud_set_clock(f"Day{day} {hour:02d}:{minute:02d}")
+                else:
+                    label = clock_label.get("label")
+                    if isinstance(label, str):
+                        self.hud_set_clock(label)
+                    else:
+                        ensure_clock(world)
+                        refreshed = world.get("clock")
+                        if isinstance(refreshed, str):
+                            self.hud_set_clock(refreshed)
             elif isinstance(clock_label, str):
                 self.hud_set_clock(clock_label)
+            else:
+                ensure_clock(world)
+                refreshed = world.get("clock")
+                if isinstance(refreshed, str):
+                    self.hud_set_clock(refreshed)
         if self.hud_set_microgoal is not None:
             self.hud_set_microgoal(self.game_state.get("director_micro_goal"))
         if self.ui_refresh is not None:

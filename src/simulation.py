@@ -160,6 +160,10 @@ def _director_clock_string(world: dict | None) -> str:
         time = clock.get("time")
         if day is not None and time is not None:
             return f"Day{day} {time}"
+        hour = clock.get("hour")
+        minute = clock.get("minute")
+        if day is not None and hour is not None and minute is not None:
+            return f"Day{day} {hour:02d}:{minute:02d}"
     return "Day1 00:00"
 
 if director_enabled:
@@ -514,6 +518,22 @@ def write_scenes_to_scene_graph(scenes):
         )
     sg_path.write_text(yaml.safe_dump(existing, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
+def _advance_time(minutes: int) -> None:
+    world = game_state.get("director_world") or game_state.get("world")
+    if not isinstance(world, dict):
+        return
+    if world.get("t_min") is not None or isinstance(world.get("clock"), dict):
+        if game_state.get("world") is world:
+            world_tick(game_state, dt=minutes)
+        else:
+            temp_state = {"world": world, "time_of_day": game_state.get("time_of_day")}
+            world_tick(temp_state, dt=minutes)
+            if "time_of_day" in temp_state:
+                game_state["time_of_day"] = temp_state["time_of_day"]
+    else:
+        ensure_clock(world)
+        add_minutes(world, minutes)
+
 hud_refresh_cb = globals().get("refresh_hud")
 pipeline = ActionPipeline(
     game_state=game_state,
@@ -522,6 +542,7 @@ pipeline = ActionPipeline(
     ui_refresh=hud_refresh_cb if callable(hud_refresh_cb) else None,
     hud_set_clock=(director_hud.set_clock if director_hud else None),
     hud_set_microgoal=(director_hud.set_microgoal if director_hud else None),
+    advance_time=_advance_time,
 )
 
 
