@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import inspect
 import re
 import sys
 import types
@@ -37,13 +38,20 @@ def load_pack(path: Path) -> Dict[str, Any]:
 
 def dump_pack(path: Path, data: Dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(
-            data=data,
-            stream=handle,
-            allow_unicode=True,
-            sort_keys=False,
-            default_flow_style=False,
-        )
+        dump_kwargs = {
+            "data": data,
+            "allow_unicode": True,
+            "sort_keys": False,
+            "default_flow_style": False,
+        }
+        signature = inspect.signature(yaml.safe_dump)
+        if "stream" in signature.parameters:
+            dump_kwargs["stream"] = handle
+            yaml.safe_dump(**dump_kwargs)
+            return
+        rendered = yaml.safe_dump(**dump_kwargs)
+        if isinstance(rendered, str):
+            handle.write(rendered)
 
 
 def extract_condition_vars(text: str) -> Optional[str]:
