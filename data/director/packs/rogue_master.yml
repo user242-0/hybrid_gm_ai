@@ -1,94 +1,159 @@
-title: "凡俗なる風来坊と最強の従者"
-seed: 73
-roles:
-  protagonist:
-    archetype: "drifter"
-    state: "petty"
-  companion:
-    archetype: "supreme_retainer"
-    state: "bound"
-  antagonist:
-    archetype: "lordling"
-    state: "proud"
-modes_enabled:
-  - "COERCE"
-  - "BOND"
-  - "FLEE"
-  - "WITNESS"
-tone:
-  - "sword-and-road"
-  - "ironic"
-world_defaults:
-  respect: 0
-  meals_shared: 0
-  confessions: 0
-  shared_tasks_completed: 0
-  distance_from_castle: 0
-  trace_level: 0
-
+actions:
+  bluff_order:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 虚勢の命令を1回だけ通す'
+    effects:
+      op: add
+      path: bluffs_succeeded
+      value: 1
+    emotion_delta: null
+    label: 虚勢の命令を1回だけ通す
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 6
+  note_companion_truth:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 従者の本心を一行メモ'
+    effects:
+      op: add
+      path: companion_truth_notes
+      value: 1
+    emotion_delta: null
+    label: 従者の本心を一行メモ
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 3
+  show_weakness_card:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 従者の弱点札を1枚だけ提示'
+    effects:
+      op: add
+      path: weakness_cards_used
+      value: 1
+    emotion_delta: null
+    label: 従者の弱点札を1枚だけ提示
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 4
 modes:
-  COERCE:
-    goals:
-      - type: "Maintain"
-        id: "keep_chain"
-        condition: "binding_stability >= 70"
-      - type: "Reach"
-        id: "win_duel"
-        condition: "duel_score >= 3"
-    micro:
-      - text: "従者の弱点札を1枚だけ提示"
-        action: "show_weakness_card"
-        time_min: 4
-        done: "weakness_cards_used >= 1"
-      - text: "虚勢の命令を1回だけ通す"
-        action: "bluff_order"
-        time_min: 6
-        done: "bluffs_succeeded >= 1"
-
   BOND:
     goals:
-      - type: "Meaning"
-        id: "earn_respect"
-        condition: "respect >= 60"
-      - type: "Reach"
-        id: "shared_quest"
-        condition: "shared_tasks_completed >= 3"
+      -
+        condition: respect >= 60
+        id: earn_respect
+        type: Meaning
+      -
+        condition: shared_tasks_completed >= 3
+        id: shared_quest
+        type: Reach
     micro:
-      - text: "食事を分け合う"
-        action: "share_meal"
+      -
+        action: share_meal
+        done: meals_shared >= 1
+        text: 食事を分け合う
         time_min: 10
-        done: "meals_shared >= 1"
-      - text: "失敗を一つ告白する"
-        action: "admit_fault"
+      -
+        action: admit_fault
+        done: confessions >= 1
+        text: 失敗を一つ告白する
         time_min: 5
-        done: "confessions >= 1"
-      - text: "小さな依頼を共にこなす"
-        action: "do_small_quest"
+      -
+        action: do_small_quest
+        done: shared_tasks_completed >= 1
+        text: 小さな依頼を共にこなす
         time_min: 15
-        done: "shared_tasks_completed >= 1"
-
+  COERCE:
+    goals:
+      -
+        condition: binding_stability >= 70
+        id: keep_chain
+        type: Maintain
+      -
+        condition: duel_score >= 3
+        id: win_duel
+        type: Reach
+    micro:
+      -
+        action: show_weakness_card
+        done: weakness_cards_used >= 1
+        text: 従者の弱点札を1枚だけ提示
+        time_min: 4
+      -
+        action: bluff_order
+        done: bluffs_succeeded >= 1
+        text: 虚勢の命令を1回だけ通す
+        time_min: 6
   FLEE:
     goals:
-      - type: "Reach"
-        id: "leave_lordland"
-        condition: "distance_from_castle >= 3"
+      -
+        condition: distance_from_castle >= 3
+        id: leave_lordland
+        type: Reach
     micro:
-      - text: "裏道→橋裏→宿場町へ移動"
-        action: "travel_waypoints"
+      -
+        action: travel_waypoints
+        done: distance_from_castle >= 1
+        text: 裏道→橋裏→宿場町へ移動
         time_min: 12
-        done: "distance_from_castle >= 1"
-      - text: "追手の視線を外す"
-        action: "shake_tail"
+      -
+        action: shake_tail
+        done: trace_level <= 3
+        text: 追手の視線を外す
         time_min: 8
-        done: "trace_level <= 3"
-
   WITNESS:
     goals:
-      - type: "Meaning"
-        id: "acknowledge_truth"
-        condition: "admit_motivation >= 1"
+      -
+        condition: admit_motivation >= 1
+        id: acknowledge_truth
+        type: Meaning
     micro:
-      - text: "従者の本心を一行メモ"
-        action: "note_companion_truth"
+      -
+        action: note_companion_truth
+        done: companion_truth_notes >= 1
+        text: 従者の本心を一行メモ
         time_min: 3
-        done: "companion_truth_notes >= 1"
+modes_enabled:
+  - COERCE
+  - BOND
+  - FLEE
+  - WITNESS
+roles:
+  antagonist:
+    archetype: lordling
+    state: proud
+  companion:
+    archetype: supreme_retainer
+    state: bound
+  protagonist:
+    archetype: drifter
+    state: petty
+seed: 73
+title: 凡俗なる風来坊と最強の従者
+tone:
+  - sword-and-road
+  - ironic
+world_defaults:
+  admit_motivation: 0
+  binding_stability: 0
+  bluffs_succeeded: 0
+  companion_truth_notes: 0
+  confessions: 0
+  distance_from_castle: 0
+  duel_score: 0
+  meals_shared: 0
+  respect: 0
+  shared_tasks_completed: 0
+  trace_level: 0
+  weakness_cards_used: 0

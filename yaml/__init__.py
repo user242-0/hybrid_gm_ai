@@ -177,6 +177,12 @@ def _dump(value: Any, lines: list[str], indent: int, sort_keys: bool) -> None:
             items = value.items()
         for key, val in items:
             key_str = str(key)
+            if isinstance(val, list) and not val:
+                lines.append(f"{prefix}{key_str}: []")
+                continue
+            if isinstance(val, dict) and not val:
+                lines.append(f"{prefix}{key_str}: {{}}")
+                continue
             if _is_simple(val):
                 lines.append(f"{prefix}{key_str}: {_scalar_to_str(val)}")
             else:

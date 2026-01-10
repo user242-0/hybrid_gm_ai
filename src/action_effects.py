@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 def _split_path(path: str) -> List[str]:
@@ -23,7 +23,14 @@ def _resolve_parent(world: Dict[str, Any], path: str) -> Tuple[Dict[str, Any], s
     return node, parts[-1]
 
 
-def apply_effects(world: Dict[str, Any], effects: List[Dict[str, Any]]) -> None:
+def apply_effects(
+    world: Dict[str, Any],
+    effects: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]],
+) -> None:
+    if effects is None:
+        return
+    if isinstance(effects, dict):
+        effects = [effects]
     if not isinstance(world, dict) or not effects:
         return
 

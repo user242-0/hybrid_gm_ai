@@ -1,88 +1,219 @@
-title: "仮想都市の目覚め"
-seed: 108
-roles:
-  protagonist:
-    archetype: "ordinary_citizen"
-    state: "asleep"
-  mentor:
-    archetype: "glitch_messenger"
-    state: "hidden"
-  system:
-    archetype: "simulation_admin"
-    state: "omniscient"
-modes_enabled:
-  - "COMPLY"
-  - "GLITCH"
-  - "AWAKEN"
-  - "FLEE"
-  - "WITNESS"
-tone:
-  - "tech-noir"
-  - "surreal"
-
+actions:
+  complete_routine:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 日常ルーチンを1つ完遂'
+    effects:
+      op: add
+      path: routines_done
+      value: 1
+    emotion_delta: null
+    label: 日常ルーチンを1つ完遂
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 5
+  decode_mentor_msg:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 師のメッセージを1つ解読'
+    effects:
+      op: add
+      path: mentor_msgs_decoded
+      value: 1
+    emotion_delta: null
+    label: 師のメッセージを1つ解読
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 8
+  log_time_skew:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 時刻ズレの掲示板を記録'
+    effects:
+      op: add
+      path: glitch_clues
+      value: 1
+    emotion_delta: null
+    label: 時刻ズレの掲示板を記録
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 4
+  move_low_trace_route:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 監視の少ない経路へ移動'
+    effects:
+      min: 0
+      op: add
+      path: trace_level
+      value: -1
+    emotion_delta: null
+    label: 監視の少ない経路へ移動
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 6
+  record_loop_cat:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 同じ猫が2回通るのを撮影'
+    effects:
+      op: add
+      path: glitch_clues
+      value: 1
+    emotion_delta: null
+    label: 同じ猫が2回通るのを撮影
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 4
+  signal_neighbor:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 窓辺の誰かに合図を送る'
+    effects:
+      op: add
+      path: awakened_citizens
+      value: 1
+    emotion_delta: null
+    label: 窓辺の誰かに合図を送る
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 2
+  unlock_port:
+    args_template: []
+    available_to:
+      - player
+      - npc
+    description: 'AUTO-STUB: 退路のポートを開く'
+    effects:
+      op: add
+      path: port_unlocked
+      value: 1
+    emotion_delta: null
+    label: 退路のポートを開く
+    requirements: null
+    tags:
+      - auto_stub
+    time_min: 12
 modes:
-  COMPLY:
-    goals:
-      - type: "Avoid"
-        id: "avoid_flag"
-        condition: "suspicion < 6"
-    micro:
-      - text: "日常ルーチンを1つ完遂"
-        action: "complete_routine"
-        time_min: 5
-        done: "routines_done >= 1"
-
-  GLITCH:
-    goals:
-      - type: "Reach"
-        id: "find_glitch"
-        condition: "glitch_clues >= 3"
-    micro:
-      - text: "同じ猫が2回通るのを撮影"
-        action: "record_loop_cat"
-        time_min: 4
-        done: "glitch_clues >= 1"
-      - text: "時刻ズレの掲示板を記録"
-        action: "log_time_skew"
-        time_min: 4
-        done: "glitch_clues >= 2"
-
   AWAKEN:
     goals:
-      - type: "Reach"
-        id: "exit_room"
-        condition: "port_unlocked >= 1"
-      - type: "Meaning"
-        id: "choose_truth"
-        condition: "truth_choice_done >= 1"
+      -
+        condition: port_unlocked >= 1
+        id: exit_room
+        type: Reach
+      -
+        condition: truth_choice_done >= 1
+        id: choose_truth
+        type: Meaning
     micro:
-      - text: "師のメッセージを1つ解読"
-        action: "decode_mentor_msg"
+      -
+        action: decode_mentor_msg
+        done: mentor_msgs_decoded >= 1
+        text: 師のメッセージを1つ解読
         time_min: 8
-        done: "mentor_msgs_decoded >= 1"
-      - text: "退路のポートを開く"
-        action: "unlock_port"
+      -
+        action: unlock_port
+        done: port_unlocked >= 1
+        text: 退路のポートを開く
         time_min: 12
-        done: "port_unlocked >= 1"
-
+  COMPLY:
+    goals:
+      -
+        condition: suspicion < 6
+        id: avoid_flag
+        type: Avoid
+    micro:
+      -
+        action: complete_routine
+        done: routines_done >= 1
+        text: 日常ルーチンを1つ完遂
+        time_min: 5
   FLEE:
     goals:
-      - type: "Maintain"
-        id: "evade_agents"
-        condition: "trace_level < 7"
+      -
+        condition: trace_level < 7
+        id: evade_agents
+        type: Maintain
     micro:
-      - text: "監視の少ない経路へ移動"
-        action: "move_low_trace_route"
+      -
+        action: move_low_trace_route
+        done: trace_level <= 6
+        text: 監視の少ない経路へ移動
         time_min: 6
-        done: "trace_level <= 6"
-
+  GLITCH:
+    goals:
+      -
+        condition: glitch_clues >= 3
+        id: find_glitch
+        type: Reach
+    micro:
+      -
+        action: record_loop_cat
+        done: glitch_clues >= 1
+        text: 同じ猫が2回通るのを撮影
+        time_min: 4
+      -
+        action: log_time_skew
+        done: glitch_clues >= 2
+        text: 時刻ズレの掲示板を記録
+        time_min: 4
   WITNESS:
     goals:
-      - type: "Meaning"
-        id: "wake_others"
-        condition: "awakened_citizens >= 1"
+      -
+        condition: awakened_citizens >= 1
+        id: wake_others
+        type: Meaning
     micro:
-      - text: "窓辺の誰かに合図を送る"
-        action: "signal_neighbor"
+      -
+        action: signal_neighbor
+        done: awakened_citizens >= 1
+        text: 窓辺の誰かに合図を送る
         time_min: 2
-        done: "awakened_citizens >= 1"
+modes_enabled:
+  - COMPLY
+  - GLITCH
+  - AWAKEN
+  - FLEE
+  - WITNESS
+roles:
+  mentor:
+    archetype: glitch_messenger
+    state: hidden
+  protagonist:
+    archetype: ordinary_citizen
+    state: asleep
+  system:
+    archetype: simulation_admin
+    state: omniscient
+seed: 108
+title: 仮想都市の目覚め
+tone:
+  - tech-noir
+  - surreal
+world_defaults:
+  awakened_citizens: 0
+  glitch_clues: 0
+  mentor_msgs_decoded: 0
+  port_unlocked: 0
+  routines_done: 0
+  suspicion: 0
+  trace_level: 0
+  truth_choice_done: 0
