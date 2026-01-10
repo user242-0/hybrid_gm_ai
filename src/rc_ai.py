@@ -65,6 +65,8 @@ def pick_action(
     def emo_score_for_action(aid: str) -> float:
         spec = get_action_spec(aid)
         delta = spec.emotion_delta if spec else {}
+        if not isinstance(delta, dict):
+            delta = {}
         dR = delta.get("R", 0)
         dG = delta.get("G", 0)
         dB = delta.get("B", 0)
