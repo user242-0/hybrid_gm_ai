@@ -43,10 +43,10 @@ except ImportError:  # pragma: no cover - optional dependency
 from src.simulation_utils import (
     add_minutes,
     ensure_clock,
-    execute_player_choice,
 )
 from src.choice_ui import present_choices
 from src.action_registry import execute_action
+from src.ui.action_pipeline import ActionPipeline
 
 # 安全に終了したい
 from src.quit_helper import handle_quit
@@ -72,6 +72,7 @@ director = None
 director_world = None
 director_hud = None
 director_hud = None
+pipeline: ActionPipeline | None = None
 
 auto_enabled = False
 _last_auto_step_ts = 0.0
@@ -194,6 +195,7 @@ if director_enabled:
     ensure_clock(director_world)
 
     game_state["director_world"] = director_world
+    game_state["world"] = director_world
     game_state["director_micro_goal"] = None
 
     if DirectorHUD is not None:
@@ -398,6 +400,7 @@ if director_enabled and director_hud is not None:
         if isinstance(director_world, dict):
             director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
         game_state["director_world"] = director_world
+        game_state["world"] = director_world
         if director_hud is not None:
             director_hud.set_clock(_director_clock_string(director_world))
         director.clear_micro_goal()
@@ -411,30 +414,23 @@ if director_enabled and director_hud is not None:
         if director_world is None:
             return
         action_id = None
-        time_min = 0
+        time_min = None
         if which == "__recommended__":
             action_id, time_min, _ = director.recommended_action(director_world)
         elif isinstance(which, int) and 0 <= which < len(current_actions):
             action_id, _, time_min = current_actions[which]
         if not action_id:
             return
-        execute_action(director_world, action_id)
-        add_minutes(director_world, time_min)
-        scenes = director.tick(director_world)
-        if scenes:
-            write_scenes_to_scene_graph(scenes)
-            for scene in scenes:
-                print(
-                    f"[SCENE] intent={scene.get('intent')} why_now={scene.get('why_now')} "
-                    f"salience={scene.get('salience')}"
-                )
-        clock_label = _director_clock_string(director_world)
-        if director_hud is not None:
-            director_hud.set_clock(clock_label)
-        if director.is_micro_goal_done(director_world):
-            director.clear_micro_goal()
-            print("[MICRO] completed -> next")
-        on_show_micro()
+        if pipeline is None:
+            return
+        actor = game_state.get("active_char")
+        pipeline.request_action(
+            action_id,
+            actor_obj=actor,
+            args=[],
+            time_min_override=time_min,
+            source="HUD",
+        )
 
     director_hud.on_auto_action = ai_step_once
     director_hud.on_ai_step = ai_step_once
@@ -499,6 +495,16 @@ def write_scenes_to_scene_graph(scenes):
             }
         )
     sg_path.write_text(yaml.safe_dump(existing, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+hud_refresh_cb = globals().get("refresh_hud")
+pipeline = ActionPipeline(
+    game_state=game_state,
+    director=director,
+    emit_director_scenes=write_scenes_to_scene_graph,
+    ui_refresh=hud_refresh_cb if callable(hud_refresh_cb) else None,
+    hud_set_clock=(director_hud.set_clock if director_hud else None),
+    hud_set_microgoal=(director_hud.set_microgoal if director_hud else None),
+)
 
 
 def _director_world_path() -> Path:
@@ -654,14 +660,23 @@ def player_loop(gs):              # ← 引数で参照を受け取る
 
         # ★ プレイヤーが操作する瞬間に必ず手動フラグを立て直す
         actor.is_npc = False                   # ← これを追加
-        result = execute_player_choice(actor, cmd, gs)
-
-        if director is not None and director_world is not None:
-            scenes = director.tick(director_world)
-            if scenes:
-                write_scenes_to_scene_graph(scenes)
+        parts = cmd.split()
+        if not parts:
             if director_hud is not None:
-                director_hud.set_clock(_director_clock_string(director_world))
+                _pump_director_hud()
+            maybe_run_auto()
+            time.sleep(0.01)
+            continue
+        action_id = parts[0]
+        args = parts[1:]
+        result = None
+        if pipeline is not None:
+            result = pipeline.request_action(
+                action_id,
+                actor_obj=actor,
+                args=args,
+                source="CLI" if USE_CLI else "GUI",
+            )
 
 
 
@@ -713,4 +728,3 @@ if __name__ == "__main__":
             time.sleep(0.01)
     except SystemExit:
         pass                        # どこかのスレッドで raise SystemExit 渡ってきたら即終了
-

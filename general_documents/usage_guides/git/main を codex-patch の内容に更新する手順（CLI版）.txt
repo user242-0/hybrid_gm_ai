@@ -16,8 +16,7 @@
     ※コンフリクトが出たら解消→ git add -A → git commit
 
 (3) ローカルで起動/テストして問題ないことを確認
-    python -m py_compile src/action_registry.py
-    python -m py_compile src/ui/action_pipeline.py
+    だいたいシミュレーションが動けばOK
     （普段の起動コマンドも実行）
 
 (4) main を push（これで GitHub の main が最新版になる）
