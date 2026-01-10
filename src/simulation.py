@@ -580,13 +580,8 @@ def load_director_world(fallback: dict | None) -> dict | None:
 
 # ---------------- ワールド Tick コールバック ----------------
 def world_tick_cb(gs):
-    messages = world_tick(gs)
-    for msg in messages:
-        record(msg)
-
-    if gs.get("running", False):
-        delay = gs.get("clock", {}).get("dt", 0.5)
-        scheduler.register(world_tick_cb, delay, gs)
+    if not gs.get("running", False):
+        return
 
 # ---------------- RC Tick コールバック ----------------
 def rc_tick(rc_char, game_state):
@@ -631,8 +626,6 @@ def player_loop(gs):              # ← 引数で参照を受け取る
     # ① 全キャラをスケジューラに登録
     for ch in gs["party"].values():
         scheduler.register(rc_tick, 0.2, ch, gs)
-
-    scheduler.register(world_tick_cb, gs.get("clock", {}).get("dt", 0.5), gs)
 
     # ② メインループ
     while gs["running"]:
