@@ -91,17 +91,19 @@ def _parse_block(lines: list[str], idx: int, indent: int) -> tuple[Any, int]:
                     key, rest = item_token.split(":", 1)
                     key = key.strip()
                     rest = rest.strip()
-                    item_value = {}
+                    item_value: dict[str, Any] = {}
                     if rest:
-                        first_value = _parse_scalar(rest)
+                        item_value[key] = _parse_scalar(rest)
+                        nested, idx = _parse_block(lines, idx, current_indent + 2)
+                        if isinstance(nested, dict):
+                            item_value.update(nested)
+                        elif nested not in ({}, None):
+                            raise ValueError(
+                                "Inline mapping list items must use dict structures"
+                            )
                     else:
                         first_value, idx = _parse_block(lines, idx, current_indent + 2)
-                    item_value[key] = first_value
-                    nested, idx = _parse_block(lines, idx, current_indent + 2)
-                    if isinstance(nested, dict):
-                        item_value.update(nested)
-                    elif nested not in ({}, None):
-                        item_value[key] = nested
+                        item_value[key] = first_value
                     value = item_value
                 else:
                     value = _parse_scalar(item_token)
