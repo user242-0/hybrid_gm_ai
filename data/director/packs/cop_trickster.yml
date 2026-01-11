@@ -117,7 +117,7 @@ world_defaults:
   report_submitted: 0
   sobriety_days: 0
   suspicion:
-    value: 0
+    value: 5
   tips_checked: 0
   victim_names_logged: 0
   witness_value: 0
