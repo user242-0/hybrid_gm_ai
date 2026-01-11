@@ -101,8 +101,8 @@ def request_auto_step() -> None:
 
 def maybe_run_auto() -> None:
     if game_state.get("auto_step_pending"):
-        game_state["auto_step_pending"] = False
         ai_step_once()
+        game_state["auto_step_pending"] = False
         return
     if not auto_enabled:
         return
@@ -294,10 +294,12 @@ if director_enabled and director_hud is not None:
         cache_rev = game_state.get("hud_cache_rev", 0)
         last_rendered_rev = game_state.get("hud_last_rendered_rev", -1)
         if cache_rev != last_rendered_rev:
+            print(f"[HUD_DEBUG] recompute rev={cache_rev} last={last_rendered_rev}")
             progress_text = director.progress_text(director_world)
             game_state["hud_cached_progress"] = progress_text
 
             rec_action, rec_minutes, rec_label = director.recommended_action(director_world)
+            print(f"[HUD_DEBUG] rec_action={rec_action} minutes={rec_minutes} label={rec_label}")
             if isinstance(director_world, dict):
                 if rec_action:
                     director_world["_recommended_action_id"] = rec_action
@@ -339,6 +341,7 @@ if director_enabled and director_hud is not None:
                     label = spec.label if spec else action_id
                 current_actions.append((action_id, label, max(0, minutes)))
             current_actions.sort(key=lambda item: item[0])
+            print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in current_actions])
             game_state["hud_cached_actions"] = current_actions.copy()
             game_state["hud_last_rendered_rev"] = cache_rev
 
@@ -449,10 +452,11 @@ if director_enabled and director_hud is not None:
 
     def maybe_run_auto() -> None:
         if game_state.get("auto_step_pending"):
-            game_state["auto_step_pending"] = False
             if director_world is None:
+                game_state["auto_step_pending"] = False
                 return
             ai_step_once()
+            game_state["auto_step_pending"] = False
             return
         if director_world is None:
             return
