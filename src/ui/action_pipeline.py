@@ -91,7 +91,7 @@ class ActionPipeline:
         if world is not None and dt_value > 0 and action_executed:
             self._advance_time(world, dt_value)
 
-        if action_executed:
+        if action_executed and action_id != "switch_character":
             self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
 
         if world is not None:

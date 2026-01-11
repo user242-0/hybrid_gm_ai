@@ -186,6 +186,26 @@ def _director_clock_string(world: dict | None) -> str:
             return f"Day{day} {hour:02d}:{minute:02d}"
     return "Day1 00:00"
 
+
+def _bump_hud_cache_rev(gs: dict, reason: str | None = None) -> None:
+    gs["hud_cache_rev"] = gs.get("hud_cache_rev", 0) + 1
+    if reason:
+        print(f"[HUD_DEBUG] bump reason={reason} rev={gs['hud_cache_rev']}")
+
+
+def _update_microgoal(micro_goal, gs: dict) -> None:
+    previous = gs.get("director_micro_goal")
+    gs["director_micro_goal"] = micro_goal
+    if previous != micro_goal:
+        _bump_hud_cache_rev(gs, reason="microgoal_change")
+
+
+def ui_show_micro(micro_goal, gs):
+    _update_microgoal(micro_goal, gs)
+    if director_hud is not None:
+        director_hud.set_microgoal(micro_goal)
+
+
 if director_enabled:
     if simulation_cli_args.premise_text:
         premise, goals, pack_id = synthesize_from_text(simulation_cli_args.premise_text)
@@ -221,7 +241,7 @@ if director_enabled:
     game_state["director_world"] = director_world
     game_state["world"] = director_world
     game_state["director_micro_goal"] = None
-    game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
+    _bump_hud_cache_rev(game_state, reason="director_init")
 
     if DirectorHUD is not None:
         try:
@@ -247,23 +267,6 @@ def _pump_director_hud() -> None:
         director_hud.pump()
     else:
         director_hud.request_update()
-
-
-def _bump_hud_cache_rev(gs: dict) -> None:
-    gs["hud_cache_rev"] = gs.get("hud_cache_rev", 0) + 1
-
-
-def _update_microgoal(micro_goal, gs: dict) -> None:
-    previous = gs.get("director_micro_goal")
-    gs["director_micro_goal"] = micro_goal
-    if previous != micro_goal:
-        _bump_hud_cache_rev(gs)
-
-
-def ui_show_micro(micro_goal, gs):
-    _update_microgoal(micro_goal, gs)
-    if director_hud is not None:
-        director_hud.set_microgoal(micro_goal)
 
 
 if director_enabled and director_hud is not None:
@@ -484,7 +487,7 @@ if director_enabled and director_hud is not None:
             director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
         game_state["director_world"] = director_world
         game_state["world"] = director_world
-        _bump_hud_cache_rev(game_state)
+        _bump_hud_cache_rev(game_state, reason="world_load")
         if director_hud is not None:
             director_hud.set_clock(_director_clock_string(director_world))
         director.clear_micro_goal()
@@ -541,7 +544,7 @@ if director_enabled and director_hud is not None:
         if not director.set_mode(new_mode):
             return
         director_hud.set_mode(director.mode)
-        _bump_hud_cache_rev(game_state)
+        _bump_hud_cache_rev(game_state, reason="mode_change")
         print(f"[Director] mode -> {new_mode}")
         on_show_micro()
         refresh_hud()
