@@ -1,0 +1,123 @@
+actions: {}
+modes:
+  FLEE:
+    goals:
+      -
+        condition: 'clock >= Day2 06:00'
+        id: escape_dawn
+        type: Reach
+      -
+        condition: suspicion.value < 7 for 2d
+        id: low_profile
+        type: Maintain
+    micro:
+      -
+        action: move_low_profile
+        done: suspicion.value <= 2
+        text: 裏路地→高架下→駅裏へ移動
+        time_min: 8
+      -
+        action: mark_avoid_shop
+        done: avoid_tags >= 1
+        text: 顔を見られた店を避ける（タグ付け）
+        time_min: 2
+  FREEZE:
+    goals:
+      -
+        condition: entropy.value < 12 for 3d
+        id: keep_job
+        type: Avoid
+      -
+        condition: victim_names_logged >= 3
+        id: witness_log
+        type: Meaning
+    micro:
+      -
+        action: check_tip
+        done: tips_checked >= 1
+        text: 未読の通報を1件だけ確認
+        time_min: 5
+      -
+        action: limit_drink
+        done: sobriety_days >= 1
+        text: 本日の酒量を規定以下にする
+        time_min: 10
+      -
+        action: log_victim
+        done: victim_names_logged >= 1
+        text: 被害者の名前をノートに1人追記
+        time_min: 3
+  PURSUE:
+    goals:
+      -
+        condition: evidence_score >= 100
+        id: arrest
+        type: Reach
+      -
+        condition: witness_value >= 3
+        id: witness
+        type: Meaning
+    micro:
+      -
+        action: collect_fiber
+        done: evidence_score >= 10
+        text: 現場で青い繊維を1点採取
+        time_min: 15
+      -
+        action: fix_cam_clock
+        done: cams_fixed >= 1
+        text: 監視カメラの時刻ズレを補正
+        time_min: 12
+      -
+        action: call_partner
+        done: partner_calls >= 1
+        text: 元相棒に5分だけ電話
+        time_min: 5
+  WITNESS:
+    goals:
+      -
+        condition: report_submitted >= 1
+        id: truth_told
+        type: Meaning
+    micro:
+      -
+        action: file_report
+        done: report_submitted >= 1
+        text: 真実を1項だけ報告書に残す
+        time_min: 7
+modes_enabled:
+  - FREEZE
+  - FLEE
+  - PURSUE
+  - WITNESS
+roles:
+  antagonist:
+    archetype: trickster_killer
+    state: at_large
+  protagonist:
+    archetype: cop
+    state: burned_out
+seed: 41
+title: 落魄の刑事 vs 愉快犯
+tone:
+  - neo-noir
+  - slow_burn
+world_defaults:
+  avoid_tags: 0
+  cams_fixed: 0
+  clock: 0
+  entropy:
+    value: 0
+  evidence_score: 0
+  flags: {}
+  harm:
+    threshold_warn: 20
+    value: 0
+  partner_calls: 0
+  report_submitted: 0
+  sobriety_days: 0
+  suspicion:
+    value: 5
+  tips_checked: 0
+  victim_names_logged: 0
+  witness_value: 0

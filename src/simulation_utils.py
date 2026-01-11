@@ -62,10 +62,33 @@ def ensure_clock(world: Dict[str, Any] | None) -> None:
                 hour = int(match.group(2))
                 minute = int(match.group(3))
                 clock_min = max(0, (day - 1) * 24 * 60 + hour * 60 + minute)
+        elif isinstance(clock_label, dict):
+            day = clock_label.get("day")
+            hour = clock_label.get("hour")
+            minute = clock_label.get("minute")
+            if isinstance(day, int) and isinstance(hour, int) and isinstance(minute, int):
+                clock_min = max(0, (day - 1) * 24 * 60 + hour * 60 + minute)
+            else:
+                label = clock_label.get("label")
+                if isinstance(label, str):
+                    match = CLOCK_RE.match(label.strip())
+                    if match:
+                        day = int(match.group(1))
+                        hour = int(match.group(2))
+                        minute = int(match.group(3))
+                        clock_min = max(0, (day - 1) * 24 * 60 + hour * 60 + minute)
+                time_label = clock_label.get("time")
+                if clock_min is None and isinstance(day, int) and isinstance(time_label, str):
+                    time_match = re.match(r"^(\d{1,2}):(\d{2})$", time_label.strip())
+                    if time_match:
+                        hour = int(time_match.group(1))
+                        minute = int(time_match.group(2))
+                        clock_min = max(0, (day - 1) * 24 * 60 + hour * 60 + minute)
     if clock_min is None:
         clock_min = 0
     world["clock_min"] = clock_min
-    world["clock"] = minutes_to_clock(clock_min)
+    if not isinstance(world.get("clock"), dict):
+        world["clock"] = minutes_to_clock(clock_min)
 
 
 def add_minutes(world: Dict[str, Any] | None, delta_min: int) -> None:

@@ -1,21 +1,31 @@
 #!/usr/bin/env python3
 import argparse
+import importlib
+import importlib.util
 import re
 import sys
 import types
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-import yaml
-
 if "dotenv" not in sys.modules:
     dotenv_stub = types.ModuleType("dotenv")
     dotenv_stub.load_dotenv = lambda *args, **kwargs: False
     sys.modules["dotenv"] = dotenv_stub
 
+PY_YAML = importlib.import_module("yaml")
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
-    sys.path.append(str(REPO_ROOT))
+    sys.path.insert(0, str(REPO_ROOT))
+
+_LOCAL_YAML_SPEC = importlib.util.spec_from_file_location(
+    "local_yaml", REPO_ROOT / "yaml" / "__init__.py"
+)
+if _LOCAL_YAML_SPEC is None or _LOCAL_YAML_SPEC.loader is None:
+    raise RuntimeError("Unable to load local yaml module.")
+local_yaml = importlib.util.module_from_spec(_LOCAL_YAML_SPEC)
+_LOCAL_YAML_SPEC.loader.exec_module(local_yaml)
 
 from src.action_definitions import get_action_specs
 
@@ -31,12 +41,12 @@ def iter_pack_files(packs_dir: Path) -> Iterable[Path]:
 
 def load_pack(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
+        data = PY_YAML.safe_load(handle)
     return data or {}
 
 
 def dump_yaml_text(data: Dict[str, Any]) -> str:
-    rendered = yaml.safe_dump(data, allow_unicode=True)
+    rendered = local_yaml.safe_dump(data, allow_unicode=True)
     if isinstance(rendered, tuple):
         rendered = rendered[0]
     if not isinstance(rendered, str):
@@ -99,12 +109,16 @@ def collect_pack_data(pack: Dict[str, Any]) -> Tuple[Set[str], Dict[str, Dict[st
                     var = extract_condition_vars(value)
                     if var:
                         condition_vars.add(var)
-                if key == "effects" and isinstance(value, list):
-                    for effect in value:
-                        if isinstance(effect, dict):
-                            path = effect.get("path")
-                            if isinstance(path, str) and path:
-                                effect_paths.add(path)
+                if key == "effects":
+                    effects_list: List[Dict[str, Any]] = []
+                    if isinstance(value, list):
+                        effects_list = [effect for effect in value if isinstance(effect, dict)]
+                    elif isinstance(value, dict):
+                        effects_list = [value]
+                    for effect in effects_list:
+                        path = effect.get("path")
+                        if isinstance(path, str) and path:
+                            effect_paths.add(path)
                 walk(value)
         elif isinstance(node, list):
             for item in node:
@@ -173,7 +187,7 @@ def build_stub(action_id: str, meta: Dict[str, Any]) -> Dict[str, Any]:
     label = meta.get("text") or action_id
     time_min = meta.get("time_min")
     done = meta.get("done") or ""
-    effects = [extract_done_effect(str(done), action_id)]
+    effects = extract_done_effect(str(done), action_id)
     return {
         "label": label,
         "description": f"AUTO-STUB: {label}",
@@ -225,9 +239,19 @@ def main() -> int:
                     continue
                 meta = action_meta.get(action_id, {})
                 actions_dict[action_id] = build_stub(action_id, meta)
-                effect_paths.add(actions_dict[action_id]["effects"][0]["path"])
+                effect_path = actions_dict[action_id]["effects"].get("path")
+                if isinstance(effect_path, str) and effect_path:
+                    effect_paths.add(effect_path)
                 changed = True
+            for action in actions_dict.values():
+                if isinstance(action, dict) and action.get("args_template") is None:
+                    action["args_template"] = []
+                    changed = True
             if seed_world_defaults(pack, condition_vars, effect_paths):
+                changed = True
+            rendered = dump_yaml_text(pack)
+            existing = pack_path.read_text(encoding="utf-8")
+            if existing != rendered:
                 changed = True
             if changed:
                 dump_pack(pack_path, pack)

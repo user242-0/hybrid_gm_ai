@@ -178,6 +178,7 @@ ACTIONS: Dict[str, Dict[str, Any]] = {
         "label": "目立たず移動する",
         "time_min": 8,
         "emotion_delta": {"R": -2, "G": +5, "B": 0},
+        "effects": {"op": "add", "path": "suspicion.value", "value": -1, "min": 0},
     },
     "mark_avoid_shop": {
         "label": "立ち寄り危険な店を避けるタグを付ける",
