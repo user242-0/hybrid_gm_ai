@@ -311,7 +311,6 @@ if director_enabled and director_hud is not None:
         ui_show_micro(micro, game_state)
         micro_text = micro or "(MicroGoal なし)"
         print(f"[UI] MicroGoal: {micro_text}")
-        refresh_hud()
 
     def on_reroll() -> None:
         if director_world is None:
