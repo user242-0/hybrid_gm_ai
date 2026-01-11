@@ -45,7 +45,6 @@ from src.simulation_utils import (
     ensure_clock,
 )
 from src.choice_ui import present_choices
-from src.action_registry import execute_action
 from src.ui.action_pipeline import ActionPipeline
 
 # 安全に終了したい
@@ -343,11 +342,15 @@ if director_enabled and director_hud is not None:
         ###↓
         emo_before = director_world.get("emotion", {}).copy()
         ###↑
-        execute_action(director_world, action_id)
+        dispatch_action(
+            action_id,
+            actor_obj=game_state.get("active_char"),
+            args=[],
+            time_min_override=tmin,
+            source="RC_AI",
+        )
         if isinstance(director_world, dict):
             director_world["_last_action_id"] = action_id
-        add_minutes(director_world, tmin)
-        scenes = director.tick(director_world)
 
         ###↓
         emo_after = director_world.get("emotion", {})
@@ -358,13 +361,6 @@ if director_enabled and director_hud is not None:
             f"B:{emo_before.get('B')}→{emo_after.get('B')}"
         )
         ###↑
-        if scenes:
-            write_scenes_to_scene_graph(scenes)
-            for scene in scenes:
-                print(
-                    f"[SCENE] intent={scene.get('intent')} why_now={scene.get('why_now')} "
-                    f"salience={scene.get('salience')}"
-                )
         clock_label = _director_clock_string(director_world)
         if director_hud is not None:
             director_hud.set_clock(clock_label)
@@ -443,10 +439,8 @@ if director_enabled and director_hud is not None:
         if spec is None:
             print(f"[HUD] invalid action_id={action_id!r} (spec missing)")
             return
-        if pipeline is None:
-            return
         actor = game_state.get("active_char")
-        pipeline.request_action(
+        dispatch_action(
             action_id,
             actor_obj=actor,
             args=[],
@@ -545,6 +539,23 @@ pipeline = ActionPipeline(
     advance_time=_advance_time,
 )
 
+def dispatch_action(
+    action_id: str,
+    actor_obj: object | None = None,
+    args: list[object] | None = None,
+    time_min_override: int | None = None,
+    source: str = "UI",
+):
+    if pipeline is None:
+        return None
+    return pipeline.request_action(
+        action_id,
+        actor_obj=actor_obj,
+        args=args or [],
+        time_min_override=time_min_override,
+        source=source,
+    )
+
 
 def _director_world_path() -> Path:
     job_root = Path(job_root_from_cfg())
@@ -604,9 +615,15 @@ def rc_tick(rc_char, game_state):
     args = parse_args(act_info, rc_char, game_state)
     if choice.action_key == "switch_character":
         target_name = choose_target_for_switch(rc_char, game_state)
-        result = act_info["function"](rc_char, game_state, target_name)
+        args = [target_name]
     else:
-        result = act_info["function"](rc_char, game_state, *args)
+        args = list(args)
+    result = dispatch_action(
+        choice.action_key,
+        actor_obj=rc_char,
+        args=args,
+        source="RC_AI",
+    )
 
     record(f"[AI] {rc_char.name} ▶ {choice.action_key}")
 
@@ -701,14 +718,12 @@ def player_loop(gs):              # ← 引数で参照を受け取る
             continue
         action_id = parts[0]
         args = parts[1:]
-        result = None
-        if pipeline is not None:
-            result = pipeline.request_action(
-                action_id,
-                actor_obj=actor,
-                args=args,
-                source="CLI" if USE_CLI else "GUI",
-            )
+        result = dispatch_action(
+            action_id,
+            actor_obj=actor,
+            args=args,
+            source="CLI" if USE_CLI else "GUI",
+        )
 
 
 

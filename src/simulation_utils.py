@@ -221,11 +221,22 @@ def emit_from_choice(player, key: str, args: list[str], game_state, why_now: str
     )
 
 
-def execute_player_choice(player, cmd: str, game_state):
+def _get_action_pipeline(game_state: Dict[str, Any]):
+    pipeline = game_state.get("_action_pipeline")
+    if pipeline is not None:
+        return pipeline
+    from src.ui.action_pipeline import ActionPipeline
+
+    pipeline = ActionPipeline(game_state=game_state)
+    game_state["_action_pipeline"] = pipeline
+    return pipeline
+
+
+def execute_player_choice(player, cmd: str, game_state, pipeline=None):
     """
     cmd は GUI で入力した文字列（例: 'attack' / '1' / 'switch Hero'）
     1) Choice を特定し requirements をチェック
-    2) 対応する action.function を呼び出す
+    2) ActionPipeline 経由で action を実行
     3) ログを残す（persist   + 画面用 log_q）
     """
     # ---- (1) キー写像 ----
@@ -262,7 +273,13 @@ def execute_player_choice(player, cmd: str, game_state):
     if not args:
         args = parse_args(action_info, player, game_state)
 
-    result = action_info["function"](player, game_state, *args)
+    action_pipeline = pipeline or _get_action_pipeline(game_state)
+    result = action_pipeline.request_action(
+        key,
+        actor_obj=player,
+        args=args,
+        source="LegacyGUI",
+    )
 
 
     # ---- (3) ログ出力 ----

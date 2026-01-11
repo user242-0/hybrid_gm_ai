@@ -28,6 +28,7 @@ from src.scheduler import Scheduler
 from src.rc_ai import select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
+from src.ui.action_pipeline import ActionPipeline
 
 # デバッグ
 import traceback
@@ -45,6 +46,19 @@ conversation_manager = ConversationManager()
 
 # --- 起動時に Scheduler 用意 ---
 scheduler = Scheduler()
+pipeline = None
+
+
+def dispatch_action(action_id, actor_obj, args, game_state):
+    global pipeline
+    if pipeline is None:
+        pipeline = ActionPipeline(game_state=game_state)
+    return pipeline.request_action(
+        action_id,
+        actor_obj=actor_obj,
+        args=args,
+        source="RC_AI",
+    )
 
 # ---------------- RC Tick コールバック ----------------
 def rc_tick(rc_char, game_state):
@@ -64,9 +78,10 @@ def rc_tick(rc_char, game_state):
     args = parse_args(act_info, rc_char, game_state)
     if choice.action_key == "switch_character":
         target_name = choose_target_for_switch(rc_char, game_state)
-        act_info["function"](rc_char, game_state, target_name)
+        args = [target_name]
     else:
-        act_info["function"](rc_char, game_state, *args)
+        args = list(args)
+    dispatch_action(choice.action_key, rc_char, args, game_state)
 
     # ❹ 次の RC Tick を再登録（0.2 s 後）
     if rc_char.is_npc:           # ← 再登録は AI 時だけで OK
