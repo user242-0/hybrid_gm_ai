@@ -439,7 +439,9 @@ if director_enabled and director_hud is not None:
         non_progress_actions = {"switch_character", "感情を設定する"}
         if action_id not in non_progress_actions and director.is_micro_goal_done(director_world):
             director.clear_micro_goal()
-            print("[MICRO] completed -> next")
+            next_micro = director.get_micro_goal(director_world, reroll=False)
+            if next_micro and next_micro != "(MicroGoal なし)":
+                print("[MICRO] completed -> next")
         on_show_micro()
         refresh_hud()
 

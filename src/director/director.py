@@ -86,6 +86,7 @@ class Director:
     goals_dict: Dict[str, Any]
     rng: random.Random = field(default_factory=random.Random)
     mode: str = "FREEZE"
+    _micro_done_debug_emitted: bool = field(default=False, init=False)
     beat_state: Dict[str, bool] = field(
         default_factory=lambda: {
             "Inciting": False,
@@ -281,29 +282,36 @@ class Director:
             if not pool and items:
                 last_id = history[-1] if history else None
                 pool = [item for item in items if self._micro_id(item) != last_id]
-            pool = pool or items
-            baseline = self._capture_micro_baseline(world, mode)
-            max_attempts = 5 if reroll else 1
+            primary_pool = pool or items
+            all_pool = items or []
+            max_attempts = len(all_pool)
             choice = None
-            remaining = list(pool)
-            for _ in range(max_attempts):
-                if not remaining:
+            baseline = {}
+            attempted: set[str] = set()
+            for candidate_pool in (primary_pool, all_pool):
+                if choice is not None:
                     break
-                candidate = self.rng.choice(remaining)
-                if (
-                    reroll
-                    and candidate
-                    and candidate != "(MicroGoal なし)"
-                    and self._is_micro_goal_done_for_text(candidate, world, baseline, mode)
-                ):
-                    remaining = [item for item in remaining if item != candidate]
-                    continue
-                choice = candidate
-                break
+                remaining = [item for item in candidate_pool if item not in attempted]
+                self.rng.shuffle(remaining)
+                for candidate in remaining:
+                    if len(attempted) >= max_attempts:
+                        break
+                    attempted.add(candidate)
+                    self._micro_cache[mode] = candidate
+                    baseline = self._capture_micro_baseline(world, mode)
+                    self._micro_baseline[mode] = baseline
+                    if candidate and self.is_micro_goal_done(world):
+                        continue
+                    choice = candidate
+                    break
             if choice is None:
-                choice = self.rng.choice(pool) if pool else "(MicroGoal なし)"
-            self._micro_cache[mode] = choice
-            self._micro_baseline[mode] = baseline
+                choice = "(MicroGoal なし)"
+                baseline = {}
+                self._micro_cache[mode] = choice
+                self._micro_baseline[mode] = baseline
+            else:
+                self._micro_cache[mode] = choice
+                self._micro_baseline[mode] = baseline
 
             choice_id = self._micro_id(choice)
             history.append(choice_id)
@@ -323,8 +331,56 @@ class Director:
 
     def is_micro_goal_done(self, world: Dict[str, Any]) -> bool:
         mode = self.mode
+        micro = self._micro_cache.get(mode)
+        if not micro or micro == "(MicroGoal なし)":
+            return False
         baseline = self._micro_baseline.get(mode, {})
-        return self._is_micro_goal_done_for_text(self._micro_cache.get(mode), world, baseline, mode)
+        done = self._is_micro_goal_done_for_text(micro, world, baseline, mode)
+        if done:
+            self._debug_micro_goal_done(world, baseline, micro, mode)
+        return done
+
+    def _debug_micro_goal_done(
+        self,
+        world: Dict[str, Any],
+        baseline: Dict[str, Any],
+        micro: str,
+        mode: str,
+    ) -> None:
+        if self._micro_done_debug_emitted:
+            return
+        rule = self._lookup_rule(micro, mode)
+        done_expr = rule.get("done") if rule else None
+        related: Dict[str, Any] = {}
+        if isinstance(done_expr, str):
+            left, _, _ = parse_cond(done_expr)
+            if left:
+                related[left] = get_path(world, left)
+        else:
+            if mode == "FREEZE":
+                related = {
+                    "sobriety_days": world.get("sobriety_days", 0),
+                    "victim_names_logged": world.get("victim_names_logged", 0),
+                    "tips_checked": world.get("tips_checked", 0),
+                }
+            elif mode == "PURSUE":
+                related = {
+                    "evidence_score": world.get("evidence_score", 0),
+                    "cams_fixed": world.get("cams_fixed", 0),
+                    "partner_calls": world.get("partner_calls", 0),
+                }
+            elif mode == "FLEE":
+                related = {
+                    "suspicion.value": _current_suspicion(world),
+                    "avoid_tags": world.get("avoid_tags", 0),
+                }
+            elif mode == "WITNESS":
+                related = {"report_submitted": world.get("report_submitted", 0)}
+        print(
+            "[MICRO_DEBUG] completed micro="
+            f"{micro!r} done={done_expr!r} baseline={baseline} related={related}"
+        )
+        self._micro_done_debug_emitted = True
 
     def apply_auto_step(self, world: Dict[str, Any]) -> Tuple[Optional[str], int]:
         if not isinstance(world, dict):
