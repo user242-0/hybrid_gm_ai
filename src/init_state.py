@@ -18,6 +18,7 @@ def init_game_state():
         "running": True,
         "input_pending" : False,
         "use_gui" : True,
+        "auto_step_pending": False,
         # ほか HP, ロケーション, etc.
         "events": {
             "statue_trial_unlocked": False

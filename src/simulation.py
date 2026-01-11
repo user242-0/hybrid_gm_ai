@@ -87,8 +87,21 @@ def set_auto(enabled: bool) -> None:
     auto_enabled = bool(enabled)
 
 
+def request_auto_step() -> None:
+    game_state["auto_step_pending"] = True
+
+
 def maybe_run_auto() -> None:
-    """Fallback no-op."""
+    if game_state.get("auto_step_pending"):
+        game_state["auto_step_pending"] = False
+        ai_step_once()
+        return
+    if not auto_enabled:
+        return
+    last_auto_ts = game_state.get("last_auto_ts", 0.0)
+    if time.monotonic() - last_auto_ts < AUTO_STEP_INTERVAL_SECONDS:
+        return
+    ai_step_once()
 
 ###[deBug]
 # simulation.py 等で定義している GridWorld に追記/調整
@@ -379,9 +392,15 @@ if director_enabled and director_hud is not None:
         print(f"[RC_AI] auto={state}")
 
     def maybe_run_auto() -> None:
-        if not auto_enabled:
+        if game_state.get("auto_step_pending"):
+            game_state["auto_step_pending"] = False
+            if director_world is None:
+                return
+            ai_step_once()
             return
         if director_world is None:
+            return
+        if not auto_enabled:
             return
         last_auto_ts = game_state.get("last_auto_ts", 0.0)
         if time.monotonic() - last_auto_ts < AUTO_STEP_INTERVAL_SECONDS:
@@ -447,7 +466,7 @@ if director_enabled and director_hud is not None:
         )
 
     director_hud.on_auto_action = ai_step_once
-    director_hud.on_ai_step = ai_step_once
+    director_hud.on_ai_step = request_auto_step
     director_hud.on_toggle_auto = set_auto
     director_hud.on_reroll = on_reroll
     director_hud.on_save = on_save
