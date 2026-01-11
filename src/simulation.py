@@ -436,7 +436,8 @@ if director_enabled and director_hud is not None:
         clock_label = _director_clock_string(director_world)
         if director_hud is not None:
             director_hud.set_clock(clock_label)
-        if director.is_micro_goal_done(director_world):
+        non_progress_actions = {"switch_character", "感情を設定する"}
+        if action_id not in non_progress_actions and director.is_micro_goal_done(director_world):
             director.clear_micro_goal()
             print("[MICRO] completed -> next")
         on_show_micro()

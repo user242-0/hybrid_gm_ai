@@ -171,6 +171,62 @@ class Director:
 
         return hashlib.md5(value.encode("utf-8")).hexdigest()[:8]
 
+    def _is_micro_goal_done_for_text(
+        self,
+        text: Optional[str],
+        world: Dict[str, Any],
+        baseline: Dict[str, Any],
+        mode: str,
+    ) -> bool:
+        rule = self._lookup_rule(text, mode)
+        if rule:
+            done_expr = rule.get("done")
+            if isinstance(done_expr, str):
+                if not done_expr.strip():
+                    return False
+                left, _, _ = parse_cond(done_expr)
+                if left:
+                    current = get_path(world, left)
+                    if current is None:
+                        return False
+                return eval_cond(done_expr, world, prev_world=None)
+            if callable(done_expr):
+                try:
+                    return bool(done_expr(world, baseline))
+                except TypeError:
+                    return bool(done_expr(world))  # type: ignore[misc]
+                except Exception:
+                    return False
+            return False
+        if mode == "FREEZE":
+            if world.get("sobriety_days", 0) >= baseline.get("sobriety_days", 0) + 1:
+                return True
+            if world.get("victim_names_logged", 0) > baseline.get("victim_names_logged", 0):
+                return True
+            if world.get("tips_checked", 0) > baseline.get("tips_checked", 0):
+                return True
+            return False
+        if mode == "PURSUE":
+            if world.get("evidence_score", 0) >= baseline.get("evidence_score", 0) + 10:
+                return True
+            if world.get("cams_fixed", 0) > baseline.get("cams_fixed", 0):
+                return True
+            if world.get("partner_calls", 0) > baseline.get("partner_calls", 0):
+                return True
+            return False
+        if mode == "FLEE":
+            current = _current_suspicion(world)
+            start = baseline.get("suspicion_value", current)
+            target = max(0, start - 1)
+            if current <= target:
+                return True
+            if world.get("avoid_tags", 0) > baseline.get("avoid_tags", 0):
+                return True
+            return False
+        if mode == "WITNESS":
+            return world.get("report_submitted", 0) > baseline.get("report_submitted", 0)
+        return False
+
     def _micro_bank(self, mode: str) -> List[Dict[str, Any]]:
         bucket = self.goals_dict.get("modes", {}).get(mode, {})
         raw = bucket.get("micro", [])
@@ -226,9 +282,28 @@ class Director:
                 last_id = history[-1] if history else None
                 pool = [item for item in items if self._micro_id(item) != last_id]
             pool = pool or items
-            choice = self.rng.choice(pool) if pool else "(MicroGoal なし)"
+            baseline = self._capture_micro_baseline(world, mode)
+            max_attempts = 5 if reroll else 1
+            choice = None
+            remaining = list(pool)
+            for _ in range(max_attempts):
+                if not remaining:
+                    break
+                candidate = self.rng.choice(remaining)
+                if (
+                    reroll
+                    and candidate
+                    and candidate != "(MicroGoal なし)"
+                    and self._is_micro_goal_done_for_text(candidate, world, baseline, mode)
+                ):
+                    remaining = [item for item in remaining if item != candidate]
+                    continue
+                choice = candidate
+                break
+            if choice is None:
+                choice = self.rng.choice(pool) if pool else "(MicroGoal なし)"
             self._micro_cache[mode] = choice
-            self._micro_baseline[mode] = self._capture_micro_baseline(world, mode)
+            self._micro_baseline[mode] = baseline
 
             choice_id = self._micro_id(choice)
             history.append(choice_id)
@@ -248,47 +323,8 @@ class Director:
 
     def is_micro_goal_done(self, world: Dict[str, Any]) -> bool:
         mode = self.mode
-        rule = self._lookup_rule(self._micro_cache.get(mode), mode)
         baseline = self._micro_baseline.get(mode, {})
-        if rule:
-            done_expr = rule.get("done")
-            if isinstance(done_expr, str) and done_expr.strip():
-                return eval_cond(done_expr, world, prev_world=None)
-            if callable(done_expr):
-                try:
-                    return bool(done_expr(world, baseline))
-                except TypeError:
-                    return bool(done_expr(world))  # type: ignore[misc]
-                except Exception:
-                    return False
-        if mode == "FREEZE":
-            if world.get("sobriety_days", 0) >= baseline.get("sobriety_days", 0) + 1:
-                return True
-            if world.get("victim_names_logged", 0) > baseline.get("victim_names_logged", 0):
-                return True
-            if world.get("tips_checked", 0) > baseline.get("tips_checked", 0):
-                return True
-            return False
-        if mode == "PURSUE":
-            if world.get("evidence_score", 0) >= baseline.get("evidence_score", 0) + 10:
-                return True
-            if world.get("cams_fixed", 0) > baseline.get("cams_fixed", 0):
-                return True
-            if world.get("partner_calls", 0) > baseline.get("partner_calls", 0):
-                return True
-            return False
-        if mode == "FLEE":
-            current = _current_suspicion(world)
-            start = baseline.get("suspicion_value", current)
-            target = max(0, start - 1)
-            if current <= target:
-                return True
-            if world.get("avoid_tags", 0) > baseline.get("avoid_tags", 0):
-                return True
-            return False
-        if mode == "WITNESS":
-            return world.get("report_submitted", 0) > baseline.get("report_submitted", 0)
-        return False
+        return self._is_micro_goal_done_for_text(self._micro_cache.get(mode), world, baseline, mode)
 
     def apply_auto_step(self, world: Dict[str, Any]) -> Tuple[Optional[str], int]:
         if not isinstance(world, dict):
