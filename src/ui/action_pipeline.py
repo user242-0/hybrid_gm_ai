@@ -91,6 +91,9 @@ class ActionPipeline:
         if world is not None and dt_value > 0 and action_executed:
             self._advance_time(world, dt_value)
 
+        if action_executed:
+            self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
+
         if world is not None:
             action_registry.ensure_emotion(world)
             action_registry.apply_emotion_delta(world, action_id)

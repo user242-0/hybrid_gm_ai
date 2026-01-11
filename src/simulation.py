@@ -57,6 +57,14 @@ USE_CLI = False     # True にすると黒い端末だけでプレイ
 scheduler = Scheduler()
 game_state = init_game_state()    # ★ ここで一度だけ生成
 game_state["last_auto_ts"] = 0.0
+game_state.setdefault("hud_cache_rev", 0)
+game_state.setdefault("hud_last_rendered_rev", -1)
+game_state.setdefault("hud_cached_actions", [])
+game_state.setdefault("hud_cached_progress", None)
+game_state.setdefault(
+    "hud_cached_recommended",
+    {"label": None, "enabled": False, "action_id": None, "minutes": None},
+)
 init_world(game_state)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -213,6 +221,7 @@ if director_enabled:
     game_state["director_world"] = director_world
     game_state["world"] = director_world
     game_state["director_micro_goal"] = None
+    game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
 
     if DirectorHUD is not None:
         try:
@@ -240,8 +249,19 @@ def _pump_director_hud() -> None:
         director_hud.request_update()
 
 
-def ui_show_micro(micro_goal, gs):
+def _bump_hud_cache_rev(gs: dict) -> None:
+    gs["hud_cache_rev"] = gs.get("hud_cache_rev", 0) + 1
+
+
+def _update_microgoal(micro_goal, gs: dict) -> None:
+    previous = gs.get("director_micro_goal")
     gs["director_micro_goal"] = micro_goal
+    if previous != micro_goal:
+        _bump_hud_cache_rev(gs)
+
+
+def ui_show_micro(micro_goal, gs):
+    _update_microgoal(micro_goal, gs)
     if director_hud is not None:
         director_hud.set_microgoal(micro_goal)
 
@@ -260,41 +280,77 @@ if director_enabled and director_hud is not None:
             director_hud.set_progress(None)
             director_hud.set_recommended(None, enabled=False)
             director_hud.set_actions([])
+            game_state["hud_cached_progress"] = None
+            game_state["hud_cached_actions"] = []
+            game_state["hud_cached_recommended"] = {
+                "label": None,
+                "enabled": False,
+                "action_id": None,
+                "minutes": None,
+            }
+            game_state["hud_last_rendered_rev"] = game_state.get("hud_cache_rev", 0)
             return
 
-        director_hud.set_progress(director.progress_text(director_world))
+        cache_rev = game_state.get("hud_cache_rev", 0)
+        last_rendered_rev = game_state.get("hud_last_rendered_rev", -1)
+        if cache_rev != last_rendered_rev:
+            progress_text = director.progress_text(director_world)
+            game_state["hud_cached_progress"] = progress_text
 
-        rec_action, rec_minutes, rec_label = director.recommended_action(director_world)
-        if isinstance(director_world, dict):
+            rec_action, rec_minutes, rec_label = director.recommended_action(director_world)
+            if isinstance(director_world, dict):
+                if rec_action:
+                    director_world["_recommended_action_id"] = rec_action
+                else:
+                    director_world.pop("_recommended_action_id", None)
             if rec_action:
-                director_world["_recommended_action_id"] = rec_action
+                label = f"★ {rec_label or rec_action} (+{rec_minutes}m)"
+                recommended = {
+                    "label": label,
+                    "enabled": True,
+                    "action_id": rec_action,
+                    "minutes": rec_minutes,
+                }
             else:
-                director_world.pop("_recommended_action_id", None)
-        if rec_action:
-            label = f"★ {rec_label or rec_action} (+{rec_minutes}m)"
-            director_hud.set_recommended(label, enabled=True)
-        else:
-            director_hud.set_recommended("(Recommended)", enabled=False)
+                recommended = {
+                    "label": "(Recommended)",
+                    "enabled": False,
+                    "action_id": None,
+                    "minutes": None,
+                }
+            game_state["hud_cached_recommended"] = recommended
 
-        current_actions.clear()
-        for record in director.list_actions_for_mode(director.mode):
-            action_id = None
-            label = None
-            minutes = 5
-            if isinstance(record, dict):
-                action_id = record.get("action") or record.get("id") or record.get("action_id")
-                label = record.get("text") or record.get("label")
-                try:
-                    minutes = int(record.get("time_min", 5))
-                except (TypeError, ValueError):
-                    minutes = 5
-            if not action_id:
-                continue
-            spec = get_action_spec(action_id)
-            if not label:
-                label = spec.label if spec else action_id
-            current_actions.append((action_id, label, max(0, minutes)))
-        director_hud.set_actions(current_actions.copy())
+            current_actions.clear()
+            for record in director.list_actions_for_mode(director.mode):
+                action_id = None
+                label = None
+                minutes = 5
+                if isinstance(record, dict):
+                    action_id = record.get("action") or record.get("id") or record.get("action_id")
+                    label = record.get("text") or record.get("label")
+                    try:
+                        minutes = int(record.get("time_min", 5))
+                    except (TypeError, ValueError):
+                        minutes = 5
+                if not action_id:
+                    continue
+                spec = get_action_spec(action_id)
+                if not label:
+                    label = spec.label if spec else action_id
+                current_actions.append((action_id, label, max(0, minutes)))
+            current_actions.sort(key=lambda item: item[0])
+            game_state["hud_cached_actions"] = current_actions.copy()
+            game_state["hud_last_rendered_rev"] = cache_rev
+
+        director_hud.set_progress(game_state.get("hud_cached_progress"))
+        recommended = game_state.get("hud_cached_recommended") or {}
+        director_hud.set_recommended(
+            recommended.get("label"),
+            enabled=bool(recommended.get("enabled")),
+        )
+        cached_actions = game_state.get("hud_cached_actions") or []
+        current_actions[:] = list(cached_actions)
+        director_hud.set_actions(list(cached_actions))
 
     def _hud_adjust_value(path, delta, *, minimum=None, maximum=None):
         node = director_world
@@ -424,6 +480,7 @@ if director_enabled and director_hud is not None:
             director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
         game_state["director_world"] = director_world
         game_state["world"] = director_world
+        _bump_hud_cache_rev(game_state)
         if director_hud is not None:
             director_hud.set_clock(_director_clock_string(director_world))
         director.clear_micro_goal()
@@ -439,7 +496,9 @@ if director_enabled and director_hud is not None:
         action_id = None
         time_min = None
         if which == "__recommended__":
-            action_id, time_min, _ = director.recommended_action(director_world)
+            recommended = game_state.get("hud_cached_recommended") or {}
+            action_id = recommended.get("action_id")
+            time_min = recommended.get("minutes")
         elif isinstance(which, int) and 0 <= which < len(current_actions):
             action_id, _, time_min = current_actions[which]
         if not action_id or not isinstance(action_id, str) or not action_id.strip():
@@ -478,6 +537,7 @@ if director_enabled and director_hud is not None:
         if not director.set_mode(new_mode):
             return
         director_hud.set_mode(director.mode)
+        _bump_hud_cache_rev(game_state)
         print(f"[Director] mode -> {new_mode}")
         on_show_micro()
         refresh_hud()
