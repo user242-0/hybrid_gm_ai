@@ -56,6 +56,7 @@ USE_CLI = False     # True にすると黒い端末だけでプレイ
 # --- 起動時に Scheduler 用意 ---
 scheduler = Scheduler()
 game_state = init_game_state()    # ★ ここで一度だけ生成
+game_state["last_auto_ts"] = 0.0
 init_world(game_state)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -74,7 +75,6 @@ director_hud = None
 pipeline: ActionPipeline | None = None
 
 auto_enabled = False
-_last_auto_step_ts = 0.0
 AUTO_STEP_INTERVAL_SECONDS = 0.5
 
 
@@ -323,15 +323,12 @@ if director_enabled and director_hud is not None:
         refresh_hud()
 
     def ai_step_once() -> None:
-        global _last_auto_step_ts
-
         if director_world is None:
             return
 
         actions = director.list_actions_for_mode(director.mode) or []
         micro = director.get_micro_goal(director_world, reroll=False)
         action_id, tmin, _ = pick_action(director_world, director.mode, actions, micro)
-        _last_auto_step_ts = time.monotonic()
 
         if not action_id:
             director.clear_micro_goal()
@@ -349,6 +346,7 @@ if director_enabled and director_hud is not None:
             time_min_override=tmin,
             source="RC_AI",
         )
+        game_state["last_auto_ts"] = time.monotonic()
         if isinstance(director_world, dict):
             director_world["_last_action_id"] = action_id
 
@@ -371,11 +369,11 @@ if director_enabled and director_hud is not None:
         refresh_hud()
 
     def set_auto(enabled: bool) -> None:
-        global auto_enabled, _last_auto_step_ts
+        global auto_enabled
 
         auto_enabled = bool(enabled)
         if auto_enabled:
-            _last_auto_step_ts = time.monotonic() - AUTO_STEP_INTERVAL_SECONDS
+            game_state["last_auto_ts"] = time.monotonic() - AUTO_STEP_INTERVAL_SECONDS
         if director_hud is not None:
             director_hud.set_auto_enabled(auto_enabled)
         state = "on" if auto_enabled else "off"
@@ -386,7 +384,8 @@ if director_enabled and director_hud is not None:
             return
         if director_world is None:
             return
-        if time.monotonic() - _last_auto_step_ts < AUTO_STEP_INTERVAL_SECONDS:
+        last_auto_ts = game_state.get("last_auto_ts", 0.0)
+        if time.monotonic() - last_auto_ts < AUTO_STEP_INTERVAL_SECONDS:
             return
         ai_step_once()
 
