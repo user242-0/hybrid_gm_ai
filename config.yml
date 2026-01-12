@@ -12,6 +12,12 @@ datalab:
   emit_thresholds:
     salience_min: 0.60
     red_impulse_min: 0.50
+  # SceneGraph/emotion_eval/seedledger の出力制御
+  emit_sources: ["GUI", "HUD", "CLI", ]          # SceneGraph と emotion_eval の出力元（default）
+  emit_exclude_actions: ["switch_character"]    # SceneGraph と emotion_eval から除外する action_id（default）
+  seedledger_enabled: true                      # seedledger の出力を有効化（default: true）
+  seedledger_sources: ["GUI", "HUD", "CLI" ]     # seedledger の出力元（default: emit_sources と揃える）
+  emotion_eval_sources: ["GUI", "HUD", "CLI"]   # emotion_eval の出力元（default: emit_sources と揃える）
 
 director:
   enabled: true

@@ -111,22 +111,51 @@ class ActionPipeline:
             mats += ["steel_brushed", "leather_soft"]
         return mats
 
-    def _emit_scene_graph(self, actor_obj: Any, action_id: str, args: list, world: dict, micro_goal: str | None) -> None:
-        """Emit scene graph if enabled in config"""
+    def _emit_scene_graph(self, actor_obj: Any, action_id: str, args: list, world: dict, micro_goal: str | None, source: str = "UI") -> None:
+        """Emit scene graph if enabled in config and passes filters"""
         try:
+            cfg = get_cfg()
+            datalab_cfg = cfg.get("datalab", {})
+            
+            # A) emit_scene_graph が true
+            if not datalab_cfg.get("emit_scene_graph", True):
+                return
+            
+            # B) source が emit_sources に含まれる
+            emit_sources = datalab_cfg.get("emit_sources", ["GUI", "HUD", "CLI"])
+            if not isinstance(emit_sources, list):
+                emit_sources = ["GUI", "HUD", "CLI"]
+            if source not in emit_sources:
+                return
+            
+            # C) action_id が emit_exclude_actions に含まれない
+            emit_exclude_actions = datalab_cfg.get("emit_exclude_actions", ["switch_character"])
+            if not isinstance(emit_exclude_actions, list):
+                emit_exclude_actions = ["switch_character"]
+            if action_id in emit_exclude_actions:
+                return
+            
             # Convert args to list of strings
             args_str = [str(arg) for arg in args] if args else []
             
             job_root = Path(job_root_from_cfg())
             job_root.mkdir(parents=True, exist_ok=True)
             
-            # emotion eval
-            signals_doc = emit_emotion_eval(job_root, actor_obj=actor_obj, game_state=self.game_state)
-            cfg = get_cfg()
-            thresholds = cfg.get("datalab", {}).get("emit_thresholds", {})
+            # emotion eval（emotion_eval_sources でフィルタリング）
+            emotion_eval_sources = datalab_cfg.get("emotion_eval_sources", emit_sources)
+            if not isinstance(emotion_eval_sources, list):
+                emotion_eval_sources = emit_sources
+            if source in emotion_eval_sources:
+                signals_doc = emit_emotion_eval(job_root, actor_obj=actor_obj, game_state=self.game_state)
+            else:
+                # emotion_eval を出力しない場合は、ダミーの signals_doc を作成
+                signals_doc = {"signals": {}}
+            
+            thresholds = datalab_cfg.get("emit_thresholds", {})
             decision = summarize_why_now(signals_doc.get("signals", {}), thresholds)
             
-            policy = cfg.get("datalab", {}).get("emit_policy", "always")
+            # D) 既存 emit_policy 判定を通る
+            policy = datalab_cfg.get("emit_policy", "always")
             emit_ok = (policy == "always") or (policy == "threshold" and decision["ok"])
             why_now_text = f'{decision["text"]} | policy={policy} {"emit" if emit_ok else "skip"}'
             
@@ -177,7 +206,7 @@ class ActionPipeline:
             
             objects = objs if objs else [ObjectSpec(**fallback_kwargs)]
             
-            # emit scene graph
+            # emit scene graph（source を渡して seedledger の制御を可能にする）
             emit_scene_graph(
                 job_root=job_root,
                 theme=picked.get("theme", f"{ctx['location']}での{action}"),
@@ -189,6 +218,7 @@ class ActionPipeline:
                 actor=actor_obj.name,
                 action=action,
                 args=args_str,
+                source=source,
                 extra_meta={
                     "camera": picked.get("camera"),
                     "lighting": picked.get("lighting"),
@@ -300,11 +330,11 @@ class ActionPipeline:
                 microgoal=micro_goal,
             )
 
-            # scene_graph emit（設定ONのときだけ）
+            # scene_graph emit（設定ONのときだけ、フィルタリングは _emit_scene_graph 内で実施）
             cfg = get_cfg()
             emit_enabled = cfg.get("datalab", {}).get("emit_scene_graph", True)
             if emit_enabled and actor_obj is not None and hasattr(actor_obj, "name"):
-                self._emit_scene_graph(actor_obj, action_id, arg_list, world, micro_goal)
+                self._emit_scene_graph(actor_obj, action_id, arg_list, world, micro_goal, source)
 
         if world is not None and self.hud_set_clock is not None:
             clock_label = world.get("clock")

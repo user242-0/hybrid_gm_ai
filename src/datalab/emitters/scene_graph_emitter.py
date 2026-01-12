@@ -18,6 +18,7 @@ def emit_scene_graph(*, job_root: Path, theme: str, background: str, objects: li
                      actor: str | None = None,
                      action: str | None = None,
                      args: list[str] | None = None,
+                     source: str | None = None,
                      extra_meta: dict | None = None):
     job_root = Path(job_root)
     job_root.mkdir(parents=True, exist_ok=True)
@@ -46,15 +47,26 @@ def emit_scene_graph(*, job_root: Path, theme: str, background: str, objects: li
     out = job_root / "scene_graph.yml"
     out.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
-    # ここで seed_ledger を追記
-    append_seed_ledger(
-        job_root,
-        scene_file=out,
-        seed=seed,
-        commit_hash=commit_hash,
-        profile=profile,
-        actor=actor or "",
-        action=action or "",
-        args=args or [],
-    )
+    # seed_ledger の出力制御（SceneGraphを実際に出力したときだけ追記）
+    datalab_cfg = cfg.get("datalab", {})
+    seedledger_enabled = datalab_cfg.get("seedledger_enabled", True)
+    
+    if seedledger_enabled and source is not None:
+        seedledger_sources = datalab_cfg.get("seedledger_sources", ["GUI", "HUD", "CLI"])
+        if not isinstance(seedledger_sources, list):
+            seedledger_sources = ["GUI", "HUD", "CLI"]
+        
+        # source が seedledger_sources に含まれるときだけ seedledger に追記
+        if source in seedledger_sources:
+            append_seed_ledger(
+                job_root,
+                scene_file=out,
+                seed=seed,
+                commit_hash=commit_hash,
+                profile=profile,
+                actor=actor or "",
+                action=action or "",
+                args=args or [],
+            )
+    
     return out

@@ -156,9 +156,27 @@ def _build_ctx(player, game_state, action: str, args: list[str], raw_key: str | 
     }
 
 # emit_from_choice の定義を少し拡張（why_now, profile, actor情報を渡す）
-def emit_from_choice(player, key: str, args: list[str], game_state, why_now: str | None = None):
-    if not CFG["datalab"].get("emit_scene_graph", True):
+def emit_from_choice(player, key: str, args: list[str], game_state, why_now: str | None = None, source: str = "LegacyGUI"):
+    datalab_cfg = CFG.get("datalab", {})
+    
+    # A) emit_scene_graph が true
+    if not datalab_cfg.get("emit_scene_graph", True):
         return
+    
+    # B) source が emit_sources に含まれる
+    emit_sources = datalab_cfg.get("emit_sources", ["GUI", "HUD", "CLI"])
+    if not isinstance(emit_sources, list):
+        emit_sources = ["GUI", "HUD", "CLI"]
+    if source not in emit_sources:
+        return
+    
+    # C) action_id が emit_exclude_actions に含まれない
+    emit_exclude_actions = datalab_cfg.get("emit_exclude_actions", ["switch_character"])
+    if not isinstance(emit_exclude_actions, list):
+        emit_exclude_actions = ["switch_character"]
+    if key in emit_exclude_actions:
+        return
+    
     action = normalize_action(key, args)
     ctx = _build_ctx(player, game_state, action, args, raw_key=key)
     picked = resolve(ctx)  # scene_policy.yaml を解決
@@ -215,6 +233,7 @@ def emit_from_choice(player, key: str, args: list[str], game_state, why_now: str
         why_now=why_now,
         profile=CFG.get("profile", "prod"),
         actor=player.name, action=action, args=args,
+        source=source,
         extra_meta={"camera": picked.get("camera"), "lighting": picked.get("lighting"),
                     "tpo_ctx": {"location": ctx["location"], "time": ctx["time"],
                                 "relation_labels": sorted(list(ctx["relation_labels"]))}},
@@ -308,7 +327,7 @@ def execute_player_choice(player, cmd: str, game_state, pipeline=None):
     why_now_text = f'{decision["text"]} | policy={policy} {"emit" if emit_ok else "skip"}'
 
     if emit_ok:
-        emit_from_choice(player, key, args, game_state, why_now=why_now_text)
+        emit_from_choice(player, key, args, game_state, why_now=why_now_text, source="LegacyGUI")
     # （この後に story_emitter 等を呼ぶ）
 
     # 追加：可読ログ（Story）
