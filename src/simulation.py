@@ -320,22 +320,6 @@ def write_scenes_to_scene_graph(scenes):
         )
     sg_path.write_text(yaml.safe_dump(existing, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
-def _advance_time(minutes: int) -> None:
-    world = ctx.game_state.get("director_world") or ctx.game_state.get("world")
-    if not isinstance(world, dict):
-        return
-    if world.get("t_min") is not None or isinstance(world.get("clock"), dict):
-        if ctx.game_state.get("world") is world:
-            world_tick(ctx.game_state, dt=minutes)
-        else:
-            temp_state = {"world": world, "time_of_day": ctx.game_state.get("time_of_day")}
-            world_tick(temp_state, dt=minutes)
-            if "time_of_day" in temp_state:
-                ctx.game_state["time_of_day"] = temp_state["time_of_day"]
-    else:
-        ensure_clock(world)
-        add_minutes(world, minutes)
-
 hud_refresh_cb = globals().get("refresh_hud")
 ctx.pipeline = ActionPipeline(
     game_state=ctx.game_state,
@@ -344,7 +328,7 @@ ctx.pipeline = ActionPipeline(
     ui_refresh=hud_refresh_cb if callable(hud_refresh_cb) else None,
     hud_set_clock=(ctx.director_hud.set_clock if ctx.director_hud else None),
     hud_set_microgoal=(ctx.director_hud.set_microgoal if ctx.director_hud else None),
-    advance_time=_advance_time,
+    # advance_time uses ActionPipeline's built-in _advance_time
 )
 
 def dispatch_action(
