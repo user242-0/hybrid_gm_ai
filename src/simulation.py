@@ -84,16 +84,6 @@ ctx = GameContext(
     cfg=_cfg,
 )
 
-# 後方互換用エイリアス（段階的に削除予定）
-scheduler = ctx.scheduler
-game_state = ctx.game_state
-cfg = ctx.cfg
-director = ctx.director
-director_world = ctx.director_world
-director_hud = ctx.director_hud
-pipeline = ctx.pipeline
-auto_enabled = ctx.auto_enabled
-
 director_cfg = _cfg.get("director", {})
 director_enabled = bool(director_cfg.get("enabled", False))
 
