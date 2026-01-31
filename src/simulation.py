@@ -52,6 +52,7 @@ from src.quit_helper import handle_quit
 
 # コンテキスト管理
 from src.game_context import GameContext
+from src.ui.hud_callbacks import HUDCallbacks
 
 # 中略...
 USE_CLI = False     # True にすると黒い端末だけでプレイ
@@ -97,29 +98,10 @@ director_cfg = _cfg.get("director", {})
 director_enabled = bool(director_cfg.get("enabled", False))
 
 
-def ai_step_once() -> None:
-    """Fallback no-op when director HUD is unavailable."""
-
-
-def set_auto(enabled: bool) -> None:
-    ctx.set_auto(enabled)
-
-
 def request_auto_step() -> None:
+    """自動ステップをリクエストする"""
     ctx.request_auto_step()
 
-
-def maybe_run_auto() -> None:
-    if ctx.game_state.get("auto_step_pending"):
-        ai_step_once()
-        ctx.game_state["auto_step_pending"] = False
-        return
-    if not ctx.auto_enabled:
-        return
-    last_auto_ts = ctx.game_state.get("last_auto_ts", 0.0)
-    if time.monotonic() - last_auto_ts < ctx.AUTO_STEP_INTERVAL_SECONDS:
-        return
-    ai_step_once()
 
 ###[deBug]
 # simulation.py 等で定義している GridWorld に追記/調整
@@ -216,6 +198,38 @@ def ui_show_micro(micro_goal, gs):
         ctx.director_hud.set_microgoal(micro_goal)
 
 
+def _director_world_path() -> Path:
+    job_root = Path(job_root_from_cfg())
+    job_root.mkdir(parents=True, exist_ok=True)
+    return job_root / "director_world.yml"
+
+
+def save_director_world(world: dict) -> None:
+    path = _director_world_path()
+    try:
+        path.write_text(
+            yaml.safe_dump(world, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        print(f"[SAVE] failed to persist director world: {exc}")
+
+
+def load_director_world(fallback: dict | None) -> dict | None:
+    path = _director_world_path()
+    if not path.exists():
+        return fallback
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"[LOAD] failed to restore director world: {exc}")
+        return fallback
+    if isinstance(loaded, dict):
+        ensure_clock(loaded)
+        return loaded
+    return fallback
+
+
 if director_enabled:
     if simulation_cli_args.premise_text:
         premise, goals, pack_id = synthesize_from_text(simulation_cli_args.premise_text)
@@ -279,280 +293,67 @@ def _pump_director_hud() -> None:
         ctx.director_hud.request_update()
 
 
-if director_enabled and ctx.director_hud is not None:
+# HUD コールバックのセットアップ（dispatch_action 定義後に初期化）
+_hud_cbs: HUDCallbacks | None = None
+_available_modes: list[str] = []
 
+if director_enabled and ctx.director_hud is not None:
     ctx.current_actions = []
-    available_modes = ctx.director.available_modes()
-    if not available_modes:
+    _available_modes = ctx.director.available_modes()
+    if not _available_modes:
         print("[Director] warning: no modes found in goals_dict")
 
-    def refresh_hud() -> None:
-        if ctx.director_hud is None:
-            return
-        if ctx.director_world is None:
-            ctx.director_hud.set_progress(None)
-            ctx.director_hud.set_recommended(None, enabled=False)
-            ctx.director_hud.set_actions([])
-            ctx.game_state["hud_cached_progress"] = None
-            ctx.game_state["hud_cached_actions"] = []
-            ctx.game_state["hud_cached_recommended"] = {
-                "label": None,
-                "enabled": False,
-                "action_id": None,
-                "minutes": None,
-            }
-            ctx.game_state["hud_last_rendered_rev"] = ctx.game_state.get("hud_cache_rev", 0)
-            return
 
-        cache_rev = ctx.game_state.get("hud_cache_rev", 0)
-        last_rendered_rev = ctx.game_state.get("hud_last_rendered_rev", -1)
-        if cache_rev != last_rendered_rev:
-            print(f"[HUD_DEBUG] recompute rev={cache_rev} last={last_rendered_rev}")
-            progress_text = ctx.director.progress_text(ctx.director_world)
-            ctx.game_state["hud_cached_progress"] = progress_text
+def _init_hud_callbacks() -> None:
+    """dispatch_action 定義後に呼び出される HUD コールバック初期化"""
+    global _hud_cbs
+    if not director_enabled or ctx.director_hud is None:
+        return
 
-            rec_action, rec_minutes, rec_label = ctx.director.recommended_action(ctx.director_world)
-            print(f"[HUD_DEBUG] rec_action={rec_action} minutes={rec_minutes} label={rec_label}")
-            if isinstance(ctx.director_world, dict):
-                if rec_action:
-                    ctx.director_world["_recommended_action_id"] = rec_action
-                else:
-                    ctx.director_world.pop("_recommended_action_id", None)
-            if rec_action:
-                label = f"★ {rec_label or rec_action} (+{rec_minutes}m)"
-                recommended = {
-                    "label": label,
-                    "enabled": True,
-                    "action_id": rec_action,
-                    "minutes": rec_minutes,
-                }
-            else:
-                recommended = {
-                    "label": "(Recommended)",
-                    "enabled": False,
-                    "action_id": None,
-                    "minutes": None,
-                }
-            ctx.game_state["hud_cached_recommended"] = recommended
+    _hud_cbs = HUDCallbacks(
+        ctx=ctx,
+        get_action_spec=get_action_spec,
+        pick_action=pick_action,
+        dispatch_action=dispatch_action,
+        ui_show_micro=ui_show_micro,
+        director_clock_string=_director_clock_string,
+        save_director_world=save_director_world,
+        load_director_world=load_director_world,
+        ensure_clock=ensure_clock,
+        request_auto_step=request_auto_step,
+    )
+    _hud_cbs.bind_to_hud()
 
-            ctx.current_actions.clear()
-            for record in ctx.director.list_actions_for_mode(ctx.director.mode):
-                action_id = None
-                label = None
-                minutes = 5
-                if isinstance(record, dict):
-                    action_id = record.get("action") or record.get("id") or record.get("action_id")
-                    label = record.get("text") or record.get("label")
-                    try:
-                        minutes = int(record.get("time_min", 5))
-                    except (TypeError, ValueError):
-                        minutes = 5
-                if not action_id:
-                    continue
-                spec = get_action_spec(action_id)
-                if not label:
-                    label = spec.label if spec else action_id
-                ctx.current_actions.append((action_id, label, max(0, minutes)))
-            ctx.current_actions.sort(key=lambda item: item[0])
-            print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
-            ctx.game_state["hud_cached_actions"] = ctx.current_actions.copy()
-            ctx.game_state["hud_last_rendered_rev"] = cache_rev
-
-        ctx.director_hud.set_progress(ctx.game_state.get("hud_cached_progress"))
-        recommended = ctx.game_state.get("hud_cached_recommended") or {}
-        ctx.director_hud.set_recommended(
-            recommended.get("label"),
-            enabled=bool(recommended.get("enabled")),
-        )
-        cached_actions = ctx.game_state.get("hud_cached_actions") or []
-        ctx.current_actions[:] = list(cached_actions)
-        ctx.director_hud.set_actions(list(cached_actions))
-
-    def _hud_adjust_value(path, delta, *, minimum=None, maximum=None):
-        node = ctx.director_world
-        if node is None:
-            return
-        for key in path[:-1]:
-            if not isinstance(node, dict):
-                return
-            node = node.get(key)
-        if not isinstance(node, dict):
-            return
-        leaf_key = path[-1]
-        value = node.get(leaf_key, 0)
-        if not isinstance(value, (int, float)):
-            return
-        new_value = value + delta
-        if minimum is not None:
-            new_value = max(minimum, new_value)
-        if maximum is not None:
-            new_value = min(maximum, new_value)
-        node[leaf_key] = new_value
-
-    def on_show_micro() -> None:
-        if ctx.director_world is None:
-            return
-        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
-        ui_show_micro(micro, ctx.game_state)
-        micro_text = micro or "(MicroGoal なし)"
-        print(f"[UI] MicroGoal: {micro_text}")
-
-    def on_reroll() -> None:
-        if ctx.director_world is None:
-            return
-        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=True)
-        ui_show_micro(micro, ctx.game_state)
-        micro_text = micro or "(MicroGoal なし)"
-        print(f"[UI] MicroGoal (reroll): {micro_text}")
-        refresh_hud()
-
-    def ai_step_once() -> None:
-        if ctx.director_world is None:
-            return
-
-        actions = ctx.director.list_actions_for_mode(ctx.director.mode) or []
-        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
-        action_id, tmin, _ = pick_action(ctx.director_world, ctx.director.mode, actions, micro)
-
-        if not action_id:
-            ctx.director.clear_micro_goal()
-            on_show_micro()
-            refresh_hud()
-            print("[RC_AI] no action; rerolled micro")
-            return
-        emo_before = ctx.director_world.get("emotion", {}).copy()
-        dispatch_action(
-            action_id,
-            actor_obj=ctx.game_state.get("active_char"),
-            args=[],
-            time_min_override=tmin,
-            source="RC_AI",
-        )
-        ctx.game_state["last_auto_ts"] = time.monotonic()
-        if isinstance(ctx.director_world, dict):
-            ctx.director_world["_last_action_id"] = action_id
-
-        emo_after = ctx.director_world.get("emotion", {})
-        print(
-            f"[RC_AI] picked={action_id} reason={_} "
-            f"emotion R:{emo_before.get('R')}→{emo_after.get('R')} "
-            f"G:{emo_before.get('G')}→{emo_after.get('G')} "
-            f"B:{emo_before.get('B')}→{emo_after.get('B')}"
-        )
-        clock_label = _director_clock_string(ctx.director_world)
-        if ctx.director_hud is not None:
-            ctx.director_hud.set_clock(clock_label)
-        non_progress_actions = {"switch_character", "感情を設定する"}
-        if action_id not in non_progress_actions and ctx.director.is_micro_goal_done(ctx.director_world):
-            ctx.director.clear_micro_goal()
-            next_micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
-            if next_micro and next_micro != "(MicroGoal なし)":
-                print("[MICRO] completed -> next")
-        on_show_micro()
-        refresh_hud()
-
-    def set_auto(enabled: bool) -> None:
-        ctx.set_auto(enabled)
-
-    def maybe_run_auto() -> None:
-        if ctx.game_state.get("auto_step_pending"):
-            if ctx.director_world is None:
-                ctx.game_state["auto_step_pending"] = False
-                return
-            ai_step_once()
-            ctx.game_state["auto_step_pending"] = False
-            return
-        if ctx.director_world is None:
-            return
-        if not ctx.auto_enabled:
-            return
-        last_auto_ts = ctx.game_state.get("last_auto_ts", 0.0)
-        if time.monotonic() - last_auto_ts < ctx.AUTO_STEP_INTERVAL_SECONDS:
-            return
-        ai_step_once()
-
-    def on_save() -> None:
-        if ctx.director_world is None:
-            return
-        save_director_world(ctx.director_world)
-        print("[SAVE] world saved")
-
-    def on_load() -> None:
-        loaded = load_director_world(ctx.director_world)
-        if loaded is None:
-            return
-        ctx.director_world = loaded
-        ensure_clock(ctx.director_world)
-        if isinstance(ctx.director_world, dict):
-            ctx.director_world["reload_epoch"] = ctx.director_world.get("reload_epoch", 0) + 1
-        ctx.game_state["director_world"] = ctx.director_world
-        ctx.game_state["world"] = ctx.director_world
-        ctx.bump_hud_cache_rev(reason="world_load")
-        if ctx.director_hud is not None:
-            ctx.director_hud.set_clock(_director_clock_string(ctx.director_world))
-        ctx.director.clear_micro_goal()
-        on_show_micro()
-        reload_epoch = (
-            ctx.director_world.get("reload_epoch") if isinstance(ctx.director_world, dict) else None
-        )
-        print(f"[LOAD] world loaded; reload_epoch={reload_epoch}")
-
-    def on_action_select(which: object) -> None:
-        if ctx.director_world is None:
-            return
-        action_id = None
-        time_min = None
-        if which == "__recommended__":
-            recommended = ctx.game_state.get("hud_cached_recommended") or {}
-            action_id = recommended.get("action_id")
-            time_min = recommended.get("minutes")
-        elif isinstance(which, int) and 0 <= which < len(ctx.current_actions):
-            action_id, _, time_min = ctx.current_actions[which]
-        if not action_id or not isinstance(action_id, str) or not action_id.strip():
-            print(f"[HUD] invalid action_id={action_id!r} (empty)")
-            return
-        if any(not char.isascii() for char in action_id):
-            print(f"[HUD] invalid action_id={action_id!r} (non-ascii)")
-            return
-        spec = get_action_spec(action_id)
-        print(
-            f"[HUD] which={which} action_id={action_id} "
-            f"spec={'OK' if spec else 'NONE'}"
-        )
-        if spec is None:
-            print(f"[HUD] invalid action_id={action_id!r} (spec missing)")
-            return
-        actor = ctx.game_state.get("active_char")
-        dispatch_action(
-            action_id,
-            actor_obj=actor,
-            args=[],
-            time_min_override=time_min,
-            source="HUD",
-        )
-
-    ctx.director_hud.on_auto_action = ai_step_once
-    ctx.director_hud.on_ai_step = request_auto_step
-    ctx.director_hud.on_toggle_auto = set_auto
-    ctx.director_hud.on_reroll = on_reroll
-    ctx.director_hud.on_save = on_save
-    ctx.director_hud.on_load = on_load
-    ctx.director_hud.on_show_micro = on_show_micro
-    ctx.director_hud.on_action_select = on_action_select
-
-    def on_mode_dropdown(new_mode: str) -> None:
-        if not ctx.director.set_mode(new_mode):
-            return
-        ctx.director_hud.set_mode(ctx.director.mode)
-        ctx.bump_hud_cache_rev(reason="mode_change")
-        print(f"[Director] mode -> {new_mode}")
-        on_show_micro()
-        refresh_hud()
-
-    ctx.director_hud.set_modes(available_modes, on_change=on_mode_dropdown)
+    # モードドロップダウンのバインド
+    ctx.director_hud.set_modes(_available_modes, on_change=_hud_cbs.on_mode_dropdown)
     ctx.director_hud.set_mode(ctx.director.mode)
     ctx.director_hud.set_auto_enabled(ctx.auto_enabled)
-    on_show_micro()
+    _hud_cbs.on_show_micro()
+
+
+# HUDCallbacks へのデリゲート関数（後方互換性のため）
+def refresh_hud() -> None:
+    if _hud_cbs is not None:
+        _hud_cbs.refresh_hud()
+
+
+def ai_step_once() -> None:
+    if _hud_cbs is not None:
+        _hud_cbs.ai_step_once()
+
+
+def set_auto(enabled: bool) -> None:
+    if _hud_cbs is not None:
+        _hud_cbs.set_auto(enabled)
+    else:
+        ctx.set_auto(enabled)
+
+
+def maybe_run_auto() -> None:
+    if _hud_cbs is not None:
+        _hud_cbs.maybe_run_auto()
+    elif ctx.game_state.get("auto_step_pending"):
+        ctx.game_state["auto_step_pending"] = False
 
 """
 # Luna への参照を取得
@@ -641,36 +442,8 @@ def dispatch_action(
     )
 
 
-def _director_world_path() -> Path:
-    job_root = Path(job_root_from_cfg())
-    job_root.mkdir(parents=True, exist_ok=True)
-    return job_root / "director_world.yml"
-
-
-def save_director_world(world: dict) -> None:
-    path = _director_world_path()
-    try:
-        path.write_text(
-            yaml.safe_dump(world, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
-    except Exception as exc:  # pragma: no cover - logging only
-        print(f"[SAVE] failed to persist director world: {exc}")
-
-
-def load_director_world(fallback: dict | None) -> dict | None:
-    path = _director_world_path()
-    if not path.exists():
-        return fallback
-    try:
-        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # pragma: no cover - logging only
-        print(f"[LOAD] failed to restore director world: {exc}")
-        return fallback
-    if isinstance(loaded, dict):
-        ensure_clock(loaded)
-        return loaded
-    return fallback
+# HUD コールバックを初期化（dispatch_action 定義後）
+_init_hud_callbacks()
 
 
 # ---------------- ワールド Tick コールバック ----------------
