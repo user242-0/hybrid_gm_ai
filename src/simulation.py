@@ -93,60 +93,6 @@ def request_auto_step() -> None:
     ctx.request_auto_step()
 
 
-###[deBug]
-# simulation.py 等で定義している GridWorld に追記/調整
-class GridWorld:
-    def __init__(self, rooms=None, dt_per_action=30, clock=None, weather=None, t_min=0):
-        self.rooms = rooms or {}                                      # {(x,y): "部屋名"}
-        self.dt_per_action = dt_per_action                            # world.get("dt_per_action", 30)
-        self.clock = clock or {"minute": 0, "hour": 8, "day": 1}      # world["clock"]
-        self.weather = weather or {"kind": "clear", "intensity": 0}   # world.setdefault("weather", {...})
-        self.t_min = t_min                                            # world["t_min"]
-
-    # --- 辞書ライク API（world.py が dict を想定しても動く）---
-    def get(self, key, default=None):
-        return getattr(self, key, default)
-
-    def __getitem__(self, key):
-        if hasattr(self, key):
-            return getattr(self, key)
-        raise KeyError(key)
-
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
-
-    def setdefault(self, key, default=None):              # ← 今回これが無くて落ちた
-        if not hasattr(self, key) or getattr(self, key) is None:
-            setattr(self, key, default)
-            return default
-        return getattr(self, key)
-
-    # 任意：'in' ガードが書かれていても落ちないように
-    def __contains__(self, key):
-        return hasattr(self, key)
-
-    # 位置前進（例。既にあるならそのままでOK）
-    def advance(self, pos, direction=None):
-        x = (pos or {}).get("x", 0)
-        y = (pos or {}).get("y", 0)
-        dx, dy = {"N": (0,1), "S": (0,-1), "E": (1,0), "W": (-1,0)}.get(direction or "N", (0,1))
-        new_pos = {"x": x+dx, "y": y+dy}
-        name = self.rooms.get((new_pos["x"], new_pos["y"]), f"通路({new_pos['x']},{new_pos['y']})")
-        return new_pos, name
-
-
-###
-###[deBug]
-"""
-game_state["position"] = {"x":0, "y":0}
-game_state["direction"] = "N"
-game_state["world"] = GridWorld(
-    rooms = {(0,1): "洞窟入口", (0,2): "湿った通路", (0,3): "石像の間"},
-    dt_per_action = 30,
-    clock = {"minute": 0, "hour": 8, "day": 1},
-)
-"""
-###
 def _director_clock_string(world: dict | None) -> str:
     if not isinstance(world, dict):
         return "Day1 00:00"
@@ -344,19 +290,6 @@ def maybe_run_auto() -> None:
         _hud_cbs.maybe_run_auto()
     elif ctx.game_state.get("auto_step_pending"):
         ctx.game_state["auto_step_pending"] = False
-
-"""
-# Luna への参照を取得
-if isinstance(game_state["party"], dict):
-    luna_from_party = game_state["party"]["Luna"]
-else:  # list or tuple
-    luna_from_party = next(c for c in game_state["party"] if c.name == "Luna")
-
-luna_from_map = game_state["party_map"]["Luna"]
-
-print("id in party:", id(luna_from_party))
-print("id in map  :", id(luna_from_map))
-"""
 
 
 def record(msg):
