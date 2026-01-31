@@ -50,40 +50,51 @@ from src.ui.action_pipeline import ActionPipeline
 # 安全に終了したい
 from src.quit_helper import handle_quit
 
+# コンテキスト管理
+from src.game_context import GameContext
+
 # 中略...
 USE_CLI = False     # True にすると黒い端末だけでプレイ
 
-# --- 起動時に Scheduler 用意 ---
-scheduler = Scheduler()
-game_state = init_game_state()    # ★ ここで一度だけ生成
-game_state["last_auto_ts"] = 0.0
-game_state.setdefault("hud_cache_rev", 0)
-game_state.setdefault("hud_last_rendered_rev", -1)
-game_state.setdefault("hud_cached_actions", [])
-game_state.setdefault("hud_cached_progress", None)
-game_state.setdefault(
-    "hud_cached_recommended",
-    {"label": None, "enabled": False, "action_id": None, "minutes": None},
-)
-init_world(game_state)
+# --- 起動時に GameContext を初期化 ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 cli_parser = argparse.ArgumentParser(add_help=False)
 cli_parser.add_argument("--premise-text", type=str, default=None)
 simulation_cli_args, _ = cli_parser.parse_known_args()
 
-cfg = load_config()
-director_cfg = cfg.get("director", {})
+_cfg = load_config()
+_game_state = init_game_state()
+_game_state["last_auto_ts"] = 0.0
+_game_state.setdefault("hud_cache_rev", 0)
+_game_state.setdefault("hud_last_rendered_rev", -1)
+_game_state.setdefault("hud_cached_actions", [])
+_game_state.setdefault("hud_cached_progress", None)
+_game_state.setdefault(
+    "hud_cached_recommended",
+    {"label": None, "enabled": False, "action_id": None, "minutes": None},
+)
+init_world(_game_state)
+
+# GameContext インスタンス（唯一のグローバル状態）
+ctx = GameContext(
+    scheduler=Scheduler(),
+    game_state=_game_state,
+    cfg=_cfg,
+)
+
+# 後方互換用エイリアス（段階的に削除予定）
+scheduler = ctx.scheduler
+game_state = ctx.game_state
+cfg = ctx.cfg
+director = ctx.director
+director_world = ctx.director_world
+director_hud = ctx.director_hud
+pipeline = ctx.pipeline
+auto_enabled = ctx.auto_enabled
+
+director_cfg = _cfg.get("director", {})
 director_enabled = bool(director_cfg.get("enabled", False))
-
-director = None
-director_world = None
-director_hud = None
-director_hud = None
-pipeline: ActionPipeline | None = None
-
-auto_enabled = False
-AUTO_STEP_INTERVAL_SECONDS = 0.5
 
 
 def ai_step_once() -> None:
@@ -91,23 +102,22 @@ def ai_step_once() -> None:
 
 
 def set_auto(enabled: bool) -> None:
-    global auto_enabled
-    auto_enabled = bool(enabled)
+    ctx.set_auto(enabled)
 
 
 def request_auto_step() -> None:
-    game_state["auto_step_pending"] = True
+    ctx.request_auto_step()
 
 
 def maybe_run_auto() -> None:
-    if game_state.get("auto_step_pending"):
+    if ctx.game_state.get("auto_step_pending"):
         ai_step_once()
-        game_state["auto_step_pending"] = False
+        ctx.game_state["auto_step_pending"] = False
         return
-    if not auto_enabled:
+    if not ctx.auto_enabled:
         return
-    last_auto_ts = game_state.get("last_auto_ts", 0.0)
-    if time.monotonic() - last_auto_ts < AUTO_STEP_INTERVAL_SECONDS:
+    last_auto_ts = ctx.game_state.get("last_auto_ts", 0.0)
+    if time.monotonic() - last_auto_ts < ctx.AUTO_STEP_INTERVAL_SECONDS:
         return
     ai_step_once()
 
@@ -202,8 +212,8 @@ def _update_microgoal(micro_goal, gs: dict) -> None:
 
 def ui_show_micro(micro_goal, gs):
     _update_microgoal(micro_goal, gs)
-    if director_hud is not None:
-        director_hud.set_microgoal(micro_goal)
+    if ctx.director_hud is not None:
+        ctx.director_hud.set_microgoal(micro_goal)
 
 
 if director_enabled:
@@ -223,91 +233,91 @@ if director_enabled:
         pack_data = dict(pack_data)
         pack_data.setdefault("id", pack_id)
     get_action_specs(pack_data)
-    director = Director(premise=premise, goals_dict=goals)
+    ctx.director = Director(premise=premise, goals_dict=goals)
     print(
         f"[Director] enabled seed={premise.get('seed')} "
         f"premise='{premise.get('title')}' pack={pack_id}"
     )
 
-    existing_world = game_state.get("director_world")
+    existing_world = ctx.game_state.get("director_world")
     if existing_world:
-        director_world = existing_world
-        director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
+        ctx.director_world = existing_world
+        ctx.director_world["reload_epoch"] = ctx.director_world.get("reload_epoch", 0) + 1
     else:
-        director_world = director.synthesize_world()
-        director_world = apply_world_defaults(director_world, pack_data)
-    ensure_clock(director_world)
+        ctx.director_world = ctx.director.synthesize_world()
+        ctx.director_world = apply_world_defaults(ctx.director_world, pack_data)
+    ensure_clock(ctx.director_world)
 
-    game_state["director_world"] = director_world
-    game_state["world"] = director_world
-    game_state["director_micro_goal"] = None
-    _bump_hud_cache_rev(game_state, reason="director_init")
+    ctx.game_state["director_world"] = ctx.director_world
+    ctx.game_state["world"] = ctx.director_world
+    ctx.game_state["director_micro_goal"] = None
+    ctx.bump_hud_cache_rev(reason="director_init")
 
     if DirectorHUD is not None:
         try:
-            director_hud = DirectorHUD(title="Director HUD")
+            ctx.director_hud = DirectorHUD(title="Director HUD")
         except TclError as exc:  # pragma: no cover - GUI unavailable
-            director_hud = None
+            ctx.director_hud = None
             print(f"[DirectorHUD] failed to initialize: {exc}")
         else:
-            director_hud.run_async()
-            director_hud.set_mode(director.mode)
-            director_hud.set_clock(_director_clock_string(director_world))
-            director_hud.set_microgoal(game_state.get("director_micro_goal"))
+            ctx.director_hud.run_async()
+            ctx.director_hud.set_mode(ctx.director.mode)
+            ctx.director_hud.set_clock(_director_clock_string(ctx.director_world))
+            ctx.director_hud.set_microgoal(ctx.game_state.get("director_micro_goal"))
 else:
-    game_state["director_world"] = None
-    game_state["director_micro_goal"] = None
+    ctx.game_state["director_world"] = None
+    ctx.game_state["director_micro_goal"] = None
     print("[Director] disabled")
 
 
 def _pump_director_hud() -> None:
-    if director_hud is None:
+    if ctx.director_hud is None:
         return
     if threading.current_thread() is threading.main_thread():
-        director_hud.pump()
+        ctx.director_hud.pump()
     else:
-        director_hud.request_update()
+        ctx.director_hud.request_update()
 
 
-if director_enabled and director_hud is not None:
+if director_enabled and ctx.director_hud is not None:
 
-    current_actions: list[tuple[str, str, int]] = []
-    available_modes = director.available_modes()
+    ctx.current_actions = []
+    available_modes = ctx.director.available_modes()
     if not available_modes:
         print("[Director] warning: no modes found in goals_dict")
 
     def refresh_hud() -> None:
-        if director_hud is None:
+        if ctx.director_hud is None:
             return
-        if director_world is None:
-            director_hud.set_progress(None)
-            director_hud.set_recommended(None, enabled=False)
-            director_hud.set_actions([])
-            game_state["hud_cached_progress"] = None
-            game_state["hud_cached_actions"] = []
-            game_state["hud_cached_recommended"] = {
+        if ctx.director_world is None:
+            ctx.director_hud.set_progress(None)
+            ctx.director_hud.set_recommended(None, enabled=False)
+            ctx.director_hud.set_actions([])
+            ctx.game_state["hud_cached_progress"] = None
+            ctx.game_state["hud_cached_actions"] = []
+            ctx.game_state["hud_cached_recommended"] = {
                 "label": None,
                 "enabled": False,
                 "action_id": None,
                 "minutes": None,
             }
-            game_state["hud_last_rendered_rev"] = game_state.get("hud_cache_rev", 0)
+            ctx.game_state["hud_last_rendered_rev"] = ctx.game_state.get("hud_cache_rev", 0)
             return
 
-        cache_rev = game_state.get("hud_cache_rev", 0)
-        last_rendered_rev = game_state.get("hud_last_rendered_rev", -1)
+        cache_rev = ctx.game_state.get("hud_cache_rev", 0)
+        last_rendered_rev = ctx.game_state.get("hud_last_rendered_rev", -1)
         if cache_rev != last_rendered_rev:
             print(f"[HUD_DEBUG] recompute rev={cache_rev} last={last_rendered_rev}")
-            progress_text = director.progress_text(director_world)
-            game_state["hud_cached_progress"] = progress_text
+            progress_text = ctx.director.progress_text(ctx.director_world)
+            ctx.game_state["hud_cached_progress"] = progress_text
 
-            rec_action, rec_minutes, rec_label = director.recommended_action(director_world)
+            rec_action, rec_minutes, rec_label = ctx.director.recommended_action(ctx.director_world)
             print(f"[HUD_DEBUG] rec_action={rec_action} minutes={rec_minutes} label={rec_label}")
-            if isinstance(director_world, dict):
+            if isinstance(ctx.director_world, dict):
                 if rec_action:
-                    director_world["_recommended_action_id"] = rec_action
+                    ctx.director_world["_recommended_action_id"] = rec_action
                 else:
-                    director_world.pop("_recommended_action_id", None)
+                    ctx.director_world.pop("_recommended_action_id", None)
             if rec_action:
                 label = f"★ {rec_label or rec_action} (+{rec_minutes}m)"
                 recommended = {
@@ -323,10 +333,10 @@ if director_enabled and director_hud is not None:
                     "action_id": None,
                     "minutes": None,
                 }
-            game_state["hud_cached_recommended"] = recommended
+            ctx.game_state["hud_cached_recommended"] = recommended
 
-            current_actions.clear()
-            for record in director.list_actions_for_mode(director.mode):
+            ctx.current_actions.clear()
+            for record in ctx.director.list_actions_for_mode(ctx.director.mode):
                 action_id = None
                 label = None
                 minutes = 5
@@ -342,24 +352,24 @@ if director_enabled and director_hud is not None:
                 spec = get_action_spec(action_id)
                 if not label:
                     label = spec.label if spec else action_id
-                current_actions.append((action_id, label, max(0, minutes)))
-            current_actions.sort(key=lambda item: item[0])
-            print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in current_actions])
-            game_state["hud_cached_actions"] = current_actions.copy()
-            game_state["hud_last_rendered_rev"] = cache_rev
+                ctx.current_actions.append((action_id, label, max(0, minutes)))
+            ctx.current_actions.sort(key=lambda item: item[0])
+            print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
+            ctx.game_state["hud_cached_actions"] = ctx.current_actions.copy()
+            ctx.game_state["hud_last_rendered_rev"] = cache_rev
 
-        director_hud.set_progress(game_state.get("hud_cached_progress"))
-        recommended = game_state.get("hud_cached_recommended") or {}
-        director_hud.set_recommended(
+        ctx.director_hud.set_progress(ctx.game_state.get("hud_cached_progress"))
+        recommended = ctx.game_state.get("hud_cached_recommended") or {}
+        ctx.director_hud.set_recommended(
             recommended.get("label"),
             enabled=bool(recommended.get("enabled")),
         )
-        cached_actions = game_state.get("hud_cached_actions") or []
-        current_actions[:] = list(cached_actions)
-        director_hud.set_actions(list(cached_actions))
+        cached_actions = ctx.game_state.get("hud_cached_actions") or []
+        ctx.current_actions[:] = list(cached_actions)
+        ctx.director_hud.set_actions(list(cached_actions))
 
     def _hud_adjust_value(path, delta, *, minimum=None, maximum=None):
-        node = director_world
+        node = ctx.director_world
         if node is None:
             return
         for key in path[:-1]:
@@ -380,137 +390,124 @@ if director_enabled and director_hud is not None:
         node[leaf_key] = new_value
 
     def on_show_micro() -> None:
-        if director_world is None:
+        if ctx.director_world is None:
             return
-        micro = director.get_micro_goal(director_world, reroll=False)
-        ui_show_micro(micro, game_state)
+        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
+        ui_show_micro(micro, ctx.game_state)
         micro_text = micro or "(MicroGoal なし)"
         print(f"[UI] MicroGoal: {micro_text}")
 
     def on_reroll() -> None:
-        if director_world is None:
+        if ctx.director_world is None:
             return
-        micro = director.get_micro_goal(director_world, reroll=True)
-        ui_show_micro(micro, game_state)
+        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=True)
+        ui_show_micro(micro, ctx.game_state)
         micro_text = micro or "(MicroGoal なし)"
         print(f"[UI] MicroGoal (reroll): {micro_text}")
         refresh_hud()
 
     def ai_step_once() -> None:
-        if director_world is None:
+        if ctx.director_world is None:
             return
 
-        actions = director.list_actions_for_mode(director.mode) or []
-        micro = director.get_micro_goal(director_world, reroll=False)
-        action_id, tmin, _ = pick_action(director_world, director.mode, actions, micro)
+        actions = ctx.director.list_actions_for_mode(ctx.director.mode) or []
+        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
+        action_id, tmin, _ = pick_action(ctx.director_world, ctx.director.mode, actions, micro)
 
         if not action_id:
-            director.clear_micro_goal()
+            ctx.director.clear_micro_goal()
             on_show_micro()
             refresh_hud()
             print("[RC_AI] no action; rerolled micro")
             return
-        ###↓
-        emo_before = director_world.get("emotion", {}).copy()
-        ###↑
+        emo_before = ctx.director_world.get("emotion", {}).copy()
         dispatch_action(
             action_id,
-            actor_obj=game_state.get("active_char"),
+            actor_obj=ctx.game_state.get("active_char"),
             args=[],
             time_min_override=tmin,
             source="RC_AI",
         )
-        game_state["last_auto_ts"] = time.monotonic()
-        if isinstance(director_world, dict):
-            director_world["_last_action_id"] = action_id
+        ctx.game_state["last_auto_ts"] = time.monotonic()
+        if isinstance(ctx.director_world, dict):
+            ctx.director_world["_last_action_id"] = action_id
 
-        ###↓
-        emo_after = director_world.get("emotion", {})
+        emo_after = ctx.director_world.get("emotion", {})
         print(
             f"[RC_AI] picked={action_id} reason={_} "
             f"emotion R:{emo_before.get('R')}→{emo_after.get('R')} "
             f"G:{emo_before.get('G')}→{emo_after.get('G')} "
             f"B:{emo_before.get('B')}→{emo_after.get('B')}"
         )
-        ###↑
-        clock_label = _director_clock_string(director_world)
-        if director_hud is not None:
-            director_hud.set_clock(clock_label)
+        clock_label = _director_clock_string(ctx.director_world)
+        if ctx.director_hud is not None:
+            ctx.director_hud.set_clock(clock_label)
         non_progress_actions = {"switch_character", "感情を設定する"}
-        if action_id not in non_progress_actions and director.is_micro_goal_done(director_world):
-            director.clear_micro_goal()
-            next_micro = director.get_micro_goal(director_world, reroll=False)
+        if action_id not in non_progress_actions and ctx.director.is_micro_goal_done(ctx.director_world):
+            ctx.director.clear_micro_goal()
+            next_micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
             if next_micro and next_micro != "(MicroGoal なし)":
                 print("[MICRO] completed -> next")
         on_show_micro()
         refresh_hud()
 
     def set_auto(enabled: bool) -> None:
-        global auto_enabled
-
-        auto_enabled = bool(enabled)
-        if auto_enabled:
-            game_state["last_auto_ts"] = time.monotonic() - AUTO_STEP_INTERVAL_SECONDS
-        if director_hud is not None:
-            director_hud.set_auto_enabled(auto_enabled)
-        state = "on" if auto_enabled else "off"
-        print(f"[RC_AI] auto={state}")
+        ctx.set_auto(enabled)
 
     def maybe_run_auto() -> None:
-        if game_state.get("auto_step_pending"):
-            if director_world is None:
-                game_state["auto_step_pending"] = False
+        if ctx.game_state.get("auto_step_pending"):
+            if ctx.director_world is None:
+                ctx.game_state["auto_step_pending"] = False
                 return
             ai_step_once()
-            game_state["auto_step_pending"] = False
+            ctx.game_state["auto_step_pending"] = False
             return
-        if director_world is None:
+        if ctx.director_world is None:
             return
-        if not auto_enabled:
+        if not ctx.auto_enabled:
             return
-        last_auto_ts = game_state.get("last_auto_ts", 0.0)
-        if time.monotonic() - last_auto_ts < AUTO_STEP_INTERVAL_SECONDS:
+        last_auto_ts = ctx.game_state.get("last_auto_ts", 0.0)
+        if time.monotonic() - last_auto_ts < ctx.AUTO_STEP_INTERVAL_SECONDS:
             return
         ai_step_once()
 
     def on_save() -> None:
-        if director_world is None:
+        if ctx.director_world is None:
             return
-        save_director_world(director_world)
+        save_director_world(ctx.director_world)
         print("[SAVE] world saved")
 
     def on_load() -> None:
-        global director_world
-        loaded = load_director_world(director_world)
+        loaded = load_director_world(ctx.director_world)
         if loaded is None:
             return
-        director_world = loaded
-        ensure_clock(director_world)
-        if isinstance(director_world, dict):
-            director_world["reload_epoch"] = director_world.get("reload_epoch", 0) + 1
-        game_state["director_world"] = director_world
-        game_state["world"] = director_world
-        _bump_hud_cache_rev(game_state, reason="world_load")
-        if director_hud is not None:
-            director_hud.set_clock(_director_clock_string(director_world))
-        director.clear_micro_goal()
+        ctx.director_world = loaded
+        ensure_clock(ctx.director_world)
+        if isinstance(ctx.director_world, dict):
+            ctx.director_world["reload_epoch"] = ctx.director_world.get("reload_epoch", 0) + 1
+        ctx.game_state["director_world"] = ctx.director_world
+        ctx.game_state["world"] = ctx.director_world
+        ctx.bump_hud_cache_rev(reason="world_load")
+        if ctx.director_hud is not None:
+            ctx.director_hud.set_clock(_director_clock_string(ctx.director_world))
+        ctx.director.clear_micro_goal()
         on_show_micro()
         reload_epoch = (
-            director_world.get("reload_epoch") if isinstance(director_world, dict) else None
+            ctx.director_world.get("reload_epoch") if isinstance(ctx.director_world, dict) else None
         )
         print(f"[LOAD] world loaded; reload_epoch={reload_epoch}")
 
     def on_action_select(which: object) -> None:
-        if director_world is None:
+        if ctx.director_world is None:
             return
         action_id = None
         time_min = None
         if which == "__recommended__":
-            recommended = game_state.get("hud_cached_recommended") or {}
+            recommended = ctx.game_state.get("hud_cached_recommended") or {}
             action_id = recommended.get("action_id")
             time_min = recommended.get("minutes")
-        elif isinstance(which, int) and 0 <= which < len(current_actions):
-            action_id, _, time_min = current_actions[which]
+        elif isinstance(which, int) and 0 <= which < len(ctx.current_actions):
+            action_id, _, time_min = ctx.current_actions[which]
         if not action_id or not isinstance(action_id, str) or not action_id.strip():
             print(f"[HUD] invalid action_id={action_id!r} (empty)")
             return
@@ -525,7 +522,7 @@ if director_enabled and director_hud is not None:
         if spec is None:
             print(f"[HUD] invalid action_id={action_id!r} (spec missing)")
             return
-        actor = game_state.get("active_char")
+        actor = ctx.game_state.get("active_char")
         dispatch_action(
             action_id,
             actor_obj=actor,
@@ -534,27 +531,27 @@ if director_enabled and director_hud is not None:
             source="HUD",
         )
 
-    director_hud.on_auto_action = ai_step_once
-    director_hud.on_ai_step = request_auto_step
-    director_hud.on_toggle_auto = set_auto
-    director_hud.on_reroll = on_reroll
-    director_hud.on_save = on_save
-    director_hud.on_load = on_load
-    director_hud.on_show_micro = on_show_micro
-    director_hud.on_action_select = on_action_select
+    ctx.director_hud.on_auto_action = ai_step_once
+    ctx.director_hud.on_ai_step = request_auto_step
+    ctx.director_hud.on_toggle_auto = set_auto
+    ctx.director_hud.on_reroll = on_reroll
+    ctx.director_hud.on_save = on_save
+    ctx.director_hud.on_load = on_load
+    ctx.director_hud.on_show_micro = on_show_micro
+    ctx.director_hud.on_action_select = on_action_select
 
     def on_mode_dropdown(new_mode: str) -> None:
-        if not director.set_mode(new_mode):
+        if not ctx.director.set_mode(new_mode):
             return
-        director_hud.set_mode(director.mode)
-        _bump_hud_cache_rev(game_state, reason="mode_change")
+        ctx.director_hud.set_mode(ctx.director.mode)
+        ctx.bump_hud_cache_rev(reason="mode_change")
         print(f"[Director] mode -> {new_mode}")
         on_show_micro()
         refresh_hud()
 
-    director_hud.set_modes(available_modes, on_change=on_mode_dropdown)
-    director_hud.set_mode(director.mode)
-    director_hud.set_auto_enabled(auto_enabled)
+    ctx.director_hud.set_modes(available_modes, on_change=on_mode_dropdown)
+    ctx.director_hud.set_mode(ctx.director.mode)
+    ctx.director_hud.set_auto_enabled(ctx.auto_enabled)
     on_show_micro()
 
 """
@@ -600,29 +597,29 @@ def write_scenes_to_scene_graph(scenes):
     sg_path.write_text(yaml.safe_dump(existing, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
 def _advance_time(minutes: int) -> None:
-    world = game_state.get("director_world") or game_state.get("world")
+    world = ctx.game_state.get("director_world") or ctx.game_state.get("world")
     if not isinstance(world, dict):
         return
     if world.get("t_min") is not None or isinstance(world.get("clock"), dict):
-        if game_state.get("world") is world:
-            world_tick(game_state, dt=minutes)
+        if ctx.game_state.get("world") is world:
+            world_tick(ctx.game_state, dt=minutes)
         else:
-            temp_state = {"world": world, "time_of_day": game_state.get("time_of_day")}
+            temp_state = {"world": world, "time_of_day": ctx.game_state.get("time_of_day")}
             world_tick(temp_state, dt=minutes)
             if "time_of_day" in temp_state:
-                game_state["time_of_day"] = temp_state["time_of_day"]
+                ctx.game_state["time_of_day"] = temp_state["time_of_day"]
     else:
         ensure_clock(world)
         add_minutes(world, minutes)
 
 hud_refresh_cb = globals().get("refresh_hud")
-pipeline = ActionPipeline(
-    game_state=game_state,
-    director=director,
+ctx.pipeline = ActionPipeline(
+    game_state=ctx.game_state,
+    director=ctx.director,
     emit_director_scenes=write_scenes_to_scene_graph,
     ui_refresh=hud_refresh_cb if callable(hud_refresh_cb) else None,
-    hud_set_clock=(director_hud.set_clock if director_hud else None),
-    hud_set_microgoal=(director_hud.set_microgoal if director_hud else None),
+    hud_set_clock=(ctx.director_hud.set_clock if ctx.director_hud else None),
+    hud_set_microgoal=(ctx.director_hud.set_microgoal if ctx.director_hud else None),
     advance_time=_advance_time,
 )
 
@@ -633,9 +630,9 @@ def dispatch_action(
     time_min_override: int | None = None,
     source: str = "UI",
 ):
-    if pipeline is None:
+    if ctx.pipeline is None:
         return None
-    return pipeline.request_action(
+    return ctx.pipeline.request_action(
         action_id,
         actor_obj=actor_obj,
         args=args or [],
@@ -682,26 +679,23 @@ def world_tick_cb(gs):
         return
 
 # ---------------- RC Tick コールバック ----------------
-def rc_tick(rc_char, game_state):
-    #[DEBUG]
-    #print('[TICK]', rc_char.name, rc_char.is_npc)
-    #END[DEBUG]
-    if not rc_char.is_npc:       # ← 手動キャラなら
-        return                   #    AI ロジックを完全スキップ
+def rc_tick(rc_char, gs):
+    if not rc_char.is_npc:
+        return
 
-    # ❶ 現時点で実行可能な choice 一覧を取得
-    choices = get_available_choices(rc_char, game_state)
+    # 現時点で実行可能な choice 一覧を取得
+    choices = get_available_choices(rc_char, gs)
 
-    # ❷ AI に選択させる
-    choice = select_action(rc_char, game_state, choices)
+    # AI に選択させる
+    choice = select_action(rc_char, gs, choices)
     if not choice:
-        return                                    # 該当なしなら終了
+        return
 
-    # ❸ アクション実行
+    # アクション実行
     act_info = actions[choice.action_key]
-    args = parse_args(act_info, rc_char, game_state)
+    args = parse_args(act_info, rc_char, gs)
     if choice.action_key == "switch_character":
-        target_name = choose_target_for_switch(rc_char, game_state)
+        target_name = choose_target_for_switch(rc_char, gs)
         args = [target_name]
     else:
         args = list(args)
@@ -715,67 +709,66 @@ def rc_tick(rc_char, game_state):
     record(f"[AI] {rc_char.name} ▶ {choice.action_key}")
 
     if isinstance(result, CharacterStatus) and result.is_npc:
-        scheduler.register(rc_tick, 0.01, result, game_state)
+        ctx.scheduler.register(rc_tick, 0.01, result, gs)
 
-
-    # ❹ 次の RC Tick を再登録（0.2 s 後）
-    if rc_char.is_npc:           # ← 再登録は AI 時だけで OK
-        scheduler.register(rc_tick, 0.2, rc_char, game_state)
+    # 次の RC Tick を再登録（0.2 s 後）
+    if rc_char.is_npc:
+        ctx.scheduler.register(rc_tick, 0.2, rc_char, gs)
 
 # -------------------------------
 
 
 # ---------------- Simulation スレッド ----------------
-def player_loop(gs):              # ← 引数で参照を受け取る
-    # ① 全キャラをスケジューラに登録
+def player_loop(gs):
+    # 全キャラをスケジューラに登録
     for ch in gs["party"].values():
-        scheduler.register(rc_tick, 0.2, ch, gs)
+        ctx.scheduler.register(rc_tick, 0.2, ch, gs)
 
-    # ② メインループ
+    # メインループ
     while gs["running"]:
         maybe_run_auto()
-        while scheduler.run_once():          # due を全部消化
-            if director_hud is not None:
-                director_hud.pump()
+        while ctx.scheduler.run_once():
+            if ctx.director_hud is not None:
+                ctx.director_hud.pump()
             maybe_run_auto()
         actor = gs["active_char"]
-        director_world = gs.get("director_world")
-        if director is not None and director_world is not None:
-            micro_goal = director.get_micro_goal(director_world, reroll=False)
+        dw = gs.get("director_world")
+        if ctx.director is not None and dw is not None:
+            micro_goal = ctx.director.get_micro_goal(dw, reroll=False)
             ui_show_micro(micro_goal, gs)
-            if director_hud is not None:
-                director_hud.set_mode(director.mode)
-                director_hud.set_clock(_director_clock_string(director_world))
+            if ctx.director_hud is not None:
+                ctx.director_hud.set_mode(ctx.director.mode)
+                ctx.director_hud.set_clock(_director_clock_string(dw))
         num_choice_map = {}
         command_ready = False
-        # ▼ CLI で直接 input() する場合（GUI を使わないモード）
+        # CLI で直接 input() する場合（GUI を使わないモード）
         if USE_CLI:
             gs["input_pending"] = True
             raw = input(">> ").strip()
             gs["input_pending"] = False
-            handle_quit(raw, gs)          # ★ ここで判定
-            cmd = raw                     # → 後続処理へ
+            handle_quit(raw, gs)
+            cmd = raw
             command_ready = True
 
-        # ▼ GUI モード：Entry から event_q を受信
+        # GUI モード：Entry から event_q を受信
         else:
             gs["input_pending"] = True
             try:
-                num_choice_map = present_choices(actor, gs)     # ← dict を受け取る
+                num_choice_map = present_choices(actor, gs)
                 cmd = event_q.get(timeout=0.05)
                 command_ready = True
             except Empty:
                 maybe_run_auto()
-                if director_hud is not None:
-                    director_hud.pump()
+                if ctx.director_hud is not None:
+                    ctx.director_hud.pump()
                 time.sleep(0.01)
                 continue
             finally:
                 gs["input_pending"] = False
-            handle_quit(cmd, gs)          # ★ ここでも同じ
+            handle_quit(cmd, gs)
 
         if not command_ready:
-            if director_hud is not None:
+            if ctx.director_hud is not None:
                 _pump_director_hud()
             maybe_run_auto()
             time.sleep(0.01)
@@ -794,11 +787,11 @@ def player_loop(gs):              # ← 引数で参照を受け取る
                     cmd += f" {others[0].name}"
         
 
-        # ★ プレイヤーが操作する瞬間に必ず手動フラグを立て直す
-        actor.is_npc = False                   # ← これを追加
+        # プレイヤーが操作する瞬間に必ず手動フラグを立て直す
+        actor.is_npc = False
         parts = cmd.split()
         if not parts:
-            if director_hud is not None:
+            if ctx.director_hud is not None:
                 _pump_director_hud()
             maybe_run_auto()
             time.sleep(0.01)
@@ -812,21 +805,19 @@ def player_loop(gs):              # ← 引数で参照を受け取る
             source="CLI" if USE_CLI else "GUI",
         )
 
-
-
         # 旧プレイヤーが CharacterStatus なら AI キューに登録
         if isinstance(result, CharacterStatus):
             print('[REG]', result.name, result.is_npc)
-            scheduler.register(rc_tick, 0.01, result, gs)
+            ctx.scheduler.register(rc_tick, 0.01, result, gs)
         # flush AI 行動
-        while scheduler.run_once() is not None:
-            if director_hud is not None:
+        while ctx.scheduler.run_once() is not None:
+            if ctx.director_hud is not None:
                 _pump_director_hud()
             maybe_run_auto()
 
         # 操作キャラが変わっている可能性があるので再表示
         present_choices(gs["active_char"], gs)
-        if director_hud is not None:
+        if ctx.director_hud is not None:
             _pump_director_hud()
         maybe_run_auto()
         time.sleep(0.01)
@@ -850,15 +841,15 @@ def choose_target_for_switch(rc_char, game_state):
 
 # ---------------- 起動処理 ----------------
 if __name__ == "__main__":
-    gs = game_state                           # ローカル短縮も可
+    gs = ctx.game_state
 
     threading.Thread(target=player_loop, args=(gs,), daemon=True).start()
-    start_gui(gs)                               # GUI は内部でサブスレッドを立てても良い
+    start_gui(gs)
     # メインスレッドは生存維持だけ
     try:
         while gs["running"]:
-            if director_hud is not None:
+            if ctx.director_hud is not None:
                 _pump_director_hud()
             time.sleep(0.01)
     except SystemExit:
-        pass                        # どこかのスレッドで raise SystemExit 渡ってきたら即終了
+        pass
