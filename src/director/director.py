@@ -121,6 +121,35 @@ class Director:
             key: [] for key in self._micro_cache.keys()
         }
         self._recent_k: int = 3
+        self._last_day: Optional[int] = None  # 日替わりリセット用
+
+    def _extract_day(self, world: Dict[str, Any]) -> Optional[int]:
+        """Extract day number from world clock."""
+        clock = world.get("clock") if isinstance(world, dict) else None
+        if isinstance(clock, str):
+            # Parse "Day1 00:00" format
+            try:
+                day_part = clock.split()[0]
+                return int(day_part.replace("Day", ""))
+            except (ValueError, IndexError):
+                return None
+        if isinstance(clock, dict):
+            day = clock.get("day")
+            if isinstance(day, (int, float)):
+                return int(day)
+        return None
+
+    def _check_daily_reset(self, world: Dict[str, Any]) -> None:
+        """Reset micro goal history when day changes."""
+        current_day = self._extract_day(world)
+        if current_day is None:
+            return
+        if self._last_day is not None and current_day != self._last_day:
+            # 日が変わったので履歴をリセット
+            for mode in self._recent_micro_ids:
+                self._recent_micro_ids[mode] = []
+            print(f"[Director] daily reset: day {self._last_day} -> {current_day}")
+        self._last_day = current_day
 
     def available_modes(self) -> List[str]:
         """Return the list of modes enabled for the current scenario."""
@@ -272,6 +301,7 @@ class Director:
         return LEGACY_MICRO_RULES.get(text)
 
     def get_micro_goal(self, world: Dict[str, Any], reroll: bool = False) -> str:
+        self._check_daily_reset(world)  # 日替わりで履歴リセット
         mode = self.mode
         if reroll or not self._micro_cache.get(mode):
             bank = self._micro_bank(mode)
