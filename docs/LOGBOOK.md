@@ -32,15 +32,31 @@
 
 ---
 
-## 2026-02-01（Session 23 開始）
+## 2026-02-01（Session 23）
 ### 気分 / 雑談
-- Session22のリファクタが効いてて「次の遊べる機能」を足しやすい状態。
-- いまは “会話がない世界” の寂しさと、MicroGoalをやり尽くした寂しさが両方ある。
+- Claude Codeが一気に作業してくれて、世界が急に「喋りだした」感じ。
+- MicroGoalをやり尽くした寂しさに、手応えのある対策が入って安心。
 
-### 今日やること（狙い）
-- まず「初期stateの世界観」をネオノワール（刑事/愉快犯/拠点/関係性）に直す。
-- その上で「会話する」アクションMVP（テンプレ選択→ログ出力）を入れる。
-- MicroGoal枯渇対策は、テンプレ化/自動生成のどちらかで“増殖”させる。
+### 今日やったこと（結果）
+- **タスク0**: Session23作業ブランチ `feature/session23-conversation-microgoal` を作成して作業
+- **タスク1**: 初期stateを `cop_trickster` パック準拠へ（刑事/愉快犯、関係性タグ、ロケーション/ターゲット）
+- **タスク2**: `talk` アクション追加（テンプレ選択、`last_dialogue` をstateへ格納）
+- **タスク3**: 日替わりで MicroGoal 消費履歴をリセット（枯渇対策MVP）
+- **タスク4**: Choice自動生成 + action_key/label分離 + heart退避
+  - `ui_visible`、`heart`（axis/value）を ActionSpec に追加
+  - `choice_definitions` から自動生成へ移行（手動登録不要に）
+  - 旧キー（日本語）→ 新action_key（英語）の互換マップ追加
+
+コミット:
+- 64adfe9: 初期state変更（cop_trickster pack参照、刑事/愉快犯、関係性タグ）
+- 7e599e2: 会話MVP（talkアクション、テンプレート選択、last_dialogue）
+- d159c89: 枯渇対策（日替わりで履歴リセット）
+- b1db9e8: Choice自動生成（action_key/label分離、ui_visible、heart移植）
+
+### 発見（次にも効く）
+- 会話は生成AIなしでも「テンプレ×関係性タグ」で十分"ゲームっぽい"。
+- packを素材（roles/locations/targets）に寄せて、init_stateが組み立てるのは拡張しやすい。
+- Choiceを自動生成にすると、新アクション追加時に choice_definitions をいじらなくて済む。
 
 ### 次回の最初の一手（15分でやる）
-- 起動→初期stateが刑事/愉快犯になっていることをHUDで確認 → talk系アクションを1回実行
+- 起動して **(1)刑事/愉快犯** が初期で出る → **(2)talk** を1回実行 → **(3)Dayが変わった後に micro が復活する** の3点を確認。

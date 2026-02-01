@@ -19,32 +19,34 @@
 
 ## 2. いまの状態（3行で）
 - ✅ 動くもの:
-  - `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由で実行できる
-  - MicroGoal/Progress/おすすめアクション表示が安定（チラつき収束）
-  - simulation.py は GameContext / HUDCallbacks 分離済みで保守しやすい
+  - `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
+  - 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
+  - `talk` アクションが追加され、関係性タグに応じた会話テンプレがログに出る（`last_dialogue` もstateに保持）
+  - 日が変わると MicroGoal の消費履歴がリセットされる（枯渇対策のMVP）
+  - Choiceが action_definitions から自動生成され、`ui_visible=True` のもののみ表示される
+  - `action_key`（英語内部ID）と `label`（日本語表示名）が分離され、pack差し替えに対応しやすい構造
 - ⚠️ いまの課題:
-  - 初期 game_state が Hero/Luna + 「祭壇」(ファンタジー風) のまま
-  - MicroGoal の候補数が少ないモードでは「やり尽くし感」が出る（体験枯渇）
+  - 会話テンプレがまだ少なく、状況（場所/時間/天候）と関係性の掛け算が薄い
+  - `talk` が MicroGoal/おすすめアクションとどう循環するかは未調整（会話→新micro生成など）
   - RC は常時動作から「明示起動」へ分離したい（run/demo/rcの整理）
 - 🎯 今やっている目的:
-  - ネオノワールの世界観（刑事/愉快犯/拠点/関係性）を初期stateに反映し、
-    その上で「会話する」アクションMVPを入れて“遊べる体験”へ
+  - 「世界観の初期化」→「会話」→「microgoal循環」を最小ループで成立させ、遊びとしての手触りを上げる
 
 ## 3. 直近の変更（最新3つだけ）
-- 2026-01-31: simulation.py をリファクタ（GameContext導入 / HUDCallbacks分離 / 未使用コード削除）
-- 2026-01-13: HUD/旧GUI/CLI を共通 ActionPipeline に統合、clock二重進行を解消
-- 2025-11-01: SceneGraph/ログ出力基盤の導入（データ工房の前段）
+- 2026-02-01: Session23: cop_trickster初期state + talkアクション + 日替わりリセット + Choice自動生成（64adfe9〜b1db9e8）
+- 2026-01-31: Session22: simulation.py をリファクタ（GameContext導入 / HUDCallbacks分離 / 未使用コード削除）
+- 2026-01-13: Session21: HUD/旧GUI/CLI を共通 ActionPipeline に統合、clock二重進行を解消
 
 ## 4. 次にやること（最大3つ・小さく）
-1. game_state初期設定を「刑事/愉快犯 + ネオノワール拠点 + 関係性タグ」に変更（MVP）
-2. 「会話する」アクションMVP：状況（場所/時間/天候）＋関係性タグ→テンプレ選択→ログ出力
-3. MicroGoal 枯渇対策：候補を「テンプレ×スロット」で増やす or ActionSpec から自動生成する
+1. `talk` を状況（場所/時間/天候）にも反応させてテンプレを増やす（最低でも 6〜12 本）
+2. 会話を MicroGoal と循環させる（例: 会話ログ→新micro候補、または talk をおすすめに出やすくする）
+3. RCを “常時動作” から “明示起動” へ分離する（run/demo/rcの整理）
 
 ## 5. ブロッカー（止まってる理由があれば）
 - 例）RCがHUD側から自動発火していてrunと混ざっている
 - 例）会話の入力/出力の置き場所（ログ形式）が未確定
 
-（現時点）ブロッカーなし。まずは「初期state」を整える。
+（現状）大きなブロッカーなし。まずは起動テストで `talk` と日替わりリセットを確認。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
@@ -59,5 +61,5 @@
 
 ## 7. 作業ブランチ / バックアップ
 - 基準（安定）: `cursor-trial/microgoal-logging`
+- 作業（Session23）: `feature/session23-conversation-microgoal`
 - バックアップ: `backup/pre-refactor-20260131`
-- 次（Session23）: `feature/session23-conversation-microgoal`（作成予定）
