@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, Callable
 
+from src.utility.config_loader import is_hud_debug_enabled
+
 if TYPE_CHECKING:
     from src.game_context import GameContext
 
@@ -65,12 +67,14 @@ class HUDCallbacks:
         cache_rev = ctx.game_state.get("hud_cache_rev", 0)
         last_rendered_rev = ctx.game_state.get("hud_last_rendered_rev", -1)
         if cache_rev != last_rendered_rev:
-            print(f"[HUD_DEBUG] recompute rev={cache_rev} last={last_rendered_rev}")
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] recompute rev={cache_rev} last={last_rendered_rev}")
             progress_text = ctx.director.progress_text(ctx.director_world)
             ctx.game_state["hud_cached_progress"] = progress_text
 
             rec_action, rec_minutes, rec_label = ctx.director.recommended_action(ctx.director_world)
-            print(f"[HUD_DEBUG] rec_action={rec_action} minutes={rec_minutes} label={rec_label}")
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] rec_action={rec_action} minutes={rec_minutes} label={rec_label}")
             if isinstance(ctx.director_world, dict):
                 if rec_action:
                     ctx.director_world["_recommended_action_id"] = rec_action
@@ -97,22 +101,28 @@ class HUDCallbacks:
             for record in ctx.director.list_actions_for_mode(ctx.director.mode):
                 action_id = None
                 label = None
-                minutes = 5
+                minutes = None
                 if isinstance(record, dict):
                     action_id = record.get("action") or record.get("id") or record.get("action_id")
                     label = record.get("text") or record.get("label")
-                    try:
-                        minutes = int(record.get("time_min", 5))
-                    except (TypeError, ValueError):
-                        minutes = 5
+                    raw_time = record.get("time_min")
+                    if raw_time is not None:
+                        try:
+                            minutes = int(raw_time)
+                        except (TypeError, ValueError):
+                            pass
                 if not action_id:
                     continue
                 spec = self._get_action_spec(action_id)
                 if not label:
                     label = spec.label if spec else action_id
-                ctx.current_actions.append((action_id, label, max(0, minutes)))
+                # time_min: record優先 → spec優先 → Noneのまま（ActionPipelineで再取得）
+                if minutes is None and spec and spec.time_min:
+                    minutes = spec.time_min
+                ctx.current_actions.append((action_id, label, minutes))
             ctx.current_actions.sort(key=lambda item: item[0])
-            print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
+            if is_hud_debug_enabled():
+                print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
             ctx.game_state["hud_cached_actions"] = ctx.current_actions.copy()
             ctx.game_state["hud_last_rendered_rev"] = cache_rev
 

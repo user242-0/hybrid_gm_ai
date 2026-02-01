@@ -24,7 +24,7 @@ from src.world import init_world, world_tick
 from src.rc_ai import pick_action, select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
-from src.utility.config_loader import job_root_from_cfg, load_config
+from src.utility.config_loader import job_root_from_cfg, load_config, is_hud_debug_enabled
 from director.registry import load_pack, synthesize_from_text
 from director.director import Director, load_yaml
 from src.world_defaults import apply_world_defaults
@@ -117,7 +117,7 @@ def _director_clock_string(world: dict | None) -> str:
 
 def _bump_hud_cache_rev(gs: dict, reason: str | None = None) -> None:
     gs["hud_cache_rev"] = gs.get("hud_cache_rev", 0) + 1
-    if reason:
+    if reason and is_hud_debug_enabled():
         print(f"[HUD_DEBUG] bump reason={reason} rev={gs['hud_cache_rev']}")
 
 

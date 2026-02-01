@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
+from src.utility.config_loader import is_hud_debug_enabled
+
 if TYPE_CHECKING:
     from src.scheduler import Scheduler
     from src.ui.action_pipeline import ActionPipeline
@@ -70,7 +72,7 @@ class GameContext:
     def bump_hud_cache_rev(self, reason: str | None = None) -> None:
         """HUDキャッシュのリビジョンをインクリメント"""
         self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
-        if reason:
+        if reason and is_hud_debug_enabled():
             print(f"[HUD_DEBUG] bump reason={reason} rev={self.game_state['hud_cache_rev']}")
 
     def update_microgoal(self, micro_goal: str | None) -> None:

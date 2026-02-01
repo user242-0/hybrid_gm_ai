@@ -58,5 +58,14 @@
 - packを素材（roles/locations/targets）に寄せて、init_stateが組み立てるのは拡張しやすい。
 - Choiceを自動生成にすると、新アクション追加時に choice_definitions をいじらなくて済む。
 
+### 追加作業（続き）
+- **HUD_DEBUGログ整理**: デフォルトOFF、`config.yml` or 環境変数 `HUD_DEBUG=1` で有効化
+  - `is_hud_debug_enabled()` を config_loader に追加
+  - hud_callbacks.py / game_context.py / simulation.py の該当箇所をラップ
+- **time_min統一**: GUI/HUD共通で action_definitions の time_min を反映
+  - ActionPipeline: `function=None` のアクションでも `action_executed=True` にして時間進行を有効化
+  - hud_callbacks: record.time_min → spec.time_min のフォールバック優先順位を修正
+  - DoD: wait(5) で +5分、observe(3) で +3分、check_tip(5) で +5分
+
 ### 次回の最初の一手（15分でやる）
-- 起動して **(1)刑事/愉快犯** が初期で出る → **(2)talk** を1回実行 → **(3)Dayが変わった後に micro が復活する** の3点を確認。
+- 起動して **(1)wait** を押す → 時刻が +5分 → **(2)observe** で +3分 → **(3)talk** を1回実行の動作確認。

@@ -1,5 +1,6 @@
 # src/utility/
 
+import os
 import yaml, datetime as dt
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,24 @@ def get_cfg():
     if _CFG is None:
         _CFG = yaml.safe_load(Path("config.yml").read_text(encoding="utf-8"))
     return _CFG
+
+
+def is_hud_debug_enabled() -> bool:
+    """
+    HUD_DEBUGログを有効にするかどうか。
+    優先順位: 環境変数 HUD_DEBUG > config.yml の debug.hud_debug
+    """
+    # 環境変数でオーバーライド
+    env_val = os.environ.get("HUD_DEBUG", "").lower()
+    if env_val in ("1", "true", "yes", "on"):
+        return True
+    if env_val in ("0", "false", "no", "off"):
+        return False
+
+    # config.yml から取得
+    cfg = get_cfg()
+    debug_cfg = cfg.get("debug", {})
+    return bool(debug_cfg.get("hud_debug", False))
 
 def _latest_job_directory(jobs_root: Path) -> Optional[Path]:
     if not jobs_root.exists():

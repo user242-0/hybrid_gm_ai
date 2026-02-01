@@ -264,7 +264,8 @@ class ActionPipeline:
                     return None
             if spec and spec.function:
                 result = spec.function(actor_obj, self.game_state, *arg_list)
-                action_executed = True
+            # アクションが認識された時点で action_executed = True（function が None でも時間進行する）
+            action_executed = True
         else:
             if world is not None:
                 if hasattr(action_registry, "execute_action_core"):

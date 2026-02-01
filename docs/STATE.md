@@ -33,14 +33,14 @@
   - 「世界観の初期化」→「会話」→「microgoal循環」を最小ループで成立させ、遊びとしての手触りを上げる
 
 ## 3. 直近の変更（最新3つだけ）
+- 2026-02-01: Session23続: HUD_DEBUG configフラグ化 + time_min統一（function=None対応）
 - 2026-02-01: Session23: cop_trickster初期state + talkアクション + 日替わりリセット + Choice自動生成（64adfe9〜b1db9e8）
 - 2026-01-31: Session22: simulation.py をリファクタ（GameContext導入 / HUDCallbacks分離 / 未使用コード削除）
-- 2026-01-13: Session21: HUD/旧GUI/CLI を共通 ActionPipeline に統合、clock二重進行を解消
 
 ## 4. 次にやること（最大3つ・小さく）
-1. `talk` を状況（場所/時間/天候）にも反応させてテンプレを増やす（最低でも 6〜12 本）
-2. 会話を MicroGoal と循環させる（例: 会話ログ→新micro候補、または talk をおすすめに出やすくする）
-3. RCを “常時動作” から “明示起動” へ分離する（run/demo/rcの整理）
+1. 起動テスト: wait(5) → 時刻+5分、HUDからも同様、check_tip(5) も確認
+2. `talk` を状況（場所/時間/天候）にも反応させてテンプレを増やす（最低でも 6〜12 本）
+3. RCを "常時動作" から "明示起動" へ分離する（run/demo/rcの整理）
 
 ## 5. ブロッカー（止まってる理由があれば）
 - 例）RCがHUD側から自動発火していてrunと混ざっている
