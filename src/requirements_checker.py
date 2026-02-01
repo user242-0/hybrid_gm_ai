@@ -34,6 +34,7 @@ class RequirementsChecker:
             "equipped_weapon_is": lambda t: self._equipped_weapon_type() == t,
             #"has_weapon": lambda: self.player_status.has_weapon,
             "has_enemy": lambda: self.game_state.get("has_enemy"),   # この行を追加
+            "has_target": lambda: bool(self.game_state.get("current_target")),
             "location": lambda loc: self.game_state.get("current_location") == loc,
             "has_item": lambda item_name: any(
                 item["name"] == item_name for item in self.player_status.inventory

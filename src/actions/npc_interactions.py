@@ -1,5 +1,91 @@
 import time
+import random
 from src.logger import log_action
+
+
+# ---------- 会話テンプレート（ネオノワール用）----------
+TALK_TEMPLATES = {
+    "default": [
+        "「……」沈黙が重い。",
+        "互いに言葉を探している。",
+        "視線が交錯する。何かを伝えようとしている。",
+    ],
+    "容疑者": [
+        "「なぜ俺を追う？」低い声が返ってくる。",
+        "「証拠もなしに話しかけてくるとはな。」",
+        "「刑事さん、あんたも疲れてるだろ。」",
+    ],
+    "追跡対象": [
+        "「また会ったな。」逃げる素振りはない。",
+        "「追いかけっこは楽しいか？」皮肉な笑み。",
+        "「そろそろ決着をつけたいと思わないか。」",
+    ],
+    "追手": [
+        "「しつこい奴だな、刑事さん。」",
+        "「まだ諦めてなかったのか。」",
+        "「こっちは遊んでるだけなのにな。」",
+    ],
+    "興味深い存在": [
+        "「お前は他の刑事とは違う気がする。」",
+        "「なぜそこまでして追う？聞いてみたかった。」",
+        "「俺たち、似た者同士かもな。」",
+    ],
+}
+
+TALK_TEMPLATES_BY_LOCATION = {
+    "拠点_安アパート": "薄暗い部屋の中、言葉が静かに交わされる。",
+    "事件現場_路地裏": "血痕の残る路地で、張り詰めた会話が始まる。",
+    "情報源_夜の酒場": "グラスを傾けながら、本音が漏れる。",
+    "警察署_控室": "蛍光灯の下、形式的な言葉が行き交う。",
+}
+
+
+def talk(character_status, game_state, *args):
+    """
+    会話アクションMVP：テンプレート選択 → last_dialogue に保存 → ログ出力
+    """
+    target_name = args[0] if args else game_state.get("current_target")
+    if not target_name:
+        print("話しかける相手がいない。")
+        return None
+
+    party = game_state.get("party", {})
+    target = party.get(target_name)
+
+    # 関係性タグを取得
+    labels = set()
+    if target and hasattr(target, "relationship_tags_from"):
+        labels = target.relationship_tags_from.get(character_status.name, set())
+
+    # テンプレート選択（関係性タグ優先）
+    template_pool = TALK_TEMPLATES["default"]
+    for label in labels:
+        if label in TALK_TEMPLATES:
+            template_pool = TALK_TEMPLATES[label]
+            break
+
+    dialogue = random.choice(template_pool)
+
+    # ロケーション描写
+    location = game_state.get("current_location", "どこか")
+    location_desc = TALK_TEMPLATES_BY_LOCATION.get(location, "")
+
+    # last_dialogue に保存
+    game_state["last_dialogue"] = {
+        "actor": character_status.name,
+        "target": target_name,
+        "dialogue": dialogue,
+        "location": location,
+        "labels": list(labels),
+    }
+
+    # 出力
+    if location_desc:
+        print(location_desc)
+    print(f"{character_status.name} → {target_name}")
+    print(dialogue)
+
+    return dialogue
 
 
 # 石像の固定セリフ

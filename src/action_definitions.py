@@ -15,6 +15,7 @@ from src.actions import (
     perform_attack,
     rest_with_event,
     swing_sword,
+    talk,
     talk_to_statue,
     talk_to_statue_with_cooldown,
 )
@@ -129,6 +130,13 @@ actions = {
         "function": set_emotion_color_action,
         "args_template": [],
         "requirements": None,
+        "available_to": ["player", "npc"],
+    },
+    "talk": {
+        "description": "ターゲットに話しかける（状況・関係性ベースのフレーバーテキスト）",
+        "function": talk,
+        "args_template": ["<target_name>"],
+        "requirements": {"has_target": True},
         "available_to": ["player", "npc"],
     },
 }
