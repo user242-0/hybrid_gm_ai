@@ -18,7 +18,7 @@ def lift_brightness(value: int) -> int:
 
 class Choice:
     def __init__(self, label, action_key, emotion_axis, emotion_value=255,
-                 requirements=None, requirement_keys=None, **kwargs):
+                 requirements=None, requirement_keys=None, actor_id=None, **kwargs):
         self.label = label
         self.action_key = action_key
         self.emotion_axis = emotion_axis  # "red", "green", "blue"
@@ -28,7 +28,10 @@ class Choice:
         # 後方互換: requirement_keys / requirements の両方を受け付ける
         self.requirements = requirements if requirements is not None else requirement_keys
         # 既存コード互換のため古い属性名も残す
-        self.requirement_keys = self.requirements        
+        self.requirement_keys = self.requirements
+
+        # Choice生成時のactor_idをスナップショット（実行時に使用）
+        self.actor_id = actor_id        
 
     def get_emotion_color(self):
         """emotion_axis と emotion_value を使って RGB 色を返す（明度底上げ）"""

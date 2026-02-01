@@ -461,20 +461,28 @@ def player_loop(gs):
             continue
 
         # 数字入力なら Choice に変換
+        # Choice生成時のactor_idを使用（キャラ切替されても正しいactorで実行）
+        choice_actor = None
         if cmd.isdigit():
             idx = int(cmd)
             if idx in num_choice_map:
                 selected_choice = num_choice_map[idx]
+                # actor_idからactorを復元（スナップショット時のactor）
+                if selected_choice.actor_id:
+                    choice_actor = gs["party"].get(selected_choice.actor_id)
                 # action_key と対象キャラ名を組み合わせて文字列化
                 cmd = selected_choice.action_key
                 if selected_choice.action_key == "switch_character":
                     # シンプルに Actor 以外の最初のキャラをターゲット
-                    others = [c for c in gs["party"].values() if c is not actor]
-                    cmd += f" {others[0].name}"
-        
+                    exec_actor = choice_actor or actor
+                    others = [c for c in gs["party"].values() if c is not exec_actor]
+                    cmd += f" {others[0].name}" if others else ""
+
+        # 実行に使うactor（Choice経由ならスナップショット、それ以外は現在のactor）
+        exec_actor = choice_actor or actor
 
         # プレイヤーが操作する瞬間に必ず手動フラグを立て直す
-        actor.is_npc = False
+        exec_actor.is_npc = False
         parts = cmd.split()
         if not parts:
             if ctx.director_hud is not None:
@@ -486,7 +494,7 @@ def player_loop(gs):
         args = parts[1:]
         result = dispatch_action(
             action_id,
-            actor_obj=actor,
+            actor_obj=exec_actor,
             args=args,
             source="CLI" if USE_CLI else "GUI",
         )

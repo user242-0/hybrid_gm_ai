@@ -61,12 +61,15 @@ def get_available_choices(actor, game_state):
         emotion_value = heart.get("value", 50)
 
         # Choice インスタンスを生成（labelとaction_keyを分離）
+        # actor_idをスナップショットして、実行時に使う
+        actor_id = getattr(actor, "name", None)
         choice = Choice(
             label=spec.label,
             action_key=action_id,  # 英語の内部ID
             emotion_axis=emotion_axis,
             emotion_value=emotion_value,
-            requirement_keys=spec.requirements
+            requirement_keys=spec.requirements,
+            actor_id=actor_id,
         )
 
         # 実行条件を満たすか
