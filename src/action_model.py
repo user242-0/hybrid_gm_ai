@@ -20,6 +20,8 @@ class ActionSpec:
     effects: Optional[List[Dict[str, Any]]] = None
     function: Optional[Callable[..., Any]] = None
     id_aliases: List[str] = field(default_factory=list)
+    ui_visible: bool = True  # UI選択肢に表示するか
+    heart: Optional[Dict[str, Any]] = None  # {axis: "red"|"green"|"blue", value: 0-255}
 
     def to_dict(self) -> Dict[str, Any]:
         data = {
@@ -35,5 +37,7 @@ class ActionSpec:
             "effects": self.effects,
             "function": self.function,
             "id_aliases": self.id_aliases or None,
+            "ui_visible": self.ui_visible,
+            "heart": self.heart,
         }
         return {key: value for key, value in data.items() if value is not None}

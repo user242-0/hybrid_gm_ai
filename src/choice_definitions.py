@@ -6,47 +6,67 @@ from pathlib import Path
 
 RULES_DIR = Path("data/rules")
 
-choice_definitions = {
-    "戦う":            {"axis": "red", "value": 250},
-    "戦わない":        {"axis": "red","value": 180},
-    "ただ、受け入れる": {"axis": "red","value": 180},
-    "攻撃する":        {"axis": "blue",  "value": 200},
-    "swing_sword":      {"axis": "blue",  "value": 200},
-    "switch_character": {"axis": "green", "value": 255},
-    "石像に話す":      {"axis": "blue",  "value": 80},
-    "探索する":        {"axis": "blue",  "value": 80},
-    "石像に話す（クールダウン）":{"axis": "blue",  "value": 100},
-    "進む":             {"axis": "blue",  "value": 100},
-    "休む":             {"axis": "blue",  "value": 100},
-    "感情を設定する":   {"axis": "green", "value": 150},  # 新規追加：プレイヤーの心を設定する緑コマンド
+# --- 旧キー互換マップ（日本語 → 英語action_id） ---
+# ログやセーブデータに日本語キーが残っている場合の変換用
+LEGACY_KEY_MAP = {
+    "探索する": "explore",
+    "進む": "move_forward",
+    "休む": "rest",
+    "攻撃する": "attack",
+    "戦う": "engage_combat",
+    "戦わない": "avoid_combat",
+    "ただ、受け入れる": "accept_attack",
+    "石像に話す": "talk_to_statue",
+    "石像に話す（クールダウン）": "talk_to_statue_cooldown",
+    "NPCが話す": "npc_speak",
+    "カード生成イベント": "generate_card",
+    "感情を設定する": "set_emotion",
 }
 
+
+def resolve_action_key(key: str) -> str:
+    """旧キー（日本語）を新action_id（英語）に変換"""
+    return LEGACY_KEY_MAP.get(key, key)
+
+
 def get_available_choices(actor, game_state):
+    """
+    action_definitionsからUI表示可能なアクションを自動生成。
+    - ui_visible=True のもののみ表示
+    - requirements_checker を通るもののみ
+    - heartからemotion_axis/valueを取得
+    """
     from src.requirements_checker import RequirementsChecker
-    
+    from src.action_definitions import get_action_specs
+
     checker = RequirementsChecker(game_state, actor)
+    specs = get_action_specs()
 
     available = []
-    from src.action_definitions import actions
-    for key, meta in choice_definitions.items():
-        act_meta = actions.get(key, {})
+    for action_id, spec in specs.items():
+        # UI非表示はスキップ
+        if not spec.ui_visible:
+            continue
 
         # NPC／プレイヤーの区分をチェック
-        available_to = act_meta.get("available_to")
-        if actor.is_npc and available_to and "npc" not in available_to:
+        available_to = spec.available_to or []
+        if actor.is_npc and "npc" not in available_to:
             continue
-        if not actor.is_npc and available_to and "player" not in available_to:
+        if not actor.is_npc and "player" not in available_to:
             continue
 
-        
-        
-        # Choice インスタンスを生成
+        # heartからemotion情報を取得
+        heart = spec.heart or {"axis": "green", "value": 50}
+        emotion_axis = heart.get("axis", "green")
+        emotion_value = heart.get("value", 50)
+
+        # Choice インスタンスを生成（labelとaction_keyを分離）
         choice = Choice(
-            label=key,
-            action_key=key,
-            emotion_axis=meta.get("emotion_axis", meta.get("axis")),  # "red"|"green"|"blue"
-            emotion_value=meta.get("emotion_value", meta.get("value", 128)),
-            requirement_keys=act_meta.get("requirements")
+            label=spec.label,
+            action_key=action_id,  # 英語の内部ID
+            emotion_axis=emotion_axis,
+            emotion_value=emotion_value,
+            requirement_keys=spec.requirements
         )
 
         # 実行条件を満たすか
