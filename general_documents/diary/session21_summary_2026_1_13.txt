@@ -1,0 +1,78 @@
+session21_summary_2026_1_13.txt
+================================
+
+Session 21: UI統合編（HUD/旧GUI/CLI → 共通ActionPipeline）
+日付: 2026-01-13（進捗まとめ）
+
+目的（DoD）
+- HUD / 旧GUI / CLI から同一の action パイプ（ActionPipeline）を通して実行できる
+- 実行順の一本化（requirements → execute(effects/function/legacy) → time/emotion → director update → scene_graph emit(ON時) → UI refresh）
+- 同じ action をどのUIから押しても world/clock/emotion/microgoal 表示が一致
+
+--------------------------------
+1) ActionPipeline導入と action 実行経路の統一
+- ui/action_pipeline.py を新設し、UIからの action 実行をオーケストレーションする ActionPipeline を追加。
+- action_registry に execute_action_core（requirements + effects/function + legacy fallback のコア）を設け、emotion など副作用は既存フロー維持のまま分離。
+- simulation.py 側に dispatch_action 入口を追加し、HUD/CLI/AI/rc_tick/旧GUI経路を ActionPipeline に寄せる形へ段階統合。
+  - HUD → pipeline 経由
+  - CLI/AI → pipeline 経由
+  - rc_tick の direct function 呼び出しも pipeline 経由に
+  - 旧GUIループも simulation_utils 経由で pipeline を呼ぶように調整（統合編の本丸）
+
+--------------------------------
+2) clock（dict時計/legacy文字列時計）統一と二重進行の解消
+- world["clock"] が dict 形式（day/hour/minute）でも動くように ensure_clock / 表示整形を強化。
+- 一時期、scheduler-driven world_tick と pipeline time advance が二重に進んで「勝手に時間が進む」状態になった。
+- これを修正し、原則「ActionPipeline経由のaction実行時のみ時間が進む」挙動に統一。
+  - ただし「自然に時間が進む」仕様も魅力があるため、将来的にオプション化の余地あり。
+
+--------------------------------
+3) emotion_delta / None安全化
+- apply_emotion_delta が None を扱えず落ちるケース（NoneType is not iterable / .get）をガード。
+- RC_AI 側の emo_score_for_action も delta None に落ちないよう安全化を実施。
+
+--------------------------------
+4) ActionSpec “spec missing” 問題とスタブ生成
+- pack に表示される micro actions が ActionSpec 未定義で HUD 上 spec missing になる問題を確認。
+- 「spec missing を自動で列挙し、雛形Specを一括生成」方針へ。
+- scripts/spec_stubgen.py を導入・改修し、pack毎の不足actionを検出して actions/action_specs をスタブ生成できるようにした。
+- rogue_master では一部 micro action spec を追加し、HUD側で spec=OK を確認。
+
+--------------------------------
+5) 自作YAMLローダー互換・packフォーマット正規化（pack-format-normalize）
+- 自作 yaml パーサが “Mixed list/dict structures are not supported” で落ちる問題が発生。
+  - 主因: effects の “- op: add” のようなインラインマップと追加インデントの扱い。
+- 自作 yaml のパース仕様を拡張し、インラインマップの辞書化/継続行取り込みを許容。
+- spec_stubgen の dump が PyYAML と自作 yaml でオプション不整合（allow_unicode/stream/default_flow_style など）を起こし、段階的に修正。
+- 結果的に pack YAML の安全な書式へ正規化するパッチを適用し、全packでロード/スタブ生成が通る状態に。
+- cop_trickster.yml が空化する事故があり、main から復旧して継続。
+- 正規化作業は “pack-format-normalize” ブランチで進行し、以後しばらくこのブランチを作業ベースに。
+
+--------------------------------
+6) MicroGoal/Progress/おすすめアクションが高速に変化する（HUDチラつき）問題の収束
+- Auto/手動(特定キー)で MicroGoal/Progress/おすすめ が目まぐるしく更新される問題を再現。
+- 原因: HUD refresh の再計算トリガ（hud_cache_rev）が switch_character 等の頻繁な行動で過剰に bump され、
+  microgoal completion → next が高速連鎖していた。
+- 対応:
+  - HUDキャッシュ（progress/recommended/actions）を導入し、再計算トリガを明確化。
+  - switch_character では hud_cache_rev を bump しない/非進行行動扱いにする等で安定化。
+  - microgoal 完了判定を厳格化し、完了済み候補を避ける。全完了時は “(MicroGoal なし)” に固定。
+- 結果: チラつきは解消し、一定時間後 “MicroGoal：なし” で落ち着く挙動に。
+
+--------------------------------
+7) ログ/データ工房（Cursor試験の前段）
+- gameplay_log_latest.jsonl が pipeline 化で一時無効になる期間があったが、後に復旧へ着手。
+- 次セッション（Cursor試験）でログを「player操作ログ」と「fullログ」に分離、configで full 出力ON/OFF 制御へ発展。
+
+--------------------------------
+本セッションの成果（要点）
+- ActionPipeline を中心に、HUD/旧GUI/CLI/AI の action 実行経路を一本化し、clock/emotion/Director/UI更新の整合性を大きく前進。
+- pack側 action が ActionSpec に揃っていない問題を可視化し、スタブ生成（spec_stubgen）と pack 正規化で “spec=OK” を実現。
+- YAML互換性の壁（自作yaml vs PyYAML）を越え、pack-format-normalize ブランチで安定して pack を扱える基盤を整備。
+- MicroGoal/おすすめ/Progress のチラつき問題を解析→収束し、UI体験を安定化。
+
+--------------------------------
+明日以降の候補（次アクション）
+- MicroGoal “枯渇” 体験の改善（フォールバック or 周回可能化など）
+- ログ/scene_graph の本格復旧（player/full・出力スコープ・seedledger抑制など）
+- packごとの主人公/助手（Hero/Lunaの表示名や初期配置）の世界観対応（表示名と内部IDの分離を維持）
