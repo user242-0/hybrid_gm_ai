@@ -363,6 +363,12 @@ def rc_tick(rc_char, gs):
     if not rc_char.is_npc:
         return
 
+    # HUDが入力待ち中はRCアクションを実行しない（推薦計算のみ許可）
+    if gs.get("input_pending"):
+        # 次の RC Tick を再登録して待機
+        ctx.scheduler.register(rc_tick, 0.1, rc_char, gs)
+        return
+
     # 現時点で実行可能な choice 一覧を取得
     choices = get_available_choices(rc_char, gs)
 
