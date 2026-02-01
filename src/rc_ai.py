@@ -9,9 +9,14 @@ from src.requirements_checker import RequirementsChecker
 def select_action(rc_char, game_state, available):
     checker = RequirementsChecker(game_state, rc_char)
 
+    # デバッグログ用フラグ
+    verbose = game_state.get("_rc_ai_verbose", False)
+
     # ❶ switch_character は最優先（input_pending 中でも許可）
     for c in available:
         if c.action_key == "switch_character" and c.is_available(checker):
+            if verbose:
+                print(f"[RC_AI] {rc_char.name}: switch_character を選択")
             return c
 
     # ❷ 通常時は緑から抽選
@@ -20,12 +25,25 @@ def select_action(rc_char, game_state, available):
     ]
 
     if not green:
+        if verbose:
+            print(f"[RC_AI] {rc_char.name}: 緑アクションなし → None")
         return None
 
     from random import choices as rnd_choices
 
     weights = [c.emotion_value for c in green]
-    return rnd_choices(green, weights=weights, k=1)[0]
+
+    # ログ出力: 候補一覧と重み
+    if verbose:
+        candidates = ", ".join(f"{c.label}({c.emotion_value})" for c in green)
+        print(f"[RC_AI] {rc_char.name}: 緑候補=[{candidates}]")
+
+    selected = rnd_choices(green, weights=weights, k=1)[0]
+
+    if verbose:
+        print(f"[RC_AI] {rc_char.name}: → {selected.label} を選択")
+
+    return selected
 
 
 def get_emotion(world: Dict) -> Dict[str, float]:

@@ -378,7 +378,11 @@ def rc_tick(rc_char, gs):
         return
 
     # アクション実行
-    act_info = actions[choice.action_key]
+    try:
+        act_info = actions[choice.action_key]
+    except KeyError:
+        # id_aliasesで見つからない場合はget_action_specを使用
+        act_info = {}
     args = parse_args(act_info, rc_char, gs)
     if choice.action_key == "switch_character":
         target_name = choose_target_for_switch(rc_char, gs)
@@ -392,7 +396,36 @@ def rc_tick(rc_char, gs):
         source="RC_AI",
     )
 
-    record(f"[AI] {rc_char.name} ▶ {choice.action_key}")
+    # switch_characterがブロックされた場合（result=None）、フォールバック選択をログ
+    if choice.action_key == "switch_character" and result is None:
+        # 緑アクションにフォールバック
+        from src.requirements_checker import RequirementsChecker
+        checker = RequirementsChecker(gs, rc_char)
+        green = [c for c in choices if c.emotion_axis == "green" and c.action_key != "switch_character" and c.is_available(checker)]
+        if green:
+            candidates = ", ".join(f"{c.label}({c.emotion_value})" for c in green)
+            print(f"[RC_AI] {rc_char.name}: switch BLOCKED → フォールバック候補=[{candidates}]")
+            from random import choices as rnd_choices
+            weights = [c.emotion_value for c in green]
+            fallback = rnd_choices(green, weights=weights, k=1)[0]
+            print(f"[RC_AI] {rc_char.name}: → {fallback.label} にフォールバック")
+            # フォールバックアクションを実行
+            try:
+                fb_info = actions[fallback.action_key]
+            except KeyError:
+                fb_info = {}
+            fb_args = parse_args(fb_info, rc_char, gs)
+            result = dispatch_action(
+                fallback.action_key,
+                actor_obj=rc_char,
+                args=list(fb_args),
+                source="RC_AI",
+            )
+            record(f"[AI] {rc_char.name} ▶ {fallback.action_key} (fallback)")
+        else:
+            print(f"[RC_AI] {rc_char.name}: switch BLOCKED, フォールバック候補なし")
+    else:
+        record(f"[AI] {rc_char.name} ▶ {choice.action_key}")
 
     if isinstance(result, CharacterStatus) and result.is_npc:
         ctx.scheduler.register(rc_tick, 0.01, result, gs)
