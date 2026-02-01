@@ -91,12 +91,23 @@ modes_enabled:
   - PURSUE
   - WITNESS
 roles:
-  antagonist:
-    archetype: trickster_killer
-    state: at_large
   protagonist:
+    name: "刑事"
     archetype: cop
     state: burned_out
+  antagonist:
+    name: "愉快犯"
+    archetype: trickster_killer
+    state: at_large
+locations:
+  default: "拠点_安アパート"
+  available:
+    - "拠点_安アパート"
+    - "事件現場_路地裏"
+    - "情報源_夜の酒場"
+    - "警察署_控室"
+targets:
+  default: "愉快犯"
 seed: 41
 title: 落魄の刑事 vs 愉快犯
 tone:

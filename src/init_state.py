@@ -1,28 +1,69 @@
+from pathlib import Path
+import yaml
+
 from src.character_status import CharacterStatus
 
-def init_game_state():
-    hero = CharacterStatus("Hero", is_rc=True, is_npc=False)
-    luna = CharacterStatus("Luna", is_rc=True, is_npc=True)
-    hero.equip_weapon({"name": "鉄の剣", "weapon_type":"sword","attack_bonus": 5})
+
+PACK_DIR = Path(__file__).parent.parent / "data" / "director" / "packs"
+
+
+def _load_pack(pack_id: str) -> dict:
+    """パックYAMLを読み込む（registry.pyと同等の機能を循環インポート回避のため直接実装）"""
+    pack_path = PACK_DIR / f"{pack_id}.yml"
+    with open(pack_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def init_game_state(pack_id: str = "cop_trickster"):
+    """
+    パックを参照してgame_stateを組み立てる。
+    パックはデータ（roles/locations/targets）を持ち、この関数が構造を組み立てる責務を持つ。
+    """
+    pack = _load_pack(pack_id)
+    roles = pack.get("roles", {})
+    locations = pack.get("locations", {})
+    targets = pack.get("targets", {})
+
+    # --- キャラクター作成 ---
+    protagonist_data = roles.get("protagonist", {})
+    antagonist_data = roles.get("antagonist", {})
+
+    protagonist_name = protagonist_data.get("name", "刑事")
+    antagonist_name = antagonist_data.get("name", "愉快犯")
+
+    protagonist = CharacterStatus(protagonist_name, is_rc=True, is_npc=False)
+    antagonist = CharacterStatus(antagonist_name, is_rc=True, is_npc=True)
+
+    # --- 関係性タグ設定 ---
+    # 刑事から見た愉快犯
+    antagonist.add_label_from(protagonist_name, "容疑者")
+    antagonist.add_label_from(protagonist_name, "追跡対象")
+    # 愉快犯から見た刑事
+    protagonist.add_label_from(antagonist_name, "追手")
+    protagonist.add_label_from(antagonist_name, "興味深い存在")
+
+    # --- ロケーション / ターゲット ---
+    current_location = locations.get("default", "拠点_安アパート")
+    current_target = targets.get("default", antagonist_name)
+
     return {
         "party": {
-            hero.name: hero,
-            luna.name: luna,
+            protagonist.name: protagonist,
+            antagonist.name: antagonist,
         },
         "party_map": {
-            hero.name: hero,
-            luna.name: luna,
+            protagonist.name: protagonist,
+            antagonist.name: antagonist,
         },
-        "active_char": hero,
-        "allow_ai_to_seize_control" : True,  # セッション14用：NPCが“自分”をターゲットにして奪う
+        "active_char": protagonist,
+        "allow_ai_to_seize_control": True,
         "running": True,
-        "input_pending" : False,
-        "use_gui" : True,
+        "input_pending": False,
+        "use_gui": True,
         "auto_step_pending": False,
-        # ほか HP, ロケーション, etc.
-        "events": {
-            "statue_trial_unlocked": False
-        },
-        "current_location": "祭壇",
-        "current_target": "古代の石像"
+        "events": {},
+        "current_location": current_location,
+        "current_target": current_target,
+        "available_locations": locations.get("available", [current_location]),
+        "pack_id": pack_id,
     }
