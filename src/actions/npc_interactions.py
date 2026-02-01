@@ -45,11 +45,20 @@ def talk(character_status, game_state, *args):
     会話アクションMVP：テンプレート選択 → last_dialogue に保存 → ログ出力
     """
     target_name = args[0] if args else game_state.get("current_target")
-    if not target_name:
-        print("話しかける相手がいない。")
-        return None
-
     party = game_state.get("party", {})
+
+    # self-talk防止：target == actor の場合はデフォルト相手に補正
+    actor_name = character_status.name
+    if not target_name or target_name == actor_name:
+        # partyから自分以外のキャラを選ぶ
+        others = [name for name in party.keys() if name != actor_name]
+        if others:
+            target_name = others[0]
+            print(f"[talk] self-talk補正: {actor_name} → {target_name}")
+        else:
+            print("話しかける相手がいない。")
+            return None
+
     target = party.get(target_name)
 
     # 関係性タグを取得
