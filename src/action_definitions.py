@@ -205,6 +205,31 @@ actions = {
         "heart": {"axis": "blue", "value": 120},
         "id_aliases": [],
     },
+    # --- 非LLM緑アクション（フォールバック用） ---
+    "wait": {
+        "label": "待機する",
+        "description": "周囲の様子を見ながら待つ。",
+        "function": None,  # 時間経過のみ
+        "args_template": [],
+        "requirements": None,
+        "available_to": ["player", "npc"],
+        "ui_visible": True,
+        "time_min": 5,
+        "heart": {"axis": "green", "value": 80},
+        "id_aliases": ["待つ"],
+    },
+    "observe": {
+        "label": "周囲を観察",
+        "description": "周囲の状況を注意深く観察する。",
+        "function": None,  # last_observation を積む（後で実装）
+        "args_template": [],
+        "requirements": None,
+        "available_to": ["player", "npc"],
+        "ui_visible": True,
+        "time_min": 3,
+        "heart": {"axis": "green", "value": 100},
+        "id_aliases": ["観察する"],
+    },
 }
 
 

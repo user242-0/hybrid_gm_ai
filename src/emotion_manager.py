@@ -13,6 +13,19 @@ def set_emotion_color_action(player, game_state):
         except AttributeError:
             # 後方互換：万一メソッド未導入なら従来プロパティだけ更新
             player.emotion_color = (r, g, b)
+
+        # world.emotion も更新（GUI同期のため）
+        world = game_state.get("director_world") or game_state.get("world") or game_state
+        world.setdefault("emotion", {})
+        world["emotion"]["R"] = r
+        world["emotion"]["G"] = g
+        world["emotion"]["B"] = b
+
+        # HUD再描画をトリガー
+        game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
+
+        # 実行ログ
+        print(f"[set_emotion] {player.name}: RGB({r}, {g}, {b})")
         return
     
     if game_state["use_gui"]:
