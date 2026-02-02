@@ -1,7 +1,9 @@
-import random 
+import random
 import os
 _CLIENT = None
 from dotenv import load_dotenv
+from src.utility.llm_guard import can_call_llm, record_call, get_fallback_text, log_llm_decision
+
 # .envから環境変数を読み込む
 load_dotenv()
 
@@ -20,15 +22,27 @@ def _get_client():
         _CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     return _CLIENT
 
-def generate_flavor_text(action, talk_situation, location):
+def generate_flavor_text(action, talk_situation, location, caller: str = "player"):
+    """
+    フレーバーテキスト生成。
+    caller: "player" or "rc" （LLMガードで使用）
+    """
     loc = str(location or "どこか")
     if isinstance(talk_situation, dict):
         ts = [f"{k}:{v}" for k, v in talk_situation.items()]
     else:
         ts = list(talk_situation or [])
 
+    # スタブモード（CI/テスト）
     if _use_stub_llm():
-        return f"{action}。{loc}の空気がわずかに揺れた。" 
+        return f"{action}。{loc}の空気がわずかに揺れた。"
+
+    # LLMガードチェック
+    allowed, reason = can_call_llm(caller, "generate_flavor")
+    log_llm_decision(allowed, reason, caller, "generate_flavor")
+
+    if not allowed:
+        return get_fallback_text(action, loc) 
        
     time_description = "深夜（夜間・真夜中）" if "late_night" in talk_situation else "昼間（通常時間帯）"
     client = _get_client()
@@ -51,7 +65,7 @@ def generate_flavor_text(action, talk_situation, location):
     - 「攻撃する」：戦闘の緊迫感や敵との対峙の状況を描写。
     """
 
-    response =  client.chat.completions.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "あなたは指定されたアクション・場所・時間帯・状況に矛盾のない短い情景描写を生成するAIです。"},
@@ -60,6 +74,7 @@ def generate_flavor_text(action, talk_situation, location):
         temperature=0.7,
         max_tokens=120
     )
+    record_call()  # LLM呼び出し成功を記録
     text = (response.choices[0].message.content or "").strip()
     return text or f"{action}。{loc}の空気がわずかに揺れた。"  # ← 空返り禁止
 

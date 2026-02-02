@@ -29,6 +29,20 @@ rc:
   excluded_actions:
     - switch_character
 
+llm:
+  # LLM呼び出しモード: off | player_only | rc_only | all
+  mode: player_only
+  # LLM呼び出しを許可するアクション（空=全て許可）
+  allow_actions:
+    - talk_to_statue
+    - generate_flavor
+  # レート制限
+  rate_limit:
+    calls_per_minute: 6
+    calls_per_turn: 1
+  # 拒否時にフォールバックテンプレを使う
+  fallback_template: true
+
 logging:
   # full ログの出力を有効化（default: false）
   full_enabled: false
