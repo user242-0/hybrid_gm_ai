@@ -24,6 +24,11 @@ director:
   seed: 41
   premise_path: "data/director/premise.yml"
 
+rc:
+  # RC側が選択候補から除外するアクション（プレイヤーは選べる）
+  excluded_actions:
+    - switch_character
+
 logging:
   # full ログの出力を有効化（default: false）
   full_enabled: false

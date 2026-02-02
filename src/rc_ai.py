@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 
 from src.action_definitions import get_action_spec
 from src.requirements_checker import RequirementsChecker
+from src.utility.config_loader import get_rc_excluded_actions
 
 
 def select_action(rc_char, game_state, available):
@@ -12,16 +13,24 @@ def select_action(rc_char, game_state, available):
     # デバッグログ用フラグ
     verbose = game_state.get("_rc_ai_verbose", False)
 
-    # ❶ switch_character は最優先（input_pending 中でも許可）
-    for c in available:
+    # ❶ RC除外リストでフィルタ
+    excluded = get_rc_excluded_actions()
+    filtered = [c for c in available if c.action_key not in excluded]
+
+    if verbose and len(filtered) < len(available):
+        removed = [c.action_key for c in available if c.action_key in excluded]
+        print(f"[RC_AI] {rc_char.name}: 除外 {removed}")
+
+    # ❷ switch_character は最優先（除外されていなければ）
+    for c in filtered:
         if c.action_key == "switch_character" and c.is_available(checker):
             if verbose:
                 print(f"[RC_AI] {rc_char.name}: switch_character を選択")
             return c
 
-    # ❷ 通常時は緑から抽選
+    # ❸ 通常時は緑から抽選
     green = [
-        c for c in available if c.emotion_axis == "green" and c.is_available(checker)
+        c for c in filtered if c.emotion_axis == "green" and c.is_available(checker)
     ]
 
     if not green:

@@ -23,6 +23,16 @@ def get_cfg():
     return _CFG
 
 
+def get_rc_excluded_actions() -> list:
+    """
+    RCが選択候補から除外するアクションのリストを取得。
+    config.yml の rc.excluded_actions を参照。
+    """
+    cfg = get_cfg()
+    rc_cfg = cfg.get("rc", {})
+    return rc_cfg.get("excluded_actions", [])
+
+
 def is_hud_debug_enabled() -> bool:
     """
     HUD_DEBUGログを有効にするかどうか。
