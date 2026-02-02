@@ -28,6 +28,10 @@ rc:
   # RC側が選択候補から除外するアクション（プレイヤーは選べる）
   excluded_actions:
     - switch_character
+  # レバーA: RC意思決定の最短間隔（秒）
+  decision_interval_sec: 1.0
+  # レバーB: 入力待ち中にRCが進められる累積時間の上限（ゲーム内分）
+  max_advance_minutes_while_input_pending: 10
 
 llm:
   # LLM呼び出しモード: off | player_only | rc_only | all

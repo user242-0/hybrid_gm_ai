@@ -281,6 +281,13 @@ class ActionPipeline:
             dt_value = 0
         if world is not None and dt_value > 0 and action_executed:
             self._advance_time(world, dt_value)
+            # レバーB: RC実行時に入力待ち中なら累積時間を記録
+            if source == "RC_AI" and self.game_state.get("input_pending"):
+                prev = self.game_state.get("_rc_minutes_advanced_while_pending", 0)
+                self.game_state["_rc_minutes_advanced_while_pending"] = prev + dt_value
+            # プレイヤー実行時は累積をリセット
+            if source in ("GUI", "CLI", "HUD"):
+                self.game_state["_rc_minutes_advanced_while_pending"] = 0
 
         if action_executed and action_id != "switch_character":
             self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1

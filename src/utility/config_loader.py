@@ -33,6 +33,20 @@ def get_rc_excluded_actions() -> list:
     return rc_cfg.get("excluded_actions", [])
 
 
+def get_rc_decision_interval_sec() -> float:
+    """RC意思決定の最短間隔（秒）"""
+    cfg = get_cfg()
+    rc_cfg = cfg.get("rc", {})
+    return float(rc_cfg.get("decision_interval_sec", 1.0))
+
+
+def get_rc_max_advance_minutes() -> int:
+    """入力待ち中にRCが進められる累積時間の上限（ゲーム内分）"""
+    cfg = get_cfg()
+    rc_cfg = cfg.get("rc", {})
+    return int(rc_cfg.get("max_advance_minutes_while_input_pending", 10))
+
+
 def is_hud_debug_enabled() -> bool:
     """
     HUD_DEBUGログを有効にするかどうか。

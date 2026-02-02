@@ -24,7 +24,13 @@ from src.world import init_world, world_tick
 from src.rc_ai import pick_action, select_action
 from src.choice_definitions import get_available_choices
 from src.utility.args_parser import parse_args
-from src.utility.config_loader import job_root_from_cfg, load_config, is_hud_debug_enabled
+from src.utility.config_loader import (
+    job_root_from_cfg,
+    load_config,
+    is_hud_debug_enabled,
+    get_rc_decision_interval_sec,
+    get_rc_max_advance_minutes,
+)
 from director.registry import load_pack, synthesize_from_text
 from director.director import Director, load_yaml
 from src.world_defaults import apply_world_defaults
@@ -363,11 +369,26 @@ def rc_tick(rc_char, gs):
     if not rc_char.is_npc:
         return
 
-    # HUDが入力待ち中はRCアクションを実行しない（推薦計算のみ許可）
-    if gs.get("input_pending"):
-        # 次の RC Tick を再登録して待機
+    now = time.time()
+
+    # レバーA: 意思決定頻度制限
+    interval = get_rc_decision_interval_sec()
+    last_action_time = gs.get("_rc_last_action_time", 0.0)
+    if now - last_action_time < interval:
+        # 間隔未満なら待機して再登録
         ctx.scheduler.register(rc_tick, 0.1, rc_char, gs)
         return
+
+    # レバーB: 入力待ち中の時間予算チェック
+    if gs.get("input_pending"):
+        max_minutes = get_rc_max_advance_minutes()
+        advanced = gs.get("_rc_minutes_advanced_while_pending", 0)
+        if advanced >= max_minutes:
+            # 予算超過：推薦だけして実行しない（レバーC: no-op）
+            ctx.scheduler.register(rc_tick, 0.5, rc_char, gs)
+            return
+        # 予算内でも入力待ち中は抑制的に（再登録間隔を長めに）
+        # pass through で実行を許可するが、次の登録は長めに
 
     # 現時点で実行可能な choice 一覧を取得
     choices = get_available_choices(rc_char, gs)
@@ -395,6 +416,9 @@ def rc_tick(rc_char, gs):
         args=args,
         source="RC_AI",
     )
+
+    # RC実行時刻を記録（レバーA用）
+    gs["_rc_last_action_time"] = time.time()
 
     # switch_characterがブロックされた場合（result=None）、フォールバック選択をログ
     if choice.action_key == "switch_character" and result is None:
@@ -428,11 +452,12 @@ def rc_tick(rc_char, gs):
         record(f"[AI] {rc_char.name} ▶ {choice.action_key}")
 
     if isinstance(result, CharacterStatus) and result.is_npc:
-        ctx.scheduler.register(rc_tick, 0.01, result, gs)
+        ctx.scheduler.register(rc_tick, 0.5, result, gs)
 
-    # 次の RC Tick を再登録（0.2 s 後）
+    # 次の RC Tick を再登録（入力待ち中は長めに、通常時は設定間隔）
     if rc_char.is_npc:
-        ctx.scheduler.register(rc_tick, 0.2, rc_char, gs)
+        next_interval = interval if not gs.get("input_pending") else max(interval, 0.5)
+        ctx.scheduler.register(rc_tick, next_interval, rc_char, gs)
 
 # -------------------------------
 
