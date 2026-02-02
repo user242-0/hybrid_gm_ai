@@ -21,32 +21,28 @@
 - ✅ 動くもの:
   - `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
   - 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
-  - `talk` アクションが追加され、関係性タグに応じた会話テンプレがログに出る（`last_dialogue` もstateに保持）
-  - 日が変わると MicroGoal の消費履歴がリセットされる（枯渇対策のMVP）
-  - Choiceが action_definitions から自動生成され、`ui_visible=True` のもののみ表示される
-  - `action_key`（英語内部ID）と `label`（日本語表示名）が分離され、pack差し替えに対応しやすい構造
+  - RCの連打・時間暴走が制御されている（decision_interval, time_budget）
+  - LLM呼び出しがモード/アクション/レート制限でゲート制御されている
+  - 睡眠アクション（start_sleep/sleep）が追加、RC向け短時間版とプレイヤー向け8時間版
 - ⚠️ いまの課題:
   - 会話テンプレがまだ少なく、状況（場所/時間/天候）と関係性の掛け算が薄い
   - `talk` が MicroGoal/おすすめアクションとどう循環するかは未調整（会話→新micro生成など）
   - RC は常時動作から「明示起動」へ分離したい（run/demo/rcの整理）
 - 🎯 今やっている目的:
-  - 「世界観の初期化」→「会話」→「microgoal循環」を最小ループで成立させ、遊びとしての手触りを上げる
+  - RCの暴走を抑え、プレイヤー主導で「世界観→会話→microgoal循環」を遊べる状態を維持
 
 ## 3. 直近の変更（最新3つだけ）
-- 2026-02-01: Session23続: HUD_DEBUG configフラグ化 + time_min統一（function=None対応）
-- 2026-02-01: Session23: cop_trickster初期state + talkアクション + 日替わりリセット + Choice自動生成（64adfe9〜b1db9e8）
-- 2026-01-31: Session22: simulation.py をリファクタ（GameContext導入 / HUDCallbacks分離 / 未使用コード削除）
+- 2026-02-02: Session24: RC制御強化（switch封印, LLMゲート, throttle, sleep分離）
+- 2026-02-01: Session23: cop_trickster初期state + talkアクション + 日替わりリセット + Choice自動生成
+- 2026-01-31: Session22: simulation.py をリファクタ（GameContext導入 / HUDCallbacks分離）
 
 ## 4. 次にやること（最大3つ・小さく）
-1. 起動テスト: wait(5) → 時刻+5分、HUDからも同様、check_tip(5) も確認
+1. 起動テスト: RCのthrottle動作確認（連打しない、input_pending中に時間が暴走しない）
 2. `talk` を状況（場所/時間/天候）にも反応させてテンプレを増やす（最低でも 6〜12 本）
-3. RCを "常時動作" から "明示起動" へ分離する（run/demo/rcの整理）
+3. sleeping状態の自動進行（world_tickでの小刻み処理）を実装
 
 ## 5. ブロッカー（止まってる理由があれば）
-- 例）RCがHUD側から自動発火していてrunと混ざっている
-- 例）会話の入力/出力の置き場所（ログ形式）が未確定
-
-（現状）大きなブロッカーなし。まずは起動テストで `talk` と日替わりリセットを確認。
+（現状）大きなブロッカーなし。Session24の変更が安定しているか動作確認が必要。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
@@ -61,5 +57,5 @@
 
 ## 7. 作業ブランチ / バックアップ
 - 基準（安定）: `cursor-trial/microgoal-logging`
-- 作業（Session23）: `feature/session23-conversation-microgoal`
+- 作業（Session24）: `feature/session24-rc-throttle-llm-gating`
 - バックアップ: `backup/pre-refactor-20260131`
