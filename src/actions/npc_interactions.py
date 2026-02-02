@@ -243,7 +243,7 @@ def npc_speak(npc_name, dialogue_key):
 # NPCがセリフを発した後、ログ記録
 def npc_speak_and_log(npc_name, dialogue_key, location, game_state):
     dialogue = npc_speak(npc_name, dialogue_key)
-    
+
     # ログに記録
     log_action(
         actor=npc_name,
@@ -253,3 +253,29 @@ def npc_speak_and_log(npc_name, dialogue_key, location, game_state):
         result=dialogue,
         #game_state=game_state
     )
+
+
+# --- 睡眠アクション ---
+def start_sleep(character_status, game_state, *args):
+    """
+    眠りの開始アクション（RC用、短時間）
+    sleeping フラグを立てて、実際の回復は小刻みに処理
+    """
+    character_status.is_sleeping = True
+    game_state.setdefault("sleeping_characters", set()).add(character_status.name)
+    print(f"{character_status.name} は眠りにつこうとしている...")
+    return {"status": "falling_asleep", "character": character_status.name}
+
+
+def sleep_full(character_status, game_state, *args):
+    """
+    フル睡眠アクション（プレイヤー用、8時間）
+    一気に8時間進める。確認ダイアログは呼び出し元で実装。
+    """
+    character_status.is_sleeping = True
+    print(f"{character_status.name} は深い眠りについた。")
+    # 睡眠フラグは時間経過後に自動解除される想定
+    # game_state["_sleep_until"] = current_time + 480 などで管理
+    character_status.is_sleeping = False
+    print(f"{character_status.name} は目を覚ました。すっきりした気分だ。")
+    return {"status": "slept", "character": character_status.name, "hours": 8}

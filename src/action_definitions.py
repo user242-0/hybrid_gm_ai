@@ -14,6 +14,8 @@ from src.actions import (
     npc_speak_and_log,
     perform_attack,
     rest_with_event,
+    sleep_full,
+    start_sleep,
     swing_sword,
     talk,
     talk_to_statue,
@@ -229,6 +231,31 @@ actions = {
         "time_min": 3,
         "heart": {"axis": "green", "value": 100},
         "id_aliases": ["観察する"],
+    },
+    # --- 睡眠アクション ---
+    "start_sleep": {
+        "label": "眠りにつく",
+        "description": "眠りの準備を始める（RC用、短時間で開始）",
+        "function": start_sleep,
+        "args_template": [],
+        "requirements": None,
+        "available_to": ["npc"],  # RC専用（プレイヤーはsleep_fullを使う）
+        "ui_visible": True,  # RCが選択可能（プレイヤーUIにはavailable_toで非表示）
+        "time_min": 2,
+        "heart": {"axis": "green", "value": 50},
+        "id_aliases": [],
+    },
+    "sleep": {
+        "label": "眠る（8時間）",
+        "description": "深く眠り、体力を回復する。8時間が経過する。",
+        "function": sleep_full,
+        "args_template": [],
+        "requirements": None,
+        "available_to": ["player"],  # プレイヤー専用
+        "ui_visible": True,
+        "time_min": 480,  # 8時間 = 480分
+        "heart": {"axis": "green", "value": 100},
+        "id_aliases": ["眠る"],
     },
 }
 
