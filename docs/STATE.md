@@ -57,5 +57,5 @@
 
 ## 7. 作業ブランチ / バックアップ
 - 基準（安定）: `cursor-trial/microgoal-logging`
-- 作業（Session24）: `feature/session24-rc-throttle-llm-gating`
-- バックアップ: `backup/pre-refactor-20260131`
+- 作業（Session25）: `feature/session25-gui-color-rc-heart`
+- バックアップ: `backup/pre-session25-20260203`, `backup/pre-refactor-20260131`

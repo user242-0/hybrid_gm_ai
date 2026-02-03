@@ -63,5 +63,5 @@ python -m src.simulation
 ## ブランチ
 
 - 安定: `cursor-trial/microgoal-logging`
-- 作業中: `feature/session24-rc-throttle-llm-gating`
-- バックアップ: `backup/pre-refactor-20260131`
+- 作業中: `feature/session25-gui-color-rc-heart`
+- バックアップ: `backup/pre-session25-20260203`, `backup/pre-refactor-20260131`

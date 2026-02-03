@@ -46,6 +46,21 @@ def init_game_state(pack_id: str = "cop_trickster"):
     current_location = locations.get("default", "拠点_安アパート")
     current_target = targets.get("default", antagonist_name)
 
+    # --- actor別emotion初期化 ---
+    # CharacterStatusの初期emotion_colorを使用
+    emotions_by_actor = {
+        protagonist.name: {
+            "R": protagonist.emotion_color[0],
+            "G": protagonist.emotion_color[1],
+            "B": protagonist.emotion_color[2],
+        },
+        antagonist.name: {
+            "R": antagonist.emotion_color[0],
+            "G": antagonist.emotion_color[1],
+            "B": antagonist.emotion_color[2],
+        },
+    }
+
     return {
         "party": {
             protagonist.name: protagonist,
@@ -66,4 +81,5 @@ def init_game_state(pack_id: str = "cop_trickster"):
         "current_target": current_target,
         "available_locations": locations.get("available", [current_location]),
         "pack_id": pack_id,
+        "emotions_by_actor": emotions_by_actor,
     }

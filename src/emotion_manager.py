@@ -3,6 +3,17 @@ from src.quit_helper import handle_quit                # ← 追加
 from src.event_bus import event_q, log_q
 # GUIは「mode」付き辞書だけを描画する（厳格モード）
 
+
+def _sync_emotions_by_actor(player, game_state):
+    """actor別emotionをplayer.emotion_colorから同期する"""
+    emotions_by_actor = game_state.get("emotions_by_actor")
+    if emotions_by_actor is not None and hasattr(player, "emotion_color"):
+        r, g, b = player.emotion_color
+        emotions_by_actor.setdefault(player.name, {})
+        emotions_by_actor[player.name]["R"] = r
+        emotions_by_actor[player.name]["G"] = g
+        emotions_by_actor[player.name]["B"] = b
+
 def set_emotion_color_action(player, game_state):
     # NPC はランダム値を即時セットして終了
     if player.is_npc:
@@ -14,12 +25,14 @@ def set_emotion_color_action(player, game_state):
             # 後方互換：万一メソッド未導入なら従来プロパティだけ更新
             player.emotion_color = (r, g, b)
 
-        # world.emotion も更新（GUI同期のため）
+        # actor別emotion更新
+        _sync_emotions_by_actor(player, game_state)
+
+        # 後方互換: world.emotion は更新しない（グローバル汚染を防ぐ）
+        # ただし、プレイヤーのemotionでworld.emotionを初期化していない場合に備えてfallback
         world = game_state.get("director_world") or game_state.get("world") or game_state
-        world.setdefault("emotion", {})
-        world["emotion"]["R"] = r
-        world["emotion"]["G"] = g
-        world["emotion"]["B"] = b
+        if world.get("emotion") is None:
+            world["emotion"] = {}
 
         # HUD再描画をトリガー
         game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
@@ -54,6 +67,8 @@ def set_emotion_color_action(player, game_state):
             else:
                 # 不明なモードは LC として解釈
                 player.set_emotion_linear((r, g, b), confidence=conf if conf is not None else player.emotion.confidence)
+            # actor別emotion同期
+            _sync_emotions_by_actor(player, game_state)
         except Exception:
             # 失敗時は何もしない
             log_q.put(("⚠ 入力を解釈できませんでした。変更は行われません。", "RED"))
@@ -81,7 +96,8 @@ def set_emotion_color_action(player, game_state):
             else:
                 player.set_emotion_linear((r, g, b))
                 print(f"{player.name}の心の色（LC）は RGB({r},{g},{b}) に更新されました。")
- 
+            # actor別emotion同期
+            _sync_emotions_by_actor(player, game_state)
 
         except KeyboardInterrupt:                      # Ctrl-C でも安全終了
             handle_quit("quit", game_state)

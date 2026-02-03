@@ -255,7 +255,13 @@ class ActionPipeline:
         emotion_before = None
         if world is not None:
             clock_before = self._normalize_clock(world.get("clock"))
-            emotion_before = world.get("emotion", {}).copy() if isinstance(world.get("emotion"), dict) else {}
+            # actor別emotionを優先、なければworld.emotionにfallback
+            actor_name = actor_obj.name if actor_obj is not None and hasattr(actor_obj, "name") else None
+            emotions_by_actor = self.game_state.get("emotions_by_actor", {})
+            if actor_name and actor_name in emotions_by_actor:
+                emotion_before = emotions_by_actor[actor_name].copy()
+            else:
+                emotion_before = world.get("emotion", {}).copy() if isinstance(world.get("emotion"), dict) else {}
 
         if action_id in legacy_actions and actor_obj is not None:
             if spec and spec.requirements:
@@ -302,6 +308,14 @@ class ActionPipeline:
                     int(emo.get("G", 127)),
                     int(emo.get("B", 127)),
                 )
+                # actor別emotionも同期
+                emotions_by_actor = self.game_state.get("emotions_by_actor")
+                if emotions_by_actor is not None and hasattr(actor_obj, "name"):
+                    actor_name = actor_obj.name
+                    emotions_by_actor.setdefault(actor_name, {})
+                    emotions_by_actor[actor_name]["R"] = actor_obj.emotion_color[0]
+                    emotions_by_actor[actor_name]["G"] = actor_obj.emotion_color[1]
+                    emotions_by_actor[actor_name]["B"] = actor_obj.emotion_color[2]
 
         scenes = None
         micro_goal = None
@@ -319,9 +333,13 @@ class ActionPipeline:
         # ログ出力（director update の後、UI refresh の前）
         if action_executed and world is not None:
             clock_after = self._normalize_clock(world.get("clock"))
-            emotion_after = world.get("emotion", {}) if isinstance(world.get("emotion"), dict) else {}
-            
             actor_id = actor_obj.name if actor_obj is not None and hasattr(actor_obj, "name") else None
+            # actor別emotionを優先、なければworld.emotionにfallback
+            emotions_by_actor = self.game_state.get("emotions_by_actor", {})
+            if actor_id and actor_id in emotions_by_actor:
+                emotion_after = emotions_by_actor[actor_id].copy()
+            else:
+                emotion_after = world.get("emotion", {}) if isinstance(world.get("emotion"), dict) else {}
             mode = self.director.mode if self.director is not None else None
             
             log_action(
