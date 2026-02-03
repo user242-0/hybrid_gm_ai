@@ -21,9 +21,9 @@
 - ✅ 動くもの:
   - `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
   - 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
+  - **emotions_by_actor** でactor別emotion管理、set_emotion/switch_character後も値が保持される
   - RCの連打・時間暴走が制御されている（decision_interval, time_budget）
   - LLM呼び出しがモード/アクション/レート制限でゲート制御されている
-  - 睡眠アクション（start_sleep/sleep）が追加、RC向け短時間版とプレイヤー向け8時間版
 - ⚠️ いまの課題:
   - 会話テンプレがまだ少なく、状況（場所/時間/天候）と関係性の掛け算が薄い
   - `talk` が MicroGoal/おすすめアクションとどう循環するかは未調整（会話→新micro生成など）
@@ -32,17 +32,17 @@
   - RCの暴走を抑え、プレイヤー主導で「世界観→会話→microgoal循環」を遊べる状態を維持
 
 ## 3. 直近の変更（最新3つだけ）
+- 2026-02-04: Session25: GUIカラーバグ修正（emotions_by_actor導入、set_emotion/switch_character後の上書き防止）
 - 2026-02-02: Session24: RC制御強化（switch封印, LLMゲート, throttle, sleep分離）
 - 2026-02-01: Session23: cop_trickster初期state + talkアクション + 日替わりリセット + Choice自動生成
-- 2026-01-31: Session22: simulation.py をリファクタ（GameContext導入 / HUDCallbacks分離）
 
 ## 4. 次にやること（最大3つ・小さく）
-1. 起動テスト: RCのthrottle動作確認（連打しない、input_pending中に時間が暴走しない）
+1. RC_AIの「緑優先」をキャラの心値×アクション心値による閾値フィルタに発展させる
 2. `talk` を状況（場所/時間/天候）にも反応させてテンプレを増やす（最低でも 6〜12 本）
-3. sleeping状態の自動進行（world_tickでの小刻み処理）を実装
+3. sleeping状態中の行動抑制と時間経過での解除を最小実装する
 
 ## 5. ブロッカー（止まってる理由があれば）
-（現状）大きなブロッカーなし。Session24の変更が安定しているか動作確認が必要。
+（現状）大きなブロッカーなし。Session25のemotion修正が安定しているか動作確認を推奨。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）

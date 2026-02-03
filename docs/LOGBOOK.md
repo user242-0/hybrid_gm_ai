@@ -112,3 +112,39 @@
 
 ### 次回の最初の一手（15分でやる）
 - 起動して、RCが連打しないか確認。input_pending中に時間が暴走しないか確認。
+
+---
+
+## 2026-02-04（Session 25）
+### 気分 / 雑談
+- GUIカラーバグの原因特定に時間がかかったが、根本原因を突き止められて達成感。
+- actor別emotion管理が入って、キャラ切替してもemotionが保持されるようになった。
+
+### 今日やったこと（結果）
+- **Task25-0**: ブランチ整理
+  - バックアップ作成（backup/pre-session25-20260203）
+  - mainを安定ブランチ（cursor-trial/microgoal-logging）に追従
+  - 不要ブランチ削除＋アーカイブタグ付け（session23, session24, codex-patch, pack-format-normalize）
+  - Session25作業ブランチ作成（feature/session25-gui-color-rc-heart）
+- **Task25-1**: GUIカラーバグ修正
+  - `emotions_by_actor` 導入（actor別emotion管理の正）
+  - set_emotion後のworld.emotionによる上書き防止
+  - switch_character後のUI追従（hud_cache_rev bump）
+  - switch_character後のemotion delta適用スキップ
+  - switch_character後のemotion_color復元（emotions_by_actor → actor.emotion_color）
+
+コミット:
+- 9abc255: Add: actor-specific emotion tracking (emotions_by_actor)
+- cd3cf2b: Fix: switch_character UI refresh and actor-specific emotion display
+- bd0056b: Fix: set_emotion now correctly updates actor emotion without being overwritten
+- 5470928: Fix: switch_character no longer overwrites actor emotions
+
+### 発見（次にも効く）
+- 「可変の正」を明確にする（今回は`emotions_by_actor`）と、どこで上書きが起きているか追いやすい。
+- action_pipelineの汎用処理（emotion delta適用など）が特定アクションの結果を上書きするパターンに注意。
+
+### 痛み / ひっかかり
+- world.emotion（グローバル）とactor.emotion_color（インスタンス）の二重管理が複雑。将来的には統一したい。
+
+### 次回の最初の一手（15分でやる）
+- 起動して set_emotion(0,0,0) → switch×2 → 刑事が(0,0,0)のまま保持されるか確認。
