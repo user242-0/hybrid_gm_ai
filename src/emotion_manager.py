@@ -69,6 +69,9 @@ def set_emotion_color_action(player, game_state):
                 player.set_emotion_linear((r, g, b), confidence=conf if conf is not None else player.emotion.confidence)
             # actor別emotion同期
             _sync_emotions_by_actor(player, game_state)
+            # HUD再描画をトリガー
+            game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
+            print(f"[set_emotion] {player.name}: RGB({r}, {g}, {b})")
         except Exception:
             # 失敗時は何もしない
             log_q.put(("⚠ 入力を解釈できませんでした。変更は行われません。", "RED"))
@@ -98,6 +101,8 @@ def set_emotion_color_action(player, game_state):
                 print(f"{player.name}の心の色（LC）は RGB({r},{g},{b}) に更新されました。")
             # actor別emotion同期
             _sync_emotions_by_actor(player, game_state)
+            # HUD再描画をトリガー
+            game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
 
         except KeyboardInterrupt:                      # Ctrl-C でも安全終了
             handle_quit("quit", game_state)

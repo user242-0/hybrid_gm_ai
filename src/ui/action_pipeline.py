@@ -300,22 +300,24 @@ class ActionPipeline:
 
         if world is not None:
             action_registry.ensure_emotion(world)
-            action_registry.apply_emotion_delta(world, action_id)
-            emo = world.get("emotion")
-            if isinstance(emo, dict) and actor_obj is not None and hasattr(actor_obj, "emotion_color"):
-                actor_obj.emotion_color = (
-                    int(emo.get("R", 127)),
-                    int(emo.get("G", 127)),
-                    int(emo.get("B", 127)),
-                )
-                # actor別emotionも同期
-                emotions_by_actor = self.game_state.get("emotions_by_actor")
-                if emotions_by_actor is not None and hasattr(actor_obj, "name"):
-                    actor_name = actor_obj.name
-                    emotions_by_actor.setdefault(actor_name, {})
-                    emotions_by_actor[actor_name]["R"] = actor_obj.emotion_color[0]
-                    emotions_by_actor[actor_name]["G"] = actor_obj.emotion_color[1]
-                    emotions_by_actor[actor_name]["B"] = actor_obj.emotion_color[2]
+            # set_emotionアクションは自前でemotion_colorを設定するため、delta適用と上書きをスキップ
+            if action_id != "set_emotion":
+                action_registry.apply_emotion_delta(world, action_id)
+                emo = world.get("emotion")
+                if isinstance(emo, dict) and actor_obj is not None and hasattr(actor_obj, "emotion_color"):
+                    actor_obj.emotion_color = (
+                        int(emo.get("R", 127)),
+                        int(emo.get("G", 127)),
+                        int(emo.get("B", 127)),
+                    )
+                    # actor別emotionも同期
+                    emotions_by_actor = self.game_state.get("emotions_by_actor")
+                    if emotions_by_actor is not None and hasattr(actor_obj, "name"):
+                        actor_name = actor_obj.name
+                        emotions_by_actor.setdefault(actor_name, {})
+                        emotions_by_actor[actor_name]["R"] = actor_obj.emotion_color[0]
+                        emotions_by_actor[actor_name]["G"] = actor_obj.emotion_color[1]
+                        emotions_by_actor[actor_name]["B"] = actor_obj.emotion_color[2]
 
         scenes = None
         micro_goal = None
