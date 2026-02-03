@@ -74,10 +74,10 @@ def switch_control(actor, game_state: dict, target_name: str) -> CharacterStatus
 
         # 表示は「交換した相手」を出す
         print("{}は操作キャラクターを{} に切り替えた".format(actor.name, partner_for_log))
-        """
-        print("DBG active:", game_state["active_char"].name)
-        print("DBG hero npc?", target.is_npc, "luna npc?", current.is_npc)
-        """
+
+        # UI再描画をトリガー（キャラ切替後にGUI色が追従するように）
+        game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
+
     return current
 
 

@@ -196,10 +196,18 @@ class HUDCallbacks:
             print("[RC_AI] no action; rerolled micro")
             return
 
-        emo_before = ctx.director_world.get("emotion", {}).copy()
+        # actor別emotionを参照（なければworld.emotionにfallback）
+        actor_obj = ctx.game_state.get("active_char")
+        actor_id = actor_obj.name if actor_obj and hasattr(actor_obj, "name") else None
+        emotions_by_actor = ctx.game_state.get("emotions_by_actor", {})
+        if actor_id and actor_id in emotions_by_actor:
+            emo_before = emotions_by_actor[actor_id].copy()
+        else:
+            emo_before = ctx.director_world.get("emotion", {}).copy()
+
         self._dispatch_action(
             action_id,
-            actor_obj=ctx.game_state.get("active_char"),
+            actor_obj=actor_obj,
             args=[],
             time_min_override=tmin,
             source="RC_AI",
@@ -208,9 +216,13 @@ class HUDCallbacks:
         if isinstance(ctx.director_world, dict):
             ctx.director_world["_last_action_id"] = action_id
 
-        emo_after = ctx.director_world.get("emotion", {})
+        # actor別emotionを参照（なければworld.emotionにfallback）
+        if actor_id and actor_id in emotions_by_actor:
+            emo_after = emotions_by_actor[actor_id].copy()
+        else:
+            emo_after = ctx.director_world.get("emotion", {})
         print(
-            f"[RC_AI] picked={action_id} reason={reason} "
+            f"[RC_AI] actor={actor_id} picked={action_id} reason={reason} "
             f"emotion R:{emo_before.get('R')}→{emo_after.get('R')} "
             f"G:{emo_before.get('G')}→{emo_after.get('G')} "
             f"B:{emo_before.get('B')}→{emo_after.get('B')}"
