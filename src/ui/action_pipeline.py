@@ -300,8 +300,8 @@ class ActionPipeline:
 
         if world is not None:
             action_registry.ensure_emotion(world)
-            # set_emotionアクションは自前でemotion_colorを設定するため、delta適用と上書きをスキップ
-            if action_id != "set_emotion":
+            # set_emotion/switch_characterはemotion_colorを自前で管理するため、delta適用と上書きをスキップ
+            if action_id not in ("set_emotion", "switch_character"):
                 action_registry.apply_emotion_delta(world, action_id)
                 emo = world.get("emotion")
                 if isinstance(emo, dict) and actor_obj is not None and hasattr(actor_obj, "emotion_color"):

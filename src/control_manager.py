@@ -75,6 +75,16 @@ def switch_control(actor, game_state: dict, target_name: str) -> CharacterStatus
         # 表示は「交換した相手」を出す
         print("{}は操作キャラクターを{} に切り替えた".format(actor.name, partner_for_log))
 
+        # 切替先のemotion_colorをemotions_by_actorから復元（初期値での上書きを防ぐ）
+        emotions_by_actor = game_state.get("emotions_by_actor", {})
+        if target.name in emotions_by_actor:
+            emo = emotions_by_actor[target.name]
+            target.emotion_color = (
+                int(emo.get("R", 127)),
+                int(emo.get("G", 127)),
+                int(emo.get("B", 127)),
+            )
+
         # UI再描画をトリガー（キャラ切替後にGUI色が追従するように）
         game_state["hud_cache_rev"] = game_state.get("hud_cache_rev", 0) + 1
 
