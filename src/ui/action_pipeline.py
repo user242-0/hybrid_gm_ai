@@ -300,8 +300,16 @@ class ActionPipeline:
 
         if world is not None:
             action_registry.ensure_emotion(world)
-            # set_emotion/switch_characterはemotion_colorを自前で管理するため、delta適用と上書きをスキップ
+            # set_emotion/switch_characterはemotion_colorを自前で管理するため、delta適用をスキップ
             if action_id not in ("set_emotion", "switch_character"):
+                # SoT(emotions_by_actor) → world["emotion"]へロードしてからdelta適用
+                _eba = self.game_state.get("emotions_by_actor", {})
+                _aname = actor_obj.name if actor_obj is not None and hasattr(actor_obj, "name") else None
+                if _aname and _aname in _eba:
+                    _src = _eba[_aname]
+                    world["emotion"]["R"] = _src.get("R", 127)
+                    world["emotion"]["G"] = _src.get("G", 127)
+                    world["emotion"]["B"] = _src.get("B", 127)
                 action_registry.apply_emotion_delta(world, action_id)
                 emo = world.get("emotion")
                 if isinstance(emo, dict) and actor_obj is not None and hasattr(actor_obj, "emotion_color"):
@@ -318,6 +326,18 @@ class ActionPipeline:
                         emotions_by_actor[actor_name]["R"] = actor_obj.emotion_color[0]
                         emotions_by_actor[actor_name]["G"] = actor_obj.emotion_color[1]
                         emotions_by_actor[actor_name]["B"] = actor_obj.emotion_color[2]
+
+            # world["emotion"]を現在のアクティブactorのSoTと常に同期
+            # director.tick / rc_ai / emotion_traits がworld["emotion"]を参照するため
+            _active = self.game_state.get("active_char")
+            _eba_sync = self.game_state.get("emotions_by_actor", {})
+            _active_name = _active.name if _active is not None and hasattr(_active, "name") else None
+            if _active_name and _active_name in _eba_sync:
+                _s = _eba_sync[_active_name]
+                world.setdefault("emotion", {})
+                world["emotion"]["R"] = _s.get("R", 127)
+                world["emotion"]["G"] = _s.get("G", 127)
+                world["emotion"]["B"] = _s.get("B", 127)
 
         scenes = None
         micro_goal = None

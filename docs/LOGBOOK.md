@@ -148,3 +148,22 @@
 
 ### 次回の最初の一手（15分でやる）
 - 起動して set_emotion(0,0,0) → switch×2 → 刑事が(0,0,0)のまま保持されるか確認。
+
+---
+
+## 2026-02-04（Session 25 続・根治）
+### 今日やったこと（結果）
+- **Task25-1 根治**: emotion上書き経路の完全遮断
+  - **根本原因**: `action_pipeline.py`の`apply_emotion_delta`がグローバルな`world["emotion"]`(127,127,127等)にdeltaを適用し、その結果をSoT(`emotions_by_actor`)に書き戻していた
+  - **修正1**: delta適用前に`emotions_by_actor[actor]` → `world["emotion"]`へロード（delta計算の入力を正しく）
+  - **修正2**: emotionブロック末尾で常に`world["emotion"]`をアクティブactorのSoTと同期（director.tick等の読み取り用）
+  - 変更ファイル: `src/ui/action_pipeline.py` のみ（最小修正）
+
+### 発見（次にも効く）
+- `world["emotion"]`はグローバル1個で、actor別ではなかった。delta適用の入力にこれを使うと、set_emotionの値が消える。
+- SoTを明確にしたら「SoTからロード → 処理 → SoTへ書き戻し」のパターンを徹底すること。
+
+### DoD確認手順
+- 刑事で set_emotion(0,0,0) → observe → switch×2 → (0,0,0)のまま
+- 愉快犯も同様に保持
+- どのアクション後もemotions_by_actorが初期値に巻き戻らない

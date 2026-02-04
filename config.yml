@@ -28,6 +28,7 @@ rc:
   # RC側が選択候補から除外するアクション（プレイヤーは選べる）
   excluded_actions:
     - switch_character
+    - set_emotion
   # レバーA: RC意思決定の最短間隔（秒）
   decision_interval_sec: 1.0
   # レバーB: 入力待ち中にRCが進められる累積時間の上限（ゲーム内分）
@@ -35,7 +36,7 @@ rc:
 
 llm:
   # LLM呼び出しモード: off | player_only | rc_only | all
-  mode: player_only
+  mode: off
   # LLM呼び出しを許可するアクション（空=全て許可）
   allow_actions:
     - talk_to_statue
@@ -49,8 +50,7 @@ llm:
 
 logging:
   # full ログの出力を有効化（default: false）
-  full_enabled: false
+  full_enabled: true
   # full ログから除外する action_id のリスト（default: ["switch_character"]）
   # 空リスト [] にすると除外しない（全アクションを出力）
-  full_exclude_actions:
-    - switch_character
+  full_exclude_actions: []

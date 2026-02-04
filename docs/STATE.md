@@ -32,9 +32,9 @@
   - RCの暴走を抑え、プレイヤー主導で「世界観→会話→microgoal循環」を遊べる状態を維持
 
 ## 3. 直近の変更（最新3つだけ）
+- 2026-02-04: Session25続: emotion上書き経路の根治（delta適用前にSoTロード、world["emotion"]常時同期）
 - 2026-02-04: Session25: GUIカラーバグ修正（emotions_by_actor導入、set_emotion/switch_character後の上書き防止）
 - 2026-02-02: Session24: RC制御強化（switch封印, LLMゲート, throttle, sleep分離）
-- 2026-02-01: Session23: cop_trickster初期state + talkアクション + 日替わりリセット + Choice自動生成
 
 ## 4. 次にやること（最大3つ・小さく）
 1. RC_AIの「緑優先」をキャラの心値×アクション心値による閾値フィルタに発展させる
@@ -42,7 +42,7 @@
 3. sleeping状態中の行動抑制と時間経過での解除を最小実装する
 
 ## 5. ブロッカー（止まってる理由があれば）
-（現状）大きなブロッカーなし。Session25のemotion修正が安定しているか動作確認を推奨。
+（現状）大きなブロッカーなし。emotion上書き根治済み。手動DoD確認を推奨。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
