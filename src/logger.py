@@ -40,18 +40,38 @@ def log_action(**fields):
     """
     timestamp, actor, action, target, location, result, ... を kwargs で受け取る想定。
     追加フィールドがあってもそのまま書き出す。
-    
+
+    自動付与フィールド:
+    - controller_id: 意思決定者の識別子
+      RC_AI由来 → "RC_AI:<actor_id>", PLAYER由来 → "PLAYER:<source>"
+    - actor_rc_id: 行動主体の内部識別子（当面 actor_id のコピー）
+
     ログは2系統に分離：
     - full ログ (gameplay_log_latest.jsonl): config.logging.full_enabled=true のときのみ全sourceを出力
       ただし、config.logging.full_exclude_actions に含まれる action_id は除外可能（default: switch_character）
     - player ログ (gameplay_player_latest.jsonl): 常に出力、source が "GUI", "HUD", "CLI" のみ
       ただし、action_id=="switch_character" かつ source=="RC_AI" の行は player 側には出さない
     """
-    fields["ts"] = datetime.datetime.now().isoformat(timespec="seconds")
-    json_line = json.dumps(fields, ensure_ascii=False, default=_encode) + "\n"
-    
     source = fields.get("source", "")
     action_id = fields.get("action_id", "")
+    # actor_id が無いレガシー呼び出しでは actor フィールドにfallback
+    actor_id = fields.get("actor_id") or fields.get("actor", "")
+
+    # --- controller_id: 意思決定者 ---
+    if "controller_id" not in fields:
+        if source == "RC_AI":
+            fields["controller_id"] = f"RC_AI:{actor_id}" if actor_id else "RC_AI"
+        elif source in ("GUI", "HUD", "CLI", "LegacyGUI"):
+            fields["controller_id"] = f"PLAYER:{source}"
+        elif source:
+            fields["controller_id"] = f"UNKNOWN:{source}"
+
+    # --- actor_rc_id: 行動主体の内部識別子 ---
+    if "actor_rc_id" not in fields and actor_id:
+        fields["actor_rc_id"] = actor_id
+
+    fields["ts"] = datetime.datetime.now().isoformat(timespec="seconds")
+    json_line = json.dumps(fields, ensure_ascii=False, default=_encode) + "\n"
     
     # full ログへの書き込み判定
     logging_cfg = _get_logging_config()
