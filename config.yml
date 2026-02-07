@@ -49,7 +49,7 @@ llm:
   fallback_template: true
 
 ro:
-  # RO (Recommendation Officer) の有効化
+  # RO (Reversible Operator) の有効化
   enabled: false
   # playerログの直近何行を読むか
   log_window: 50

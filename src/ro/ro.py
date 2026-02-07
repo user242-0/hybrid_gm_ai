@@ -1,4 +1,4 @@
-"""Recommendation Officer (RO) – Phase A: advice + reason from player log only."""
+"""Reversible Operator (RO) – Phase A: advice + reason from player log only."""
 
 import json
 import datetime

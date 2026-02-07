@@ -35,27 +35,27 @@
   - `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
   - 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
   - **emotions_by_actor** でactor別emotion管理、set_emotion/switch_character後も値が保持される
-  - RCの連打・時間暴走が制御されている（decision_interval, time_budget）
-  - LLM呼び出しがモード/アクション/レート制限でゲート制御されている
+  - 全JSONLログに `controller_id`（意思決定者）/ `actor_rc_id`（行動主体）が自動付与される
+  - **RO (Reversible Operator)** Phase A 導入済み（`ro.enabled: true` で有効化、playerログから助言生成）
 - ⚠️ いまの課題:
+  - RO助言がHUDに表示されない（game_stateに格納されるだけ）
+  - ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
   - 会話テンプレがまだ少なく、状況（場所/時間/天候）と関係性の掛け算が薄い
-  - `talk` が MicroGoal/おすすめアクションとどう循環するかは未調整（会話→新micro生成など）
-  - RC は常時動作から「明示起動」へ分離したい（run/demo/rcの整理）
 - 🎯 今やっている目的:
-  - RCの暴走を抑え、プレイヤー主導で「世界観→会話→microgoal循環」を遊べる状態を維持
+  - RO層を導入し、プレイヤー↔RO↔RC_AIの「可逆的な指し手」の基盤を作る
 
 ## 3. 直近の変更（最新3つだけ）
-- 2026-02-04: Session25続: emotion上書き経路の根治（delta適用前にSoTロード、world["emotion"]常時同期）
-- 2026-02-04: Session25: GUIカラーバグ修正（emotions_by_actor導入、set_emotion/switch_character後の上書き防止）
-- 2026-02-02: Session24: RC制御強化（switch封印, LLMゲート, throttle, sleep分離）
+- 2026-02-07: Session26: RO Phase A（playerログから助言生成、ro_diary出力、config ON/OFF）
+- 2026-02-07: Session26: ログ識別子改修（controller_id / actor_rc_id を logger.py で自動付与）
+- 2026-02-04: Session25: emotion上書き経路の根治 + GUIカラーバグ修正
 
 ## 4. 次にやること（最大3つ・小さく）
-1. RC_AIの「緑優先」をキャラの心値×アクション心値による閾値フィルタに発展させる
-2. `talk` を状況（場所/時間/天候）にも反応させてテンプレを増やす（最低でも 6〜12 本）
-3. sleeping状態中の行動抑制と時間経過での解除を最小実装する
+1. RO Phase B: HUDにRO助言を表示する（recommendation表示欄の追加）
+2. RO Phase C: ROがpolicy_patchを出し、RC_AIの行動選択に影響を与える
+3. RC_AIの「緑優先」を心値×アクション心値による閾値フィルタに発展させる
 
 ## 5. ブロッカー（止まってる理由があれば）
-（現状）大きなブロッカーなし。emotion上書き根治済み。手動DoD確認を推奨。
+（現状）大きなブロッカーなし。RO Phase Aはテスト通過済み。`ro.enabled: true` で実動確認推奨。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
@@ -70,5 +70,5 @@
 
 ## 7. 作業ブランチ / バックアップ
 - 基準（安定）: `cursor-trial/microgoal-logging`
-- 作業（Session25）: `feature/session25-gui-color-rc-heart`
-- バックアップ: `backup/pre-session25-20260203`, `backup/pre-refactor-20260131`
+- 作業（Session26）: `feature/session26-simple-RO`
+- バックアップ: `backup/pre-session26-20260207`, `backup/pre-session25-20260203`
