@@ -50,7 +50,7 @@ llm:
 
 logging:
   # full ログの出力を有効化（default: false）
-  full_enabled: true
+  full_enabled: false
   # full ログから除外する action_id のリスト（default: ["switch_character"]）
   # 空リスト [] にすると除外しない（全アクションを出力）
   full_exclude_actions: []

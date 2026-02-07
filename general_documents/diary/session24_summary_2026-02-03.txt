@@ -1,0 +1,38 @@
+## 2026-02-02（Session 24）
+### 気分 / 雑談
+- RCが暴走して時間がどんどん進む問題に本格対策。
+- LLMの呼び出し制御も入れて、将来の拡張に備えた。
+
+### 今日やったこと（結果）
+- **Task24-0**: ブランチ運用整備
+  - Session23を安定ブランチにmerge
+  - Session24作業ブランチ `feature/session24-rc-throttle-llm-gating` を作成
+- **Task24-1**: RCの`switch_character`封印
+  - `rc.excluded_actions` を config.yml に追加
+  - rc_ai.py で除外リストを参照してフィルタ
+- **Task24-2**: LLM呼び出しゲート制御
+  - `llm.mode`: off/player_only/rc_only/all
+  - `llm.allow_actions`: アクション単位許可リスト
+  - `llm.rate_limit`: calls_per_minute / calls_per_turn
+  - フォールバックテンプレート対応
+- **Task24-3**: RC連打・時間暴走の制御（3レバー）
+  - レバーA: `rc.decision_interval_sec` (最短実行間隔)
+  - レバーB: `rc.max_advance_minutes_while_input_pending` (時間予算)
+  - レバーC: 制限超過時はno-op
+- **Task24-4**: 睡眠アクションの実装
+  - `start_sleep`: RC用、2分、眠りの開始
+  - `sleep`: プレイヤー用、480分（8時間）
+  - available_toで相互排他
+
+コミット:
+- 0ee3d03: RC excluded_actions
+- 2e2ee2b: LLM gating
+- 29e2c86: RC throttle
+- ba7c8e8: sleep actions
+
+### 発見（次にも効く）
+- configベースの制御は柔軟で、後から調整しやすい。
+- available_toでプレイヤー/RC向けアクションを分離できる。
+
+### 次回の最初の一手（15分でやる）
+- 起動して、RCが連打しないか確認。input_pending中に時間が暴走しないか確認。
