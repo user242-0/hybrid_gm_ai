@@ -378,6 +378,22 @@ class ActionPipeline:
                 microgoal=micro_goal,
             )
 
+            # RO recommendation (player sources only)
+            if source in ("GUI", "HUD", "CLI") and self.director is not None:
+                try:
+                    from src.ro.ro import recommend as ro_recommend
+                    candidates = [
+                        r.get("action") or r.get("id") or r.get("action_id")
+                        for r in self.director.list_actions_for_mode(self.director.mode)
+                        if r.get("action") or r.get("id") or r.get("action_id")
+                    ]
+                    mg_action, _, mg_text = self.director.recommended_action(world)
+                    rec = ro_recommend(actor_id, candidates, mg_action, mg_text)
+                    if rec is not None:
+                        self.game_state["ro_recommendation"] = rec
+                except Exception:
+                    pass  # RO failure must never block gameplay
+
             # scene_graph emit（設定ONのときだけ、フィルタリングは _emit_scene_graph 内で実施）
             cfg = get_cfg()
             emit_enabled = cfg.get("datalab", {}).get("emit_scene_graph", True)
