@@ -1,4 +1,20 @@
+import random
+
 from src.character_status import CharacterStatus
+from src.combat.resolve_exchange import resolve_exchange
+
+_HIT_SUBTYPES = ["chip", "counter", "seize"]
+_MISS_SUBTYPES = ["evade", "guard", "deflect", "clinch"]
+
+
+def _determine_outcome(attack_power: float) -> tuple[str, str]:
+    """attack_power から hit/miss と subtype を決定する。"""
+    hit_chance = 0.5 + (attack_power - 5) * 0.05  # 攻撃力5で50%、±1ごとに5%変動
+    hit_chance = max(0.25, min(0.75, hit_chance))
+    if random.random() < hit_chance:
+        return "hit", random.choice(_HIT_SUBTYPES)
+    return "miss", random.choice(_MISS_SUBTYPES)
+
 
 def engage_combat(character_status, game_state, enemy_character_status=None):
     print(f"{character_status.name}が敵との戦闘を開始します……")
@@ -11,30 +27,59 @@ def engage_combat(character_status, game_state, enemy_character_status=None):
         enemy_hp            = enemy_obj.hp
         enemy_attack_power  = enemy_obj.attack_power
         enemy_name          = enemy_obj.name
+        enemy_id            = enemy_obj.name
     else:                                     # dict 互換なら従来通り
         enemy_hp            = enemy_obj["hp"]
         enemy_attack_power  = enemy_obj["attack_power"]
         enemy_name          = enemy_obj["name"]
+        enemy_id            = enemy_obj["name"]
 
     # ③ プレイヤー側の攻撃力
     attack_power = character_status.attack_power if character_status.equipped_weapon else 1
+    attacker_id = character_status.name
+
+    combat_narrative: list[str] = []
 
     # ④ 戦闘ループ
     while character_status.hp > 0 and enemy_hp > 0:
-        enemy_hp -= attack_power
-        print(f"{enemy_name}に{attack_power}のダメージを与えた！ (敵HP: {enemy_hp})")
+        # --- 攻撃側（プレイヤー）---
+        outcome, subtype = _determine_outcome(attack_power)
+        record = resolve_exchange(
+            game_state, attacker_id, enemy_id,
+            range_="near", outcome=outcome, subtype=subtype,
+        )
+        if record["text"]:
+            print(record["text"])
+            combat_narrative.append(record["text"])
+
+        if outcome == "hit":
+            enemy_hp -= attack_power
+            print(f"  → {enemy_name}に{attack_power}のダメージ！ (敵HP: {enemy_hp})")
 
         if enemy_hp <= 0:
             print(f"{enemy_name}を倒しました！")
             game_state["has_enemy"] = False
             break
 
-        character_status.hp -= enemy_attack_power
-        print(f"{enemy_name}から{enemy_attack_power}のダメージを受けた！ (HP: {character_status.hp})")
+        # --- 防御側（敵の反撃）---
+        outcome_e, subtype_e = _determine_outcome(enemy_attack_power)
+        record_e = resolve_exchange(
+            game_state, enemy_id, attacker_id,
+            range_="near", outcome=outcome_e, subtype=subtype_e,
+        )
+        if record_e["text"]:
+            print(record_e["text"])
+            combat_narrative.append(record_e["text"])
+
+        if outcome_e == "hit":
+            character_status.hp -= enemy_attack_power
+            print(f"  → {enemy_name}から{enemy_attack_power}のダメージ！ (HP: {character_status.hp})")
 
     # ⑤ HP を書き戻す（敵がオブジェクトなら）
     if isinstance(enemy_obj, CharacterStatus):
         enemy_obj.hp = max(enemy_hp, 0)
+
+    game_state["combat_narrative"] = combat_narrative
 
     return "勝利" if enemy_hp <= 0 else "敗北"
 

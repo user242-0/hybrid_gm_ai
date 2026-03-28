@@ -22,8 +22,8 @@ class DirectorHUD:
         self.root.title(title)
         # The HUD shows multiple stacked rows; ensure the window is tall enough so the
         # Auto/Next controls and help text are visible without manual resizing.
-        self.root.geometry("520x360")
-        self.root.minsize(520, 320)
+        self.root.geometry("520x390")
+        self.root.minsize(520, 350)
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -40,6 +40,7 @@ class DirectorHUD:
         self.clock_var = tk.StringVar(value="Day1 00:00")
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
         self.progress_var = tk.StringVar(value="")
+        self.ro_var = tk.StringVar(value="")
         self.auto_var = tk.BooleanVar(value=False)
 
         self.actions_var: list[tuple[str, str, int]] = []
@@ -103,6 +104,18 @@ class DirectorHUD:
         row_rec.pack(fill="x", **pad)
         self.rec_btn = tk.Button(row_rec, text="(Recommended)", command=self._click_recommended)
         self.rec_btn.pack(side="left")
+
+        row_ro = tk.Frame(frame, bg=frame["bg"])
+        row_ro.pack(fill="x", **pad)
+        tk.Label(
+            row_ro, text="RO:", fg="#FFD700", bg=frame["bg"],
+            font=("TkDefaultFont", 9, "bold"),
+        ).pack(side="left")
+        self.ro_label = tk.Label(
+            row_ro, textvariable=self.ro_var, fg="#FFD700", bg=frame["bg"],
+            wraplength=420, justify="left",
+        )
+        self.ro_label.pack(side="left", padx=6)
 
         row_actions = tk.Frame(frame, bg=frame["bg"])
         row_actions.pack(fill="both", expand=True, **pad)
@@ -231,6 +244,9 @@ class DirectorHUD:
 
     def set_progress(self, text: Optional[str]) -> None:
         self._run_or_enqueue(lambda: self.progress_var.set(text or ""))
+
+    def set_ro_recommendation(self, text: Optional[str]) -> None:
+        self._run_or_enqueue(lambda: self.ro_var.set(text or ""))
 
     def set_recommended(self, label: Optional[str], *, enabled: bool = True) -> None:
         def apply() -> None:

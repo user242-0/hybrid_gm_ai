@@ -6,3 +6,15 @@ python -m src.simulation
 ### other scenario
 python -m src.simulation --premise-text "従者"
 python -m src.simulation --premise-text "マトリックス"
+
+### .venv の Python を“直接”使う場合
+.\.venv\Scripts\python.exe -m src.simulation
+.\.venv\Scripts\python.exe -m src.simulation　--premise-text "従者"
+
+### 仮想環境(.venv)に入るのめんどくさいなら
+run.bat
+run.bat --premise-text "従者"
+
+### シミュレーション実行後も仮想環境(.venv)に居続けたいなら(最初のドアに入る感じ)
+dev.cmd
+dev.cmd --premise-text "従者"

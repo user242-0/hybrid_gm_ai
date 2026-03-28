@@ -1,0 +1,30 @@
+## 2026-02-08（Session 27）
+### 気分 / 雑談
+- 戦闘にナラティブが付く第一歩。CSVにテキストを書いておけば、条件に合わせて引き当てられる仕組みができた。
+
+### 今日やったこと（結果）
+- **戦闘ログ辞書** (`src/combat/log_dict.py`) 新規作成
+  - `data/combat/*.csv` を全読み込み（BOM対応、キャッシュ付き）
+  - `pick_combat_log()`: range/weapon/outcome/subtype/role で4段階フォールバックマッチ
+  - 完全一致 → role緩和 → subtype無視 → 両方緩和
+- **resolve_exchange** (`src/combat/resolve_exchange.py`) 新規作成
+  - CharacterStatus から weapon_type / role を自動取得
+  - `pick_combat_log()` でテキスト引き当て → `gs["combat"]["log"]` / `last_exchange` に記録
+  - role マッピング: `faction=="player"→"cop"`, `is_npc→"trickster"` (簡易、将来パックから引く)
+- `src/combat/__init__.py` 作成（パッケージ化）
+- 既存ファイルへの変更なし
+
+### テスト
+- 検証スクリプト: pick_combat_log 完全一致 / フォールバック(role緩和/subtype無視) / マッチなし→None
+- resolve_exchange: gs["combat"]["log"]への追記、text取得を確認
+- 全テスト通過
+
+### 発見（次にも効く）
+- CSV の BOM (`utf-8-sig`) を忘れると DictReader のヘッダ最初の列名に BOM が混入して条件一致しなくなる。
+- フォールバックは `_match()` 内部で `subtype=None` / `role=None` で「条件スキップ」にするのがシンプル。
+- tags列は key=value 形式の自由テキストでも十分実用的（構造化は将来必要になったら）。
+
+### 次回の最初の一手（15分でやる）
+- resolve_exchange を既存の combat アクション経路から呼ぶ統合ポイントを探る（src/actions/combat.py を読む）。
+
+---

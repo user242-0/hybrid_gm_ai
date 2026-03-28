@@ -136,6 +136,16 @@ class HUDCallbacks:
         ctx.current_actions[:] = list(cached_actions)
         ctx.director_hud.set_actions(list(cached_actions))
 
+        # RO 助言表示
+        ro_rec = ctx.game_state.get("ro_recommendation")
+        if ro_rec and isinstance(ro_rec, dict):
+            action_id = ro_rec.get("action_id", "")
+            why = ro_rec.get("why", "")
+            ro_text = f"[{action_id}] {why}" if action_id else ""
+            ctx.director_hud.set_ro_recommendation(ro_text)
+        else:
+            ctx.director_hud.set_ro_recommendation(None)
+
     def hud_adjust_value(self, path: list, delta: float, *, minimum=None, maximum=None) -> None:
         """HUD から値を調整する"""
         node = self.ctx.director_world

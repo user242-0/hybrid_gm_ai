@@ -50,7 +50,7 @@ llm:
 
 ro:
   # RO (Reversible Operator) の有効化
-  enabled: false
+  enabled: true
   # playerログの直近何行を読むか
   log_window: 50
 

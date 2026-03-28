@@ -7,70 +7,68 @@
 
 ---
 
-## 2026-02-08（Session 27）
+## 2026-03-28（Session 29）
 ### 気分 / 雑談
-- 戦闘にナラティブが付く第一歩。CSVにテキストを書いておけば、条件に合わせて引き当てられる仕組みができた。
+- バグ修正セッション。初期化漏れと設定ミスの組み合わせで2つの機能が死んでいた。
 
 ### 今日やったこと（結果）
-- **戦闘ログ辞書** (`src/combat/log_dict.py`) 新規作成
-  - `data/combat/*.csv` を全読み込み（BOM対応、キャッシュ付き）
-  - `pick_combat_log()`: range/weapon/outcome/subtype/role で4段階フォールバックマッチ
-  - 完全一致 → role緩和 → subtype無視 → 両方緩和
-- **resolve_exchange** (`src/combat/resolve_exchange.py`) 新規作成
-  - CharacterStatus から weapon_type / role を自動取得
-  - `pick_combat_log()` でテキスト引き当て → `gs["combat"]["log"]` / `last_exchange` に記録
-  - role マッピング: `faction=="player"→"cop"`, `is_npc→"trickster"` (簡易、将来パックから引く)
-- `src/combat/__init__.py` 作成（パッケージ化）
-- 既存ファイルへの変更なし
+- **Bug Fix 1**: 「戦う」「戦わない」「ただ、受け入れる」がGUI選択肢に出なかった
+  - 原因: `init_state.py` で `has_enemy` / `enemy` を設定していなかった
+  - 修正: `init_game_state()` に `has_enemy: True`, `enemy: antagonist` を追加
+  - `engage_combat`/`avoid_combat`/`accept_attack` の requirements `{"has_enemy": True}` がパスするようになった
+- **Bug Fix 2**: RO金色ラベルが常に空だった
+  - 原因: `config.yml` で `ro.enabled: false` のままだった → `recommend()` が即座に None を返していた
+  - 修正: `ro.enabled: true` に変更
+  - `hud_callbacks.py` の `refresh_hud()` のRO表示コード自体は正しかった（Session28で実装済み）
 
 ### テスト
-- 検証スクリプト: pick_combat_log 完全一致 / フォールバック(role緩和/subtype無視) / マッチなし→None
-- resolve_exchange: gs["combat"]["log"]への追記、text取得を確認
-- 全テスト通過
+- `pytest -q`: 全5テスト通過
+- `init_game_state()` → `has_enemy: True`, `enemy.name: 愉快犯` 確認
+- `RequirementsChecker.check_all({"has_enemy": True})` → True
+- `get_available_choices()` で engage_combat / avoid_combat / accept_attack が出現
+- `ro.recommend()` が dict を返すことを確認
 
 ### 発見（次にも効く）
-- CSV の BOM (`utf-8-sig`) を忘れると DictReader のヘッダ最初の列名に BOM が混入して条件一致しなくなる。
-- フォールバックは `_match()` 内部で `subtype=None` / `role=None` で「条件スキップ」にするのがシンプル。
-- tags列は key=value 形式の自由テキストでも十分実用的（構造化は将来必要になったら）。
+- `init_state.py` が game_state の初期構造を決めるが、アクション要件（requirements_checker）との整合を忘れやすい
+- config.yml の `enabled: false` が silent に機能を殺す（except pass パターンと合わさると発見が遅れる）
 
 ### 次回の最初の一手（15分でやる）
-- resolve_exchange を既存の combat アクション経路から呼ぶ統合ポイントを探る（src/actions/combat.py を読む）。
+- 実際に simulation を起動して「戦う」選択 + RO金色ラベル表示を目視確認
 
 ---
 
-## 2026-02-07（Session 26）
+## 2026-03-26（Session 28）
 ### 気分 / 雑談
-- RO（Reversible Operator）の最初の一歩。まだ助言を出すだけだが、ログ識別子の整備から入ったので基盤は堅い。
-- 「誰が決めたか」をログに残す仕組みが入ったことで、将来の分析がずっと楽になるはず。
+- Session 27 で独立モジュールとして作った resolve_exchange が、ようやく実際の戦闘に接続された。CSVを足すだけで武器バリエーションが増える設計が効いている。
 
 ### 今日やったこと（結果）
-- **Task26-0**: ログ識別子の最小改修
-  - `logger.py` の `log_action()` に `controller_id` / `actor_rc_id` 自動付与ロジックを追加
-  - RC_AI → `controller_id="RC_AI:刑事"`, GUI → `controller_id="PLAYER:GUI"` など
-  - `actor_rc_id` = `actor_id` のコピー（将来の表示名分離に備える）
-  - レガシー呼び出し（`actor` フィールド）にもfallback対応
-  - 呼び出し側が明示的に `controller_id` を渡せば上書きしない（RO予約対応）
-- **Task26-1 (Phase A)**: RO雛形（助言＋理由）
-  - `src/ro/ro.py` 新規作成: `recommend()` がplayerログ直近N行を読みスコアリング
-  - スコアリング: microgoal近接(+2.0) / 連打抑制(-2.0/-1.0) / 頻度ペナルティ
-  - 出力: `action_id` + `why`（必須）+ `risk` / `plan_b`（任意）
-  - `config.yml` に `ro.enabled: false` / `ro.log_window: 50` 追加
-  - `action_pipeline.py`: playerアクション後に自動呼び出し、`game_state["ro_recommendation"]` に格納
-  - RO日誌: `data/logs/ro_diary_latest.jsonl` に `controller_id="RO:<actor>"` 形式で出力
-
-コミット:
-- c72773e: Feat: auto-inject controller_id and actor_rc_id into all JSONL log lines
-- 4d728c2: Feat: add RO (Reversible Operator) Phase A – advice from player log
+- **Task 1**: `resolve_exchange` を `engage_combat` に統合
+  - `_determine_outcome(attack_power)` ヘルパー追加（hit_chance = 0.25〜0.75、攻撃力で微調整）
+  - 戦闘ループを改修: 攻撃側・防御側それぞれ outcome→resolve_exchange→narrative→HP処理
+  - `game_state["combat_narrative"]` にテキスト蓄積
+  - 既存の戻り値（"勝利"/"敗北"）・HP書き戻しはそのまま維持
+- **Task 2**: `data/combat/unarmed_log_dictionary.csv` 新規作成
+  - 22エントリ: miss(evade4+guard4+deflect4+clinch4=16) + hit(chip2+counter2+seize2=6)
+  - `attacker_weapon=unarmed`, `range=near`
+  - cop↔trickster の組み合わせ、UTF-8 BOM (`utf-8-sig`)
+  - `log_dict.py` が `data/combat/*.csv` を glob するのでコード変更不要
+- **Task 3**: RO Phase B — HUD に RO 助言表示
+  - `director_hud.py`: `ro_var` (StringVar) + `row_ro` (金色ラベル `#FFD700`) + `set_ro_recommendation()` メソッド追加
+  - `hud_callbacks.py`: `refresh_hud()` 末尾で `game_state["ro_recommendation"]` を読み取り HUD に表示
+  - ウィンドウサイズ: `520x360` → `520x390`, minsize `320` → `350`
 
 ### テスト
-- `tests/test_logger_ids.py`: 6ケース（RC_AI/GUI/HUD、レガシーfallback、明示値保持、空入力）
-- `tests/test_ro.py`: 7ケース（無効時None、microgoalブースト、連打抑制、diary出力、空候補、plan_b、空ログ）
-- 既存テスト（test_director.py）含め全18テスト通過
+- `pytest -q`: 全5テスト通過
+- `_determine_outcome()` の import + 動作確認OK
+- `pick_combat_log(range_="near", attacker_weapon="unarmed", ...)` で正しくCSVからテキスト取得
+- `DirectorHUD` import + `set_ro_recommendation` メソッド存在確認OK
 
 ### 発見（次にも効く）
-- ログの一元化ポイント（`log_action`）に自動付与を入れると、呼び出し側の変更ゼロで全行に反映できる。
-- ROは `try/except` でラップして「ROの障害がゲームプレイを止めない」を保証する設計が大事。
-- `_ro_cfg()` を分離しておくとテストのmockが楽。
+- `_determine_outcome` の hit_chance クランプ (0.25-0.75) で、戦闘が長すぎ/短すぎになるのを防げる
+- dict型の敵は `gs["party"]` に居ないため resolve_exchange の narrative が空文字になるが、ダメージ処理は正常動作する（設計通り）
 
 ### 次回の最初の一手（15分でやる）
-- `config.yml` の `ro.enabled: true` にして起動 → GUIでアクション実行 → `data/logs/ro_diary_latest.jsonl` にdiaryが書かれることを確認。
+- `ro.enabled: true` で実際にシミュレーションを回して、HUDのRO助言表示を目視確認する
+
+---
+

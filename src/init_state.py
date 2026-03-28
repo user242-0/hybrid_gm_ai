@@ -79,6 +79,8 @@ def init_game_state(pack_id: str = "cop_trickster"):
         "events": {},
         "current_location": current_location,
         "current_target": current_target,
+        "has_enemy": True,
+        "enemy": antagonist,
         "available_locations": locations.get("available", [current_location]),
         "pack_id": pack_id,
         "emotions_by_actor": emotions_by_actor,
