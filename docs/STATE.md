@@ -40,26 +40,28 @@
   - **戦闘ログ辞書** + **resolve_exchange** が `engage_combat` に統合済み（hit/miss判定 → narrative描写 → HP処理）
   - 戦闘CSV: knife + unarmed の2武器種をサポート
   - **Affordance Bridge** 導入済み（GUIアクション結果→HUD候補追加/ラベル差し替えの汎用ブリッジ）
+  - **HUD location表示** + debug dropdown（current_location変更→affordance label_rules再評価→ラベル変化の確認基盤）
 - ⚠️ いまの課題:
+  - PURSUE既定actionとdiscovery由来actionが重複する（例: explore系）
+  - 酒場/アパートでも現場系actionが見える（場所による可視条件が未整理）
+  - discoveryが「手がかり」なのか「action候補」なのか曖昧
   - ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
-  - 会話テンプレがまだ少なく、状況（場所/時間/天候）と関係性の掛け算が薄い
-  - RC_AIの「緑優先」をキャラの心値×アクション心値による閾値フィルタに発展させる必要あり
 - 🎯 今やっている目的:
-  - Affordance Bridgeで「探索→発見→HUD候補追加」「文脈ラベル変化」をデータ駆動で実現
-  - RO層を導入し、プレイヤー↔RO↔RC_AIの「可逆的な指し手」の基盤を作る
+  - Session 32: discovery/opportunity分離と可視条件整理で、Affordance Bridgeの設計を洗練する
+  - actionごとに「場所限定/どこでも可/location更新あり」を明確にする
 
 ## 3. 直近の変更（最新3つだけ）
+- 2026-03-29: Session31: HUD location表示 + debug dropdown — shared state変更→HUD/GUI反映の確認基盤
 - 2026-03-29: Session30: Affordance Bridge実装 — GUIアクション結果→HUD候補/ラベル変化の汎用ブリッジ
 - 2026-03-28: Session29: init_stateにhas_enemy/enemy追加（戦闘アクション表示修正） + ro.enabled: true（RO金色ラベル修正）
-- 2026-03-26: Session28: resolve_exchange を engage_combat に統合 + unarmed CSV追加 + RO Phase B (HUD助言表示)
 
 ## 4. 次にやること（最大3つ・小さく）
-1. RO Phase C: ROがpolicy_patchを出し、RC_AIの行動選択に影響を与える仕組み
-2. RC_AIの「緑優先」をキャラの心値×アクション心値による閾値フィルタに発展させる
-3. talkテンプレを状況（場所/時間/天候）にも反応させて増やす
+1. Session 32: discoveries（手がかり）と opportunities（action候補）の分離
+2. actionごとの可視条件・実行条件整理（場所限定 / どこでも可 / location更新）
+3. PURSUE既定actionとdiscovery由来actionの重複解消
 
 ## 5. ブロッカー（止まってる理由があれば）
-（現状）大きなブロッカーなし。Affordance Bridge実装済み。実動確認推奨。
+（現状）大きなブロッカーなし。Session 32 は設計タスク（仕様整理が先、コード変更は後）。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
@@ -75,6 +77,5 @@
 
 ## 7. 作業ブランチ / バックアップ
 - 基準（安定）: `cursor-trial/microgoal-logging`
-- 作業（Session30）: `feature/session30-affordance-bridge`
-- 作業（Session29）: `feature/session27-engagement-fight`（Session28-29もこのブランチで継続）
+- 作業（Session30-31）: `feature/session30-affordance-bridge`
 - バックアップ: `backup/pre-session26-20260207`, `backup/pre-session25-20260203`

@@ -82,8 +82,6 @@ _game_state.setdefault(
     {"label": None, "enabled": False, "action_id": None, "minutes": None},
 )
 init_world(_game_state)
-# TODO(session30): テスト用の一時上書き。HUD location UI 実装後に削除する。
-_game_state["current_location"] = "情報源_夜の酒場"
 
 # GameContext インスタンス（唯一のグローバル状態）
 ctx = GameContext(

@@ -54,6 +54,9 @@ ro:
   # playerログの直近何行を読むか
   log_window: 50
 
+debug:
+  hud_debug: true
+
 logging:
   # full ログの出力を有効化（default: false）
   full_enabled: false

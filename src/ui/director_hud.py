@@ -4,7 +4,10 @@ from __future__ import annotations
 import queue
 import threading
 import tkinter as tk
+from tkinter import ttk
 from typing import Callable, Optional
+
+from src.utility.config_loader import is_hud_debug_enabled
 
 MODE_COLORS = {
     "FREEZE": "#3b3b3b",
@@ -22,8 +25,8 @@ class DirectorHUD:
         self.root.title(title)
         # The HUD shows multiple stacked rows; ensure the window is tall enough so the
         # Auto/Next controls and help text are visible without manual resizing.
-        self.root.geometry("520x390")
-        self.root.minsize(520, 350)
+        self.root.geometry("520x420")
+        self.root.minsize(520, 380)
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -42,6 +45,10 @@ class DirectorHUD:
         self.progress_var = tk.StringVar(value="")
         self.ro_var = tk.StringVar(value="")
         self.auto_var = tk.BooleanVar(value=False)
+        self.location_var = tk.StringVar(value="")
+
+        self._debug: bool = is_hud_debug_enabled()
+        self._on_location_change_cb: Optional[Callable[[str], None]] = None
 
         self.actions_var: list[tuple[str, str, int]] = []
         self.modes: list[str] = []
@@ -74,6 +81,23 @@ class DirectorHUD:
         tk.Label(row1, textvariable=self.clock_var, fg="white", bg=frame["bg"]).pack(
             side="left", padx=6
         )
+
+        # --- Location row ---
+        row_loc = tk.Frame(frame, bg=frame["bg"])
+        row_loc.pack(fill="x", **pad)
+        if self._debug:
+            tk.Label(row_loc, text="\U0001f4cd", fg="white", bg=frame["bg"]).pack(side="left")
+            self.location_combo = ttk.Combobox(
+                row_loc, textvariable=self.location_var, state="readonly", width=24,
+            )
+            self.location_combo.pack(side="left", padx=4)
+            self.location_combo.bind("<<ComboboxSelected>>", self._on_location_change)
+        else:
+            self.location_combo = None
+            tk.Label(
+                row_loc, textvariable=self.location_var, fg="white", bg=frame["bg"],
+                justify="left",
+            ).pack(side="left")
 
         row2 = tk.Frame(frame, bg=frame["bg"])
         row2.pack(fill="x", **pad)
@@ -247,6 +271,27 @@ class DirectorHUD:
 
     def set_ro_recommendation(self, text: Optional[str]) -> None:
         self._run_or_enqueue(lambda: self.ro_var.set(text or ""))
+
+    def set_location(self, text: str) -> None:
+        def apply() -> None:
+            display = f"\U0001f4cd {text}" if not self._debug else text
+            self.location_var.set(display)
+        self._run_or_enqueue(apply)
+
+    def set_location_options(self, options: list[str]) -> None:
+        if not self._debug or self.location_combo is None:
+            return
+        def apply() -> None:
+            self.location_combo["values"] = options
+        self._run_or_enqueue(apply)
+
+    def set_location_change_callback(self, fn: Callable[[str], None]) -> None:
+        self._on_location_change_cb = fn
+
+    def _on_location_change(self, _event: object) -> None:
+        value = self.location_var.get()
+        if self._on_location_change_cb:
+            self._on_location_change_cb(value)
 
     def set_recommended(self, label: Optional[str], *, enabled: bool = True) -> None:
         def apply() -> None:

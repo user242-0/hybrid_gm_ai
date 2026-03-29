@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-03-29（Session 31）
+### 今日やったこと（結果）
+- **HUD location表示**: `director_hud.py` に location 行を追加
+  - 通常モード: 読み取り専用ラベル `📍 拠点_安アパート`
+  - デバッグモード (`HUD_DEBUG=1`): `ttk.Combobox` dropdown（4箇所選択可）
+- **hud_callbacks.py**: `refresh_hud()` で `game_state["current_location"]` を HUD に反映
+  - debug dropdown 変更時: `game_state` 更新 → `bump_hud_cache_rev()` → `refresh_hud()` → affordance label_rules 再評価
+- **simulation.py**: Session 30 の一時上書き `_game_state["current_location"] = "情報源_夜の酒場"` を削除
+  - `init_state.py` のパック定義 (`拠点_安アパート`) がデフォルトとして使われる
+- **config.yml**: `debug.hud_debug` セクション追加（`is_hud_debug_enabled()` は既に対応済みだった）
+
+### 発見（次にも効く）
+- HUD dropdown で location を変えると label_rules が即座に再評価される → affordance の動作確認が容易
+- PURSUE モードの既定 action と discovery 由来 action に重複がある（explore 系）
+- 酒場やアパートにいても現場系 action（collect_fiber 等）が見える → 場所による可視条件が必要
+- discovery は「手がかり」なのか「action 候補」なのか、現状の設計では曖昧
+
+### 次回の最初の一手（15分でやる）
+- `cop_trickster.yml` の affordances セクションを眺めて、discovery と opportunity の分離案をスケッチする
+
+---
+
 ## 2026-03-29（Session 30）
 ### 今日やったこと（結果）
 - **Affordance Bridge** (`src/affordance_bridge.py`) 新規作成

@@ -162,6 +162,10 @@ class HUDCallbacks:
         else:
             ctx.director_hud.set_ro_recommendation(None)
 
+        # Location 表示
+        loc = ctx.game_state.get("current_location", "")
+        ctx.director_hud.set_location(loc)
+
     def hud_adjust_value(self, path: list, delta: float, *, minimum=None, maximum=None) -> None:
         """HUD から値を調整する"""
         node = self.ctx.director_world
@@ -353,6 +357,18 @@ class HUDCallbacks:
             source="HUD",
         )
 
+    def _on_debug_location_change(self, new_location: str) -> None:
+        """Debug dropdown で location が変更されたとき"""
+        ctx = self.ctx
+        old = ctx.game_state.get("current_location", "")
+        if new_location == old:
+            return
+        ctx.game_state["current_location"] = new_location
+        if is_hud_debug_enabled():
+            print(f"[HUD_DEBUG] location: {old!r} -> {new_location!r}")
+        ctx.bump_hud_cache_rev(reason="location_change")
+        self.refresh_hud()
+
     def on_mode_dropdown(self, new_mode: str) -> None:
         """モードを切り替える"""
         ctx = self.ctx
@@ -377,3 +393,10 @@ class HUDCallbacks:
         hud.on_load = self.on_load
         hud.on_show_micro = self.on_show_micro
         hud.on_action_select = self.on_action_select
+
+        # Debug location dropdown
+        if is_hud_debug_enabled():
+            locs = self.ctx.game_state.get("available_locations", [])
+            if locs:
+                hud.set_location_options(locs)
+            hud.set_location_change_callback(self._on_debug_location_change)
