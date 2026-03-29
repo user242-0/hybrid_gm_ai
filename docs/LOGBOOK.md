@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-03-29（Session 30）
+### 今日やったこと（結果）
+- **Affordance Bridge** (`src/affordance_bridge.py`) 新規作成
+  - `evaluate_discoveries()`: アクション実行後にtrigger条件マッチ→discoveries追加
+  - `get_pending_discoveries()`: HUD用、未消費のdiscoveryをリスト返却
+  - `apply_label_overrides()`: label_rulesに基づきアクションラベルを文脈差し替え
+  - `consume_discovery()`: discovery由来アクション実行時に消費済みマーク
+- **cop_trickster.yml** に `affordances:` セクション追加
+  - discovery_rules: explore@事件現場→collect_fiber出現、explore汎用→check_tip出現
+  - label_rules: rest@FREEZE+酒場→「酒場から家に帰る」、rest@FREEZE+アパート→「仮眠をとる」
+- **director.py**: `synthesize_world()` にaffordances初期化追加、`affordance_rules()` メソッド追加
+- **action_pipeline.py**: `request_action()` にdiscovery評価 & 消費フック追加
+- **hud_callbacks.py**: `refresh_hud()` にdiscoveryマージ & ラベル上書き追加
+
+### 発見（次にも効く）
+- プロジェクトのカスタムYAMLパーサー (`yaml/__init__.py`) は flow mapping `{key: value}` をサポートしない → block style で書く必要あり
+- affordance_bridge は Director / pack YAML に依存しない純粋関数群なのでテストしやすい
+
+### 次回の最初の一手（15分でやる）
+- `python -m src.simulation` で起動→探索実行→HUDに「現場で青い繊維を採取」が出現するか目視確認
+
+---
+
 ## 2026-03-28（Session 29）
 ### 気分 / 雑談
 - バグ修正セッション。初期化漏れと設定ミスの組み合わせで2つの機能が死んでいた。

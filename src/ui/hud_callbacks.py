@@ -121,6 +121,22 @@ class HUDCallbacks:
                     minutes = spec.time_min
                 ctx.current_actions.append((action_id, label, minutes))
             ctx.current_actions.sort(key=lambda item: item[0])
+
+            # Affordance: merge discoveries into action list
+            from src.affordance_bridge import get_pending_discoveries, apply_label_overrides
+            discoveries = get_pending_discoveries(ctx.director_world)
+            for d_action, d_label, d_time in discoveries:
+                if not any(a[0] == d_action for a in ctx.current_actions):
+                    ctx.current_actions.append((d_action, d_label, d_time))
+
+            # Affordance: contextual label overrides
+            label_rules = ctx.director.affordance_rules().get("label_rules", [])
+            if label_rules:
+                ctx.current_actions[:] = apply_label_overrides(
+                    ctx.current_actions, ctx.director_world, ctx.game_state,
+                    label_rules, mode=ctx.director.mode,
+                )
+
             if is_hud_debug_enabled():
                 print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
             ctx.game_state["hud_cached_actions"] = ctx.current_actions.copy()

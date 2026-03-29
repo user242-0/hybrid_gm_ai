@@ -1,3 +1,38 @@
+affordances:
+  discovery_rules:
+    -
+      trigger:
+        action: explore
+        location: "事件現場_路地裏"
+      chance: 0.6
+      publish:
+        id: fiber_at_scene
+        action: collect_fiber
+        label: "現場で青い繊維を採取"
+        time_min: 15
+    -
+      trigger:
+        action: explore
+      chance: 0.3
+      publish:
+        id: tip_from_explore
+        action: check_tip
+        label: "探索で得た手がかりを確認"
+        time_min: 5
+  label_rules:
+    -
+      match:
+        action: rest
+        mode: FREEZE
+        location: "情報源_夜の酒場"
+      label: "酒場から家に帰る"
+    -
+      match:
+        action: rest
+        mode: FREEZE
+        location: "拠点_安アパート"
+      label: "仮眠をとる"
+
 modes:
   FREEZE:
     goals:
@@ -20,6 +55,9 @@ modes:
         action: "log_victim"
         time_min: 3
         done: "victim_names_logged >= 1"
+      - text: "休む"
+        action: "rest"
+        time_min: 10
 
   PURSUE:
     goals:

@@ -185,6 +185,7 @@ class Director:
             "partner_calls": 0,
             "avoid_tags": 0,
             "report_submitted": 0,
+            "affordances": {"discoveries": [], "spent": set()},
         }
 
     def next_goal(self, world: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -455,6 +456,10 @@ class Director:
                 }
             )
         return actions
+
+    def affordance_rules(self) -> Dict[str, Any]:
+        """Return the affordances section from the pack YAML (goals_dict)."""
+        return (self.goals_dict or {}).get("affordances", {})
 
     def progress_text(self, world: Dict[str, Any]) -> str:
         """Return a compact description of the current micro-goal progress."""

@@ -33,6 +33,7 @@ def init_game_state(pack_id: str = "cop_trickster"):
 
     protagonist = CharacterStatus(protagonist_name, is_rc=True, is_npc=False)
     antagonist = CharacterStatus(antagonist_name, is_rc=True, is_npc=True)
+    antagonist.equipped_weapon = {"weapon_type": "small_knife", "name": "小さいナイフ"} 
 
     # --- 関係性タグ設定 ---
     # 刑事から見た愉快犯
@@ -43,7 +44,7 @@ def init_game_state(pack_id: str = "cop_trickster"):
     protagonist.add_label_from(antagonist_name, "興味深い存在")
 
     # --- ロケーション / ターゲット ---
-    current_location = locations.get("default", "拠点_安アパート")
+    current_location = locations.get("default", "事件現場")
     current_target = targets.get("default", antagonist_name)
 
     # --- actor別emotion初期化 ---

@@ -6,7 +6,7 @@
 
 ## 0. いま何を作ってる？
 - プロジェクト: hybrid_gm_ai（ナラティブゲームシミュレーションエンジン）
-- 直近の方向性: ネオノワール「落魄の刑事 vs 愉快犯」シナリオを軸に、会話アクションを実装して“遊べる体験”を強化
+- 直近の方向性: ネオノワール「落魄の刑事 vs 愉快犯」シナリオを軸に、会話アクションを実装して"遊べる体験"を強化
 
 - RO（Reversible Operator）：プレイヤー側の常駐オペレーター層。ログ編集→方針（優先度/制約/評価）パッチ→RC_AI誘導を担う。
   - Reversibleとは、以下の立場・役割の可逆性を指す。
@@ -39,18 +39,19 @@
   - **RO (Reversible Operator)** Phase A+B 導入済み（助言生成 + HUD黄色テキスト表示）
   - **戦闘ログ辞書** + **resolve_exchange** が `engage_combat` に統合済み（hit/miss判定 → narrative描写 → HP処理）
   - 戦闘CSV: knife + unarmed の2武器種をサポート
+  - **Affordance Bridge** 導入済み（GUIアクション結果→HUD候補追加/ラベル差し替えの汎用ブリッジ）
 - ⚠️ いまの課題:
   - ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
   - 会話テンプレがまだ少なく、状況（場所/時間/天候）と関係性の掛け算が薄い
   - RC_AIの「緑優先」をキャラの心値×アクション心値による閾値フィルタに発展させる必要あり
 - 🎯 今やっている目的:
-  - 戦闘シーンにナラティブな描写テキストを付与する基盤を構築する → 統合完了
+  - Affordance Bridgeで「探索→発見→HUD候補追加」「文脈ラベル変化」をデータ駆動で実現
   - RO層を導入し、プレイヤー↔RO↔RC_AIの「可逆的な指し手」の基盤を作る
 
 ## 3. 直近の変更（最新3つだけ）
+- 2026-03-29: Session30: Affordance Bridge実装 — GUIアクション結果→HUD候補/ラベル変化の汎用ブリッジ
 - 2026-03-28: Session29: init_stateにhas_enemy/enemy追加（戦闘アクション表示修正） + ro.enabled: true（RO金色ラベル修正）
 - 2026-03-26: Session28: resolve_exchange を engage_combat に統合 + unarmed CSV追加 + RO Phase B (HUD助言表示)
-- 2026-02-08: Session27: 戦闘ログ辞書 (log_dict.py) + resolve_exchange 実装
 
 ## 4. 次にやること（最大3つ・小さく）
 1. RO Phase C: ROがpolicy_patchを出し、RC_AIの行動選択に影響を与える仕組み
@@ -58,7 +59,7 @@
 3. talkテンプレを状況（場所/時間/天候）にも反応させて増やす
 
 ## 5. ブロッカー（止まってる理由があれば）
-（現状）大きなブロッカーなし。戦闘アクション表示修正済み、RO enabled化済み。実動確認推奨。
+（現状）大きなブロッカーなし。Affordance Bridge実装済み。実動確認推奨。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
@@ -70,9 +71,10 @@
    - `src/ui/action_pipeline.py`
    - `src/ui/hud_callbacks.py`
    - `src/director/director.py`
+   - `src/affordance_bridge.py`
 
 ## 7. 作業ブランチ / バックアップ
 - 基準（安定）: `cursor-trial/microgoal-logging`
+- 作業（Session30）: `feature/session30-affordance-bridge`
 - 作業（Session29）: `feature/session27-engagement-fight`（Session28-29もこのブランチで継続）
-- 作業（Session26）: `feature/session26-simple-RO`
 - バックアップ: `backup/pre-session26-20260207`, `backup/pre-session25-20260203`
