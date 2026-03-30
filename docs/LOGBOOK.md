@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-03-30（Session 32）
+### 今日やったこと（結果）
+- **Affordance Bridge v2**: discovery / opportunity / label の3層分離を実装
+  - `affordance_bridge.py` 全面書き換え: `evaluate_discoveries`, `inject_discovery`, `evaluate_opportunities`, `mark_opportunity_spent`, `merge_with_director_actions`, `apply_label_overrides`
+  - discovery_rules 5件（trigger_type: passive_or_time / action_result / director_inject）
+  - opportunity_rules 6件（visible_when でロケーション・モード制約）
+  - label_rules 2件（rest の場所別ラベル差し替え）
+- **goals / pack 参照ずれ修正**: `director.affordance_rules()` は `cop_trickster_goals.yml` を参照するが、v2 affordances を `packs/cop_trickster.yml` に書いていたことが発覚。goals 側に移設
+- **canonical_facts**: `cop_trickster_goals.yml` の `affordances.canonical_facts` に5件のフラグを定義、`synthesize_world()` で `world["flags"]` に読み込み
+- **governed action 導入**: opportunity_rules を持つ action_id は、visible opportunity がないとき Director 既定候補からも抑制される
+  - `merge_with_director_actions()` に `governed_action_ids` 引数追加
+  - collect_fiber / fix_cam_clock が discovery + crime_scene + PURSUE のときだけ表示されることを確認
+- **HUD_DEBUG 拡張**: discovery 注入 Combobox + Inject ボタン、startup affordance summary ログ、注入後の discovery/spent/opportunity 状態ログ
+- **spent 管理**: discovery は残り続け、opportunity 側（action_id ベース）で spent を管理
+- **カスタム YAML パーサ対応**: label_rules の `label` が `match` dict 内に吸い込まれる問題を fallback で対処
+
+### 確認できたこと
+- passive_or_time (unread_tip): 初回 action 実行で自動 discovery 発火
+- action_result (blue_fiber / cam_clock_skew): action_id 一致で発火
+- director_inject: `inject_discovery()` による外部注入のみ（evaluate 内では不発火）
+- visible_when: location / mode 制約が正しくフィルタ（crime_scene → apartment で消失）
+- spent: 実行済み opportunity が HUD から消える
+- merge dedup + governed: Director 候補と opportunity の action_id 重複排除、governed 抑制
+- label_rules: rest のラベルが location で切り替わる
+
+### まだ曖昧な点
+- **★Recommended が governed 未対応**: Recommended ボタンが affordance の visible_when を無視して出る・実行できる可能性あり
+- **check_tip の二重源泉**: Director FREEZE micro task と affordance opportunity の両方に存在。governed で抑制されるが、設計意図が曖昧
+- **goals / pack 二重管理**: cop_trickster_goals.yml（Director 用）と packs/cop_trickster.yml（pack メタデータ）に重複構造がある。single source of truth 化が必要
+- **action_result trigger の実動作未確認**: examine_scene / review_footage が action_definitions に未定義
+- **move_low_profile の移動先決定ロジック**: 未実装
+
+### 次回の最初の一手（15分でやる）
+- `★Recommended` が governed action の visible_when を尊重しているか確認。`hud_callbacks.py` の `recommended_action()` 呼び出しフローを追う
+
+---
+
 ## 2026-03-29（Session 31）
 ### 今日やったこと（結果）
 - **HUD location表示**: `director_hud.py` に location 行を追加

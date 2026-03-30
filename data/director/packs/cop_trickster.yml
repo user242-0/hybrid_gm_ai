@@ -120,7 +120,12 @@ world_defaults:
   entropy:
     value: 0
   evidence_score: 0
-  flags: {}
+  flags:
+    tips_unread_exists: true
+    crime_scene_blue_fiber_exists: true
+    camera_clock_skew_exists: true
+    partner_contact_available: true
+    exposed_routes_exist: true
   harm:
     threshold_warn: 20
     value: 0
@@ -132,3 +137,87 @@ world_defaults:
   tips_checked: 0
   victim_names_logged: 0
   witness_value: 0
+affordances:
+  discovery_rules:
+    - id: dr_unread_tip
+      creates_discovery: heard_or_noticed_unread_tip
+      trigger_type: passive_or_time
+      requires_facts:
+        - tips_unread_exists
+    - id: dr_blue_fiber
+      creates_discovery: blue_fiber_spotted
+      trigger_type: action_result
+      trigger_action: examine_scene
+      requires_facts:
+        - crime_scene_blue_fiber_exists
+    - id: dr_cam_clock_skew
+      creates_discovery: camera_skew_noticed
+      trigger_type: action_result
+      trigger_action: review_footage
+      requires_facts:
+        - camera_clock_skew_exists
+    - id: dr_partner_contact
+      creates_discovery: need_partner_help_realized
+      trigger_type: director_inject
+      requires_facts:
+        - partner_contact_available
+    - id: dr_unsafe_route
+      creates_discovery: unsafe_route_identified
+      trigger_type: director_inject
+      requires_facts:
+        - exposed_routes_exist
+  opportunity_rules:
+    - id: or_check_tip
+      action_id: check_tip
+      label: "未読の情報提供を確認する"
+      requires_discoveries:
+        - heard_or_noticed_unread_tip
+      opportunity_kind: standard
+    - id: or_collect_fiber
+      action_id: collect_fiber
+      label: "青い繊維片を採取する"
+      requires_discoveries:
+        - blue_fiber_spotted
+      opportunity_kind: standard
+      visible_when:
+        current_location: "事件現場_路地裏"
+        director_mode: PURSUE
+    - id: or_fix_cam_clock
+      action_id: fix_cam_clock
+      label: "カメラの時刻ずれを補正する"
+      requires_discoveries:
+        - camera_skew_noticed
+      opportunity_kind: standard
+      visible_when:
+        current_location: "事件現場_路地裏"
+        director_mode: PURSUE
+    - id: or_call_partner
+      action_id: call_partner
+      label: "相棒に電話する"
+      requires_discoveries:
+        - need_partner_help_realized
+      opportunity_kind: standard
+    - id: or_mark_avoid_shop
+      action_id: mark_avoid_shop
+      label: "危険な店舗をマークする"
+      requires_discoveries:
+        - unsafe_route_identified
+      opportunity_kind: standard
+    - id: or_move_low_profile
+      action_id: move_low_profile
+      label: "目立たないルートで移動する"
+      requires_discoveries:
+        - unsafe_route_identified
+      opportunity_kind: movement
+      location_updates: true
+  label_rules:
+    - match:
+        action: rest
+        mode: FREEZE
+        location: "情報源_夜の酒場"
+      label: "酒場から家に帰る"
+    - match:
+        action: rest
+        mode: FREEZE
+        location: "拠点_安アパート"
+      label: "仮眠をとる"

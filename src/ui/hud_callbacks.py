@@ -122,18 +122,34 @@ class HUDCallbacks:
                 ctx.current_actions.append((action_id, label, minutes))
             ctx.current_actions.sort(key=lambda item: item[0])
 
-            # Affordance: merge discoveries into action list
-            from src.affordance_bridge import get_pending_discoveries, apply_label_overrides
-            discoveries = get_pending_discoveries(ctx.director_world)
-            for d_action, d_label, d_time in discoveries:
-                if not any(a[0] == d_action for a in ctx.current_actions):
-                    ctx.current_actions.append((d_action, d_label, d_time))
+            # Affordance: evaluate opportunities and merge with director actions
+            from src.affordance_bridge import (
+                evaluate_opportunities, merge_with_director_actions, apply_label_overrides,
+            )
+            aff_rules = ctx.director.affordance_rules()
+            opp_rules = aff_rules.get("opportunity_rules", [])
+            if opp_rules:
+                opportunities = evaluate_opportunities(
+                    ctx.director_world, ctx.game_state,
+                    opp_rules, mode=ctx.director.mode,
+                )
+                governed = {r["action_id"] for r in opp_rules if r.get("action_id")}
+                if is_hud_debug_enabled():
+                    aff_state = ctx.director_world.get("affordances", {})
+                    print(f"[HUD_DEBUG] discoveries={aff_state.get('discoveries', [])}")
+                    print(f"[HUD_DEBUG] spent_opp={aff_state.get('spent_opportunities', set())}")
+                    print(f"[HUD_DEBUG] director_raw={[a[0] for a in ctx.current_actions]}")
+                    print(f"[HUD_DEBUG] visible_opps={[o['action_id'] for o in opportunities]}")
+                    print(f"[HUD_DEBUG] governed={sorted(governed)}")
+                ctx.current_actions[:] = merge_with_director_actions(
+                    ctx.current_actions, opportunities, governed,
+                )
 
             # Affordance: contextual label overrides
-            label_rules = ctx.director.affordance_rules().get("label_rules", [])
+            label_rules = aff_rules.get("label_rules", [])
             if label_rules:
                 ctx.current_actions[:] = apply_label_overrides(
-                    ctx.current_actions, ctx.director_world, ctx.game_state,
+                    ctx.current_actions, ctx.game_state,
                     label_rules, mode=ctx.director.mode,
                 )
 
@@ -380,6 +396,36 @@ class HUDCallbacks:
         self.on_show_micro()
         self.refresh_hud()
 
+    def _get_injectable_discoveries(self) -> list[str]:
+        """Pack YAML の discovery_rules から discovery ID を列挙する。"""
+        ctx = self.ctx
+        if ctx.director is None:
+            return []
+        rules = ctx.director.affordance_rules().get("discovery_rules", [])
+        return [r.get("creates_discovery", "") for r in rules if r.get("creates_discovery")]
+
+    def _on_debug_inject_discovery(self, discovery_id: str) -> None:
+        """Debug: discovery を直接注入して HUD を更新する。"""
+        ctx = self.ctx
+        if ctx.director_world is None:
+            return
+        from src.affordance_bridge import inject_discovery, evaluate_opportunities
+        ok = inject_discovery(ctx.director_world, discovery_id)
+        print(f"[HUD_DEBUG] inject_discovery({discovery_id!r}) -> {'NEW' if ok else 'already exists'}")
+        if ok:
+            aff_state = ctx.director_world.get("affordances", {})
+            print(f"[HUD_DEBUG]   discoveries={aff_state.get('discoveries', [])}")
+            print(f"[HUD_DEBUG]   spent_opp={aff_state.get('spent_opportunities', set())}")
+            opp_rules = ctx.director.affordance_rules().get("opportunity_rules", [])
+            if opp_rules:
+                opps = evaluate_opportunities(
+                    ctx.director_world, ctx.game_state,
+                    opp_rules, mode=ctx.director.mode,
+                )
+                print(f"[HUD_DEBUG]   visible_opps={[o['action_id'] for o in opps]}")
+            ctx.bump_hud_cache_rev(reason="debug_inject_discovery")
+            self.refresh_hud()
+
     def bind_to_hud(self) -> None:
         """コールバックを DirectorHUD にバインドする"""
         hud = self.ctx.director_hud
@@ -394,9 +440,30 @@ class HUDCallbacks:
         hud.on_show_micro = self.on_show_micro
         hud.on_action_select = self.on_action_select
 
-        # Debug location dropdown
+        # Debug location dropdown + discovery injection
         if is_hud_debug_enabled():
             locs = self.ctx.game_state.get("available_locations", [])
             if locs:
                 hud.set_location_options(locs)
             hud.set_location_change_callback(self._on_debug_location_change)
+
+            disc_ids = self._get_injectable_discoveries()
+            if disc_ids:
+                hud.set_discovery_options(disc_ids)
+            else:
+                print("[HUD_DEBUG] WARNING: no injectable discoveries found")
+            hud.on_inject_discovery = self._on_debug_inject_discovery
+
+            # Startup affordance summary
+            aff = self.ctx.director.affordance_rules()
+            dr_count = len(aff.get("discovery_rules", []))
+            opp_count = len(aff.get("opportunity_rules", []))
+            lr_count = len(aff.get("label_rules", []))
+            cf_count = len(aff.get("canonical_facts", {}))
+            print(f"[HUD_DEBUG] affordances loaded: "
+                  f"discovery_rules={dr_count} opportunity_rules={opp_count} "
+                  f"label_rules={lr_count} canonical_facts={cf_count}")
+            print(f"[HUD_DEBUG] injectable discoveries={disc_ids}")
+            if self.ctx.director_world:
+                flags = self.ctx.director_world.get("flags", {})
+                print(f"[HUD_DEBUG] world.flags={flags}")

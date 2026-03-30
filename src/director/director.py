@@ -185,7 +185,10 @@ class Director:
             "partner_calls": 0,
             "avoid_tags": 0,
             "report_submitted": 0,
-            "affordances": {"discoveries": [], "spent": set()},
+            "flags": dict(
+                (self.goals_dict or {}).get("affordances", {}).get("canonical_facts", {})
+            ),
+            "affordances": {"discoveries": [], "spent_opportunities": set()},
         }
 
     def next_goal(self, world: Dict[str, Any]) -> Optional[Dict[str, Any]]:

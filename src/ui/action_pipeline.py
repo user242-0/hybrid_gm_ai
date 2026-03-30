@@ -352,21 +352,22 @@ class ActionPipeline:
                 micro_goal = self.director.get_micro_goal(world, reroll=True)
             self.game_state["director_micro_goal"] = micro_goal
 
-        # Affordance discovery evaluation
+        # Affordance discovery evaluation + opportunity spent tracking
         if action_executed and self.director is not None and world is not None:
-            from src.affordance_bridge import evaluate_discoveries, consume_discovery
-            aff_rules = self.director.affordance_rules().get("discovery_rules", [])
-            if aff_rules:
+            from src.affordance_bridge import evaluate_discoveries, mark_opportunity_spent
+            aff_rules = self.director.affordance_rules()
+            disc_rules = aff_rules.get("discovery_rules", [])
+            if disc_rules:
                 new_discoveries = evaluate_discoveries(
-                    world, self.game_state, action_id, aff_rules,
-                    self.director.rng, mode=self.director.mode,
+                    world, self.game_state, action_id, disc_rules,
+                    mode=self.director.mode,
                 )
                 if new_discoveries:
                     self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
                     for nd in new_discoveries:
-                        print(f"[Affordance] discovered: {nd['id']} -> {nd['label']}")
-            # discovery 消費チェック
-            consume_discovery(world, action_id)
+                        print(f"[Affordance] discovered: {nd}")
+            # opportunity spent tracking
+            mark_opportunity_spent(world, action_id)
 
         # ログ出力（director update の後、UI refresh の前）
         if action_executed and world is not None:

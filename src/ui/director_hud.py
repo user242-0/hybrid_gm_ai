@@ -38,6 +38,7 @@ class DirectorHUD:
         self.on_action_select: Optional[Callable[[object], None]] = None
         self.on_toggle_auto: Optional[Callable[[bool], None]] = None
         self.on_ai_step: Optional[Callable[[], None]] = None
+        self.on_inject_discovery: Optional[Callable[[str], None]] = None
 
         self.mode_var = tk.StringVar(value="")
         self.clock_var = tk.StringVar(value="Day1 00:00")
@@ -98,6 +99,20 @@ class DirectorHUD:
                 row_loc, textvariable=self.location_var, fg="white", bg=frame["bg"],
                 justify="left",
             ).pack(side="left")
+
+        # --- Debug: discovery injection ---
+        if self._debug:
+            row_disc = tk.Frame(frame, bg=frame["bg"])
+            row_disc.pack(fill="x", **pad)
+            tk.Label(row_disc, text="\U0001f50d Disc:", fg="#80FF80", bg=frame["bg"]).pack(side="left")
+            self._disc_var = tk.StringVar(value="")
+            self._disc_combo = ttk.Combobox(
+                row_disc, textvariable=self._disc_var, state="readonly", width=30,
+            )
+            self._disc_combo.pack(side="left", padx=4)
+            tk.Button(
+                row_disc, text="Inject", command=self._on_inject_click,
+            ).pack(side="left", padx=4)
 
         row2 = tk.Frame(frame, bg=frame["bg"])
         row2.pack(fill="x", **pad)
@@ -414,3 +429,17 @@ class DirectorHUD:
     def _run_index(self, idx: int) -> None:
         if self.on_action_select:
             self.on_action_select(idx)
+
+    # --- Debug: discovery injection ---
+
+    def set_discovery_options(self, options: list[str]) -> None:
+        if not self._debug or not hasattr(self, "_disc_combo"):
+            return
+        def apply() -> None:
+            self._disc_combo["values"] = options
+        self._run_or_enqueue(apply)
+
+    def _on_inject_click(self) -> None:
+        disc_id = self._disc_var.get()
+        if disc_id and self.on_inject_discovery:
+            self.on_inject_discovery(disc_id)
