@@ -31,7 +31,7 @@ from src.utility.config_loader import (
     get_rc_decision_interval_sec,
     get_rc_max_advance_minutes,
 )
-from director.registry import load_pack, synthesize_from_text
+from director.registry import load_pack, extract_goals_from_pack, synthesize_from_text
 from director.director import Director, load_yaml
 from src.world_defaults import apply_world_defaults
 
@@ -181,10 +181,10 @@ if director_enabled:
             premise_path = BASE_DIR / premise_path
         premise_doc = load_yaml(str(premise_path)) or {}
         premise = premise_doc.get("premise", {})
-        goals_path = BASE_DIR / "data/director/cop_trickster_goals.yml"
-        goals = load_yaml(str(goals_path)) or {}
         pack_id = "cop_trickster"
     pack_data = load_pack(pack_id) if pack_id else None
+    if not simulation_cli_args.premise_text:
+        goals = extract_goals_from_pack(pack_data) if pack_data else {}
     if isinstance(pack_data, dict):
         pack_data = dict(pack_data)
         pack_data.setdefault("id", pack_id)

@@ -47,6 +47,10 @@ modes:
         done: victim_names_logged >= 1
         text: 被害者の名前をノートに1人追記
         time_min: 3
+      -
+        action: rest
+        text: 休む
+        time_min: 10
   PURSUE:
     goals:
       -
@@ -138,12 +142,13 @@ world_defaults:
   victim_names_logged: 0
   witness_value: 0
 affordances:
+  canonical_facts:
+    tips_unread_exists: true
+    crime_scene_blue_fiber_exists: true
+    camera_clock_skew_exists: true
+    partner_contact_available: true
+    exposed_routes_exist: true
   discovery_rules:
-    - id: dr_unread_tip
-      creates_discovery: heard_or_noticed_unread_tip
-      trigger_type: passive_or_time
-      requires_facts:
-        - tips_unread_exists
     - id: dr_blue_fiber
       creates_discovery: blue_fiber_spotted
       trigger_type: action_result
@@ -167,12 +172,6 @@ affordances:
       requires_facts:
         - exposed_routes_exist
   opportunity_rules:
-    - id: or_check_tip
-      action_id: check_tip
-      label: "未読の情報提供を確認する"
-      requires_discoveries:
-        - heard_or_noticed_unread_tip
-      opportunity_kind: standard
     - id: or_collect_fiber
       action_id: collect_fiber
       label: "青い繊維片を採取する"

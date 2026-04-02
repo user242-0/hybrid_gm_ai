@@ -4,6 +4,7 @@ import random
 from pathlib import Path
 
 from director.director import Director, load_yaml
+from director.registry import load_pack, extract_goals_from_pack
 from src.action_registry import execute_action
 from src.simulation_utils import add_minutes, ensure_clock
 
@@ -11,7 +12,7 @@ from src.simulation_utils import add_minutes, ensure_clock
 ROOT = Path(__file__).resolve().parent.parent
 PREMISE_DOC = load_yaml(str(ROOT / "data/director/premise.yml")) or {}
 PREMISE = PREMISE_DOC.get("premise", {})
-GOALS = load_yaml(str(ROOT / "data/director/cop_trickster_goals.yml")) or {}
+GOALS = extract_goals_from_pack(load_pack("cop_trickster"))
 
 
 def make_director(seed: int = 321) -> Director:

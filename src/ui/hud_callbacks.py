@@ -128,6 +128,7 @@ class HUDCallbacks:
             )
             aff_rules = ctx.director.affordance_rules()
             opp_rules = aff_rules.get("opportunity_rules", [])
+            governed: set[str] = set()
             if opp_rules:
                 opportunities = evaluate_opportunities(
                     ctx.director_world, ctx.game_state,
@@ -152,6 +153,20 @@ class HUDCallbacks:
                     ctx.current_actions, ctx.game_state,
                     label_rules, mode=ctx.director.mode,
                 )
+
+            # Suppress recommended action if governed and not currently visible
+            if rec_action and rec_action in governed:
+                visible_ids = {aid for aid, _, _ in ctx.current_actions}
+                if rec_action not in visible_ids:
+                    recommended = {
+                        "label": "(Recommended)",
+                        "enabled": False,
+                        "action_id": None,
+                        "minutes": None,
+                    }
+                    ctx.game_state["hud_cached_recommended"] = recommended
+                    if is_hud_debug_enabled():
+                        print(f"[HUD_DEBUG] recommended {rec_action} suppressed (governed)")
 
             if is_hud_debug_enabled():
                 print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
@@ -348,6 +363,12 @@ class HUDCallbacks:
             recommended = ctx.game_state.get("hud_cached_recommended") or {}
             action_id = recommended.get("action_id")
             time_min = recommended.get("minutes")
+            if action_id:
+                cached_actions = ctx.game_state.get("hud_cached_actions", [])
+                visible_ids = {aid for aid, _, _ in cached_actions}
+                if action_id not in visible_ids:
+                    print(f"[HUD] recommended {action_id} no longer visible, skipped")
+                    return
         elif isinstance(which, int) and 0 <= which < len(ctx.current_actions):
             action_id, _, time_min = ctx.current_actions[which]
         if not action_id or not isinstance(action_id, str) or not action_id.strip():

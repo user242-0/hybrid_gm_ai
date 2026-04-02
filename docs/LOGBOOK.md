@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-04-02（Session 33）
+### 今日やったこと（結果）
+- **Obj1: Pack Single Source of Truth**
+  - `cop_trickster_goals.yml` を削除し、`packs/cop_trickster.yml` に統一
+  - `registry.py` に `extract_goals_from_pack()` 追加、`synthesize_from_text()` も経由するよう修正
+  - `simulation.py` Path B を pack_data 経由に変更
+  - 6テストファイルの goals ロードを pack 経由に移行
+  - `pytest.ini` の `python_files` を `test_*.py` に修正（全テスト発見できるように）
+- **Obj4: check_tip 二重源泉の解消**
+  - `or_check_tip` (opportunity) と `dr_unread_tip` (discovery) を削除
+  - check_tip は Director micro task (FREEZE) としてのみ残す
+  - discovery_rules: 5→4件、opportunity_rules: 6→5件
+- **Obj2: Recommended governance 修正**
+  - `refresh_hud()`: affordance bridge 完了後に rec_action が governed & 非visible なら Recommended を抑制
+  - `on_action_select("__recommended__")`: hud_cached_actions の visible_ids と照合して非表示なら skip
+- **Obj3: Action Proposal DSL v0.1（種まき）**
+  - `docs/action_proposal_dsl_v0.1.md`: 仕様書（proposal format、check A-F、三値結果、採用段階）
+  - `src/action_proposal/validator.py`: `validate_syntax()` (Check A) 実装、B-F は UNKNOWN stub
+
+### 確認できたこと
+- 全12テスト（6ファイル）がパス。既存の壊れテスト3件は Session 33 以前のもの
+- `extract_goals_from_pack()` が modes + affordances を正しく抽出
+- `validate_proposal()` が syntax PASS / REJECT を正しく返す
+
+### 次回の最初の一手（15分でやる）
+- `python -m src.simulation` を HUD_DEBUG=1 で起動し、affordances loaded のカウントが discovery_rules=4, opportunity_rules=5 であることを確認
+
+---
+
 ## 2026-03-30（Session 32）
 ### 今日やったこと（結果）
 - **Affordance Bridge v2**: discovery / opportunity / label の3層分離を実装
@@ -86,71 +115,6 @@
 
 ### 次回の最初の一手（15分でやる）
 - `python -m src.simulation` で起動→探索実行→HUDに「現場で青い繊維を採取」が出現するか目視確認
-
----
-
-## 2026-03-28（Session 29）
-### 気分 / 雑談
-- バグ修正セッション。初期化漏れと設定ミスの組み合わせで2つの機能が死んでいた。
-
-### 今日やったこと（結果）
-- **Bug Fix 1**: 「戦う」「戦わない」「ただ、受け入れる」がGUI選択肢に出なかった
-  - 原因: `init_state.py` で `has_enemy` / `enemy` を設定していなかった
-  - 修正: `init_game_state()` に `has_enemy: True`, `enemy: antagonist` を追加
-  - `engage_combat`/`avoid_combat`/`accept_attack` の requirements `{"has_enemy": True}` がパスするようになった
-- **Bug Fix 2**: RO金色ラベルが常に空だった
-  - 原因: `config.yml` で `ro.enabled: false` のままだった → `recommend()` が即座に None を返していた
-  - 修正: `ro.enabled: true` に変更
-  - `hud_callbacks.py` の `refresh_hud()` のRO表示コード自体は正しかった（Session28で実装済み）
-
-### テスト
-- `pytest -q`: 全5テスト通過
-- `init_game_state()` → `has_enemy: True`, `enemy.name: 愉快犯` 確認
-- `RequirementsChecker.check_all({"has_enemy": True})` → True
-- `get_available_choices()` で engage_combat / avoid_combat / accept_attack が出現
-- `ro.recommend()` が dict を返すことを確認
-
-### 発見（次にも効く）
-- `init_state.py` が game_state の初期構造を決めるが、アクション要件（requirements_checker）との整合を忘れやすい
-- config.yml の `enabled: false` が silent に機能を殺す（except pass パターンと合わさると発見が遅れる）
-
-### 次回の最初の一手（15分でやる）
-- 実際に simulation を起動して「戦う」選択 + RO金色ラベル表示を目視確認
-
----
-
-## 2026-03-26（Session 28）
-### 気分 / 雑談
-- Session 27 で独立モジュールとして作った resolve_exchange が、ようやく実際の戦闘に接続された。CSVを足すだけで武器バリエーションが増える設計が効いている。
-
-### 今日やったこと（結果）
-- **Task 1**: `resolve_exchange` を `engage_combat` に統合
-  - `_determine_outcome(attack_power)` ヘルパー追加（hit_chance = 0.25〜0.75、攻撃力で微調整）
-  - 戦闘ループを改修: 攻撃側・防御側それぞれ outcome→resolve_exchange→narrative→HP処理
-  - `game_state["combat_narrative"]` にテキスト蓄積
-  - 既存の戻り値（"勝利"/"敗北"）・HP書き戻しはそのまま維持
-- **Task 2**: `data/combat/unarmed_log_dictionary.csv` 新規作成
-  - 22エントリ: miss(evade4+guard4+deflect4+clinch4=16) + hit(chip2+counter2+seize2=6)
-  - `attacker_weapon=unarmed`, `range=near`
-  - cop↔trickster の組み合わせ、UTF-8 BOM (`utf-8-sig`)
-  - `log_dict.py` が `data/combat/*.csv` を glob するのでコード変更不要
-- **Task 3**: RO Phase B — HUD に RO 助言表示
-  - `director_hud.py`: `ro_var` (StringVar) + `row_ro` (金色ラベル `#FFD700`) + `set_ro_recommendation()` メソッド追加
-  - `hud_callbacks.py`: `refresh_hud()` 末尾で `game_state["ro_recommendation"]` を読み取り HUD に表示
-  - ウィンドウサイズ: `520x360` → `520x390`, minsize `320` → `350`
-
-### テスト
-- `pytest -q`: 全5テスト通過
-- `_determine_outcome()` の import + 動作確認OK
-- `pick_combat_log(range_="near", attacker_weapon="unarmed", ...)` で正しくCSVからテキスト取得
-- `DirectorHUD` import + `set_ro_recommendation` メソッド存在確認OK
-
-### 発見（次にも効く）
-- `_determine_outcome` の hit_chance クランプ (0.25-0.75) で、戦闘が長すぎ/短すぎになるのを防げる
-- dict型の敵は `gs["party"]` に居ないため resolve_exchange の narrative が空文字になるが、ダメージ処理は正常動作する（設計通り）
-
-### 次回の最初の一手（15分でやる）
-- `ro.enabled: true` で実際にシミュレーションを回して、HUDのRO助言表示を目視確認する
 
 ---
 

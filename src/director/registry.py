@@ -27,6 +27,16 @@ def load_pack(pack_id: str) -> Dict:
         return yaml.safe_load(f)
 
 
+def extract_goals_from_pack(pack_data: dict) -> dict:
+    """Extract the goals_dict (modes + affordances) from unified pack data."""
+    goals: Dict = {}
+    if pack_data.get("modes"):
+        goals["modes"] = pack_data["modes"]
+    if pack_data.get("affordances"):
+        goals["affordances"] = pack_data["affordances"]
+    return goals
+
+
 def synthesize_from_text(premise_text: str) -> Tuple[Dict, Dict, str]:
     pid = select_pack_id(premise_text)
     data = load_pack(pid)
@@ -37,5 +47,5 @@ def synthesize_from_text(premise_text: str) -> Tuple[Dict, Dict, str]:
         "modes_enabled": data.get("modes_enabled", []),
         "tone": data.get("tone", []),
     }
-    goals = {"modes": data["modes"]}
+    goals = extract_goals_from_pack(data)
     return premise, goals, pid

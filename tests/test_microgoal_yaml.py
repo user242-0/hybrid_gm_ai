@@ -1,8 +1,9 @@
 from director.director import Director, load_yaml
+from director.registry import load_pack, extract_goals_from_pack
 
 
 def test_yaml_micro_rules_load_and_done():
-    goals = load_yaml("data/director/cop_trickster_goals.yml")
+    goals = extract_goals_from_pack(load_pack("cop_trickster"))
     premise_doc = load_yaml("data/director/premise.yml") or {}
     premise = premise_doc.get("premise", {})
     director = Director(premise=premise, goals_dict=goals)

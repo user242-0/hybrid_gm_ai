@@ -4,12 +4,13 @@ from pathlib import Path
 import pytest
 
 from director.director import Director, load_yaml
+from director.registry import load_pack, extract_goals_from_pack
 
 
 ROOT = Path(__file__).resolve().parent.parent
 PREMISE_DOC = load_yaml(str(ROOT / "data/director/premise.yml")) or {}
 PREMISE = PREMISE_DOC.get("premise", {})
-GOALS = load_yaml(str(ROOT / "data/director/cop_trickster_goals.yml")) or {}
+GOALS = extract_goals_from_pack(load_pack("cop_trickster"))
 
 
 @pytest.fixture()
@@ -22,8 +23,8 @@ def test_reroll_avoids_immediate_duplicates(director: Director):
     world = director.synthesize_world()
     for mode, bucket in GOALS.get("modes", {}).items():
         micro_items = bucket.get("micro", [])
-        unique_items = {item for item in micro_items}
-        if len(unique_items) <= 1:
+        unique_texts = {item.get("text") if isinstance(item, dict) else item for item in micro_items}
+        if len(unique_texts) <= 1:
             continue
         director.mode = mode
         last_goal = None

@@ -25,7 +25,7 @@
 - Run:
   - `python -m src.simulation`
 - Test:
-  - `pytest -q`  （※まだ無い/別コマンドならここを更新）
+  - `pytest -q`
 - RC（回帰/自動挙動）:
   - （例）`python -m src.simulation --rc` / `python -m src.rc_ai` など
   - 現状のRC起動方法: TODO（確定したらここに1行で）
@@ -40,26 +40,29 @@
   - **戦闘ログ辞書** + **resolve_exchange** が `engage_combat` に統合済み（hit/miss判定 → narrative描写 → HP処理）
   - **Affordance Bridge v2**: discovery/opportunity/label の3層分離。governed action で Director 既定候補も visible_when に従う
   - **HUD_DEBUG**: location dropdown + discovery 注入 Combobox + Inject ボタン + affordance 状態ログ
+  - **Pack Single Source**: `packs/cop_trickster.yml` に modes + affordances を統一。`cop_trickster_goals.yml` は削除済み
+  - **Recommended governance**: governed action が visible でなければ Recommended ボタン抑制 + on_action_select で再検証
+  - **Action Proposal DSL v0.1**: syntax validator 実装済み（B-F は UNKNOWN stub）
 - ⚠️ いまの課題:
-  - ★Recommended が governed action の visible_when を無視して表示・実行される可能性あり
-  - cop_trickster_goals.yml / packs/cop_trickster.yml の二重管理（single source of truth 化が必要）
-  - check_tip が Director micro task と affordance opportunity の両方に存在（設計負債）
   - ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
+  - action_result trigger の実動作未確認（examine_scene / review_footage が action_definitions に未定義）
+  - move_low_profile の移動先決定ロジック未実装
+  - 既存テスト3件が Session 33 以前から壊れている（test_npc_switch, test_requirements_time_weather, test_scene_graph_roundtrip）
 - 🎯 今やっている目的:
-  - Session 33: Recommended governance、goals/pack 単一化方針、check_tip 二重源泉の整理
+  - Session 33 完了。次回は Action Proposal DSL の B-F check 実装、または RO policy_patch
 
 ## 3. 直近の変更（最新3つだけ）
-- 2026-03-30: Session32: Affordance Bridge v2 — discovery/opportunity 分離、visible_when、governed action、HUD_DEBUG 注入。設計と最小実装が通った
+- 2026-04-02: Session33: Pack単一化、Recommended governance修正、check_tip二重源泉解消、Action Proposal DSL v0.1種まき
+- 2026-03-30: Session32: Affordance Bridge v2 — discovery/opportunity 分離、visible_when、governed action、HUD_DEBUG 注入
 - 2026-03-29: Session31: HUD location表示 + debug dropdown — shared state変更→HUD/GUI反映の確認基盤
-- 2026-03-29: Session30: Affordance Bridge実装 — GUIアクション結果→HUD候補/ラベル変化の汎用ブリッジ
 
 ## 4. 次にやること（最大3つ・小さく）
-1. ★Recommended を governed action の visible_when に従わせるか整理 / 実装
-2. cop_trickster_goals.yml と packs/cop_trickster.yml の単一 source 化方針整理
-3. check_tip の二重源泉（Director micro と affordance）の扱い整理
+1. Action Proposal DSL の B-F validation check を段階的に実装
+2. RO policy_patch（ROがRC_AIの行動選択に介入する仕組み）
+3. action_result trigger 用の examine_scene / review_footage を action_definitions に追加
 
 ## 5. ブロッカー（止まってる理由があれば）
-（現状）大きなブロッカーなし。Session 32 のコア目標は DoD。Session 33 は Recommended governance と YAML 整理が先。
+（現状）大きなブロッカーなし。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
@@ -72,9 +75,10 @@
    - `src/ui/hud_callbacks.py`
    - `src/director/director.py`
    - `src/affordance_bridge.py`
+   - `src/action_proposal/validator.py`
 
 ## 7. 作業ブランチ / バックアップ
 - 基準（安定）: `cursor-trial/microgoal-logging`
-- 作業（Session32）: `feature/session32-discovery-opportunity-separation`
-- 前作業（Session30-31）: `feature/session30-affordance-bridge`
+- 作業（Session33）: `feature/session33-pack-unify-recommended-guard`
+- 前作業（Session32）: `feature/session32-discovery-opportunity-separation`
 - バックアップ: `backup/pre-session26-20260207`, `backup/pre-session25-20260203`
