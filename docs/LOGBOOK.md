@@ -6,6 +6,35 @@
 - 長文になったら、`general_documents/diary/` に退避してリンクを貼る
 
 ---
+## 2026-06-07（Codex CLI trial）
+
+### 今日やったこと（結果）
+
+* OpenAI Codex CLI を Windows PowerShell から導入し、`codex/read-only-survey` ブランチで読み取り専用調査を実施。
+* Codex に `STATE.md` / `LOGBOOK.md` / Action Proposal DSL 関連を確認させ、最初に触る低リスクタスクとして validator テスト追加を選定。
+* `tests/test_action_proposal_validator.py` を追加。
+
+  * valid proposal の `A_syntax == PASS`
+  * required field 欠落、id形式不正、time_min不正の REJECT
+  * B-F checks が現状 UNKNOWN
+  * valid proposal でも B-F UNKNOWN のため overall UNKNOWN
+* `pytest tests/test_action_proposal_validator.py -q` が成功。
+
+### 気づき
+
+* Action Proposal DSL は「アクション提案アクション」のための規約書・検問所に近い。
+* まず現状仕様をテストで固定してから、B-Fを1つずつ実装する方が安全。
+* Codex は初回から中枢ファイルを触らせず、テスト追加やvalidatorなど低リスク箇所に限定すると扱いやすい。
+
+### 次回の最初の一手
+
+* `Check B: Uniqueness` だけを小さく実装する。
+
+  * `active_action_ids` が未指定なら B は UNKNOWN 維持。
+  * 指定ありで proposal id が重複したら REJECT。
+  * 重複なしなら PASS。
+
+
 
 ## 2026-04-02（Session 33）
 ### 今日やったこと（結果）

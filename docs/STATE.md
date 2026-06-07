@@ -52,14 +52,14 @@
   - Session 33 完了。次回は Action Proposal DSL の B-F check 実装、または RO policy_patch
 
 ## 3. 直近の変更（最新3つだけ）
+* 2026-06-07: Codex CLI trial: Action Proposal DSL validator の現状仕様テストを追加。`tests/test_action_proposal_validator.py` 作成、`pytest tests/test_action_proposal_validator.py -q` 成功。次は Check B: Uniqueness の小実装。
 - 2026-04-02: Session33: Pack単一化、Recommended governance修正、check_tip二重源泉解消、Action Proposal DSL v0.1種まき
 - 2026-03-30: Session32: Affordance Bridge v2 — discovery/opportunity 分離、visible_when、governed action、HUD_DEBUG 注入
-- 2026-03-29: Session31: HUD location表示 + debug dropdown — shared state変更→HUD/GUI反映の確認基盤
 
 ## 4. 次にやること（最大3つ・小さく）
-1. Action Proposal DSL の B-F validation check を段階的に実装
-2. RO policy_patch（ROがRC_AIの行動選択に介入する仕組み）
-3. action_result trigger 用の examine_scene / review_footage を action_definitions に追加
+1. Action Proposal DSL の Check B: Uniqueness を実装
+2. Action Proposal DSL の C-F validation check を段階的に実装
+3. RO policy_patch（ROがRC_AIの行動選択に介入する仕組み）
 
 ## 5. ブロッカー（止まってる理由があれば）
 （現状）大きなブロッカーなし。
