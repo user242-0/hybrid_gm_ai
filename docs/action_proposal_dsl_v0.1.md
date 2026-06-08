@@ -47,14 +47,34 @@ proposal:
 
 ## Validation Checks
 
-| ID | Name | Description | v0.1 |
-|----|------|-------------|------|
-| A | Syntax | Required fields present, types correct | Implemented |
-| B | Uniqueness | No duplicate `id` in active actions | UNKNOWN stub |
-| C | Requirements | requirements keys are valid | UNKNOWN stub |
-| D | Effects | effects targets exist in world state | UNKNOWN stub |
-| E | Safety | No harmful side effects (harm threshold) | UNKNOWN stub |
-| F | Narrative | Consistent with current mode/tone | UNKNOWN stub |
+| ID | Name         | Description                              | v0.1         |
+| -- | ------------ | ---------------------------------------- | ------------ |
+| A  | Syntax       | Required fields present, types correct   | Implemented  |
+| B  | Uniqueness   | No duplicate `id` in active actions      | Implemented  |
+| C  | Requirements | `requirements` keys are valid            | Implemented  |
+| D  | Effects      | effects targets exist in world state     | UNKNOWN stub |
+| E  | Safety       | No harmful side effects (harm threshold) | UNKNOWN stub |
+| F  | Narrative    | Consistent with current mode/tone        | UNKNOWN stub |
+
+### Check B: Uniqueness
+
+`validate_proposal()` accepts optional `active_action_ids`.
+
+* If `active_action_ids` is not provided, B returns `UNKNOWN`.
+* If the proposal `id` already exists in `active_action_ids`, B returns `REJECT`.
+* If the proposal `id` is new, B returns `PASS`.
+
+### Check C: Requirements
+
+`validate_proposal()` accepts optional `known_requirement_keys`.
+
+* If `requirements` is missing, `None`, or `{}`, C returns `PASS`.
+* If `requirements` is not a dict, C returns `REJECT`.
+* If `requirements` is a dict but `known_requirement_keys` is not provided, C returns `UNKNOWN`.
+* If `requirements` contains unknown keys, C returns `REJECT`.
+* If all requirement keys are known, C returns `PASS`.
+
+v0.1 only validates requirement key names. It does not validate requirement values or connect to `RequirementsChecker` yet.
 
 ## Result Values
 

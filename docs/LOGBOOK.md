@@ -6,6 +6,45 @@
 - 長文になったら、`general_documents/diary/` に退避してリンクを貼る
 
 ---
+
+## 2026-06-08（Session 34: Action Proposal DSL Check B/C）
+
+### 今日やったこと（結果）
+
+* Action Proposal DSL v0.1 の Check B: Uniqueness を実装。
+
+  * `validate_proposal(..., active_action_ids=None)` に拡張。
+  * `active_action_ids` 未指定なら `B_uniqueness = UNKNOWN`。
+  * proposal id が既存 action id と重複する場合は `REJECT`。
+  * 重複しない場合は `PASS`。
+* Action Proposal DSL v0.1 の Check C: Requirements を実装。
+
+  * `validate_proposal(..., known_requirement_keys=None)` に拡張。
+  * `requirements` 未指定 / `None` / `{}` は `PASS`。
+  * `requirements` が dict 以外なら `REJECT`。
+  * `known_requirement_keys` 未指定なら `UNKNOWN`。
+  * 未知の requirements key があれば `REJECT`。
+  * 全 key が既知なら `PASS`。
+* `pytest tests/test_action_proposal_validator.py -q` が成功。
+
+  * 結果: `26 passed`
+
+### 気づき
+
+* Action Proposal DSL は、いきなり実行系に接続せず、A-F の検問を小さく固める方針が安全。
+* B/C は外部情報を任意引数で渡す形にしたため、既存呼び出しを壊さず段階的に導入できる。
+* C はまだ `RequirementsChecker` には接続していない。現段階では「requirements key の語彙チェック」に留めている。
+
+### 次回の最初の一手
+
+* Check D: Effects を小さく実装する。
+
+  * まずは effects の構造だけを見る。
+  * world state への実接続や ActionPipeline 連携はまだ行わない。
+  * `effects` 未指定なら PASS、構造不正なら REJECT、検査材料不足なら UNKNOWN、という粒度で進める。
+
+
+
 ## 2026-06-07（Codex CLI trial）
 
 ### 今日やったこと（結果）

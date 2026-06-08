@@ -43,35 +43,42 @@
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
-- ✅ 動くもの:
-  - `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
-  - 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
-  - **emotions_by_actor** でactor別emotion管理、set_emotion/switch_character後も値が保持される
-  - 全JSONLログに `controller_id`（意思決定者）/ `actor_rc_id`（行動主体）が自動付与される
-  - **RO (Reversible Operator)** Phase A+B 導入済み（助言生成 + HUD黄色テキスト表示）
-  - **戦闘ログ辞書** + **resolve_exchange** が `engage_combat` に統合済み（hit/miss判定 → narrative描写 → HP処理）
-  - **Affordance Bridge v2**: discovery/opportunity/label の3層分離。governed action で Director 既定候補も visible_when に従う
-  - **HUD_DEBUG**: location dropdown + discovery 注入 Combobox + Inject ボタン + affordance 状態ログ
-  - **Pack Single Source**: `packs/cop_trickster.yml` に modes + affordances を統一。`cop_trickster_goals.yml` は削除済み
-  - **Recommended governance**: governed action が visible でなければ Recommended ボタン抑制 + on_action_select で再検証
-  - **Action Proposal DSL v0.1**: syntax validator 実装済み（B-F は UNKNOWN stub）
-- ⚠️ いまの課題:
-  - ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
-  - action_result trigger の実動作未確認（examine_scene / review_footage が action_definitions に未定義）
-  - move_low_profile の移動先決定ロジック未実装
-  - 既存テスト3件が Session 33 以前から壊れている（test_npc_switch, test_requirements_time_weather, test_scene_graph_roundtrip）
-- 🎯 今やっている目的:
-  - Session 33 完了。次回は Action Proposal DSL の B-F check 実装、または RO policy_patch
+
+* ✅ 動くもの:
+
+  * `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
+  * 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
+  * **Action Proposal DSL v0.1**: Check A Syntax / Check B Uniqueness / Check C Requirements まで実装済み
+
+    * B: `active_action_ids` 指定時に action id 重複を検出
+    * C: `known_requirement_keys` 指定時に requirements key の妥当性を検査
+    * D-F は UNKNOWN stub のまま
+
+* ⚠️ いまの課題:
+
+  * Action Proposal DSL の Check D-F が未実装
+  * requirements の値検証や `RequirementsChecker` 連携は未実施
+  * proposal を HUD / ActionPipeline / Director に接続する導線はまだ未実装
+  * ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
+  * action_result trigger の実動作未確認（examine_scene / review_footage が action_definitions に未定義）
+  * move_low_profile の移動先決定ロジック未実装
+
+* 🎯 今やっている目的:
+
+  * Action Proposal DSL の検問を A→F の順に小さく実装し、将来的な「アクション提案アクション」の安全な入口を作る
 
 ## 3. 直近の変更（最新3つだけ）
-* 2026-06-07: Codex CLI trial: Action Proposal DSL validator の現状仕様テストを追加。`tests/test_action_proposal_validator.py` 作成、`pytest tests/test_action_proposal_validator.py -q` 成功。次は Check B: Uniqueness の小実装。
-- 2026-04-02: Session33: Pack単一化、Recommended governance修正、check_tip二重源泉解消、Action Proposal DSL v0.1種まき
-- 2026-03-30: Session32: Affordance Bridge v2 — discovery/opportunity 分離、visible_when、governed action、HUD_DEBUG 注入
+
+* 2026-06-08: Session 34: Action Proposal DSL Check B / C 実装。`active_action_ids` による重複検査、`known_requirement_keys` による requirements key 検査を追加。`pytest tests/test_action_proposal_validator.py -q` は 26 passed。
+* 2026-06-07: Codex CLI trial: Action Proposal DSL validator の現状仕様テストを追加。`tests/test_action_proposal_validator.py` 作成、`pytest tests/test_action_proposal_validator.py -q` 成功。
+* 2026-04-02: Session33: Pack単一化、Recommended governance修正、check_tip二重源泉解消、Action Proposal DSL v0.1種まき
 
 ## 4. 次にやること（最大3つ・小さく）
-1. Action Proposal DSL の Check B: Uniqueness を実装
-2. Action Proposal DSL の C-F validation check を段階的に実装
-3. RO policy_patch（ROがRC_AIの行動選択に介入する仕組み）
+
+1. Action Proposal DSL の Check D: Effects を「構造だけ検証する」粒度で実装
+2. Check E: Safety / Check F: Narrative を段階的に実装
+3. Shadow mode の `propose_action` 導線を作り、proposal を検問してログ保存できるようにする
+
 
 ## 5. ブロッカー（止まってる理由があれば）
 （現状）大きなブロッカーなし。
