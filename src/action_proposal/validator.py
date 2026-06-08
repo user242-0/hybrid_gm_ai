@@ -59,11 +59,35 @@ def validate_syntax(proposal: dict[str, Any]) -> tuple[ValidationResult, str]:
     return ValidationResult.PASS, ""
 
 
+def validate_requirements(
+    proposal: dict[str, Any],
+    known_requirement_keys: set[str] | list[str] | tuple[str, ...] | None = None,
+) -> tuple[ValidationResult, str]:
+    """Check C: requirement keys are known when requirements are provided."""
+    requirements = proposal.get("requirements") if isinstance(proposal, dict) else None
+    if requirements is None or requirements == {}:
+        return ValidationResult.PASS, ""
+
+    if not isinstance(requirements, dict):
+        return ValidationResult.REJECT, "requirements must be a dict"
+
+    if known_requirement_keys is None:
+        return ValidationResult.UNKNOWN, "known_requirement_keys not provided"
+
+    known_keys = set(known_requirement_keys)
+    unknown_keys = sorted(set(requirements.keys()) - known_keys)
+    if unknown_keys:
+        return ValidationResult.REJECT, f"unknown requirement keys: {unknown_keys}"
+
+    return ValidationResult.PASS, ""
+
+
 def validate_proposal(
     proposal: dict[str, Any],
     active_action_ids: set[str] | list[str] | tuple[str, ...] | None = None,
+    known_requirement_keys: set[str] | list[str] | tuple[str, ...] | None = None,
 ) -> ValidationReport:
-    """Run all validation checks (A-B implemented, C-F stubs)."""
+    """Run all validation checks (A-C implemented, D-F stubs)."""
     report = ValidationReport()
 
     # A: Syntax
@@ -84,8 +108,14 @@ def validate_proposal(
         else:
             report.checks["B_uniqueness"] = ValidationResult.PASS
 
-    # C-F: stubs
-    for check_id in ("C_requirements", "D_effects", "E_safety", "F_narrative"):
+    # C: Requirements
+    result_c, reason_c = validate_requirements(proposal, known_requirement_keys)
+    report.checks["C_requirements"] = result_c
+    if reason_c:
+        report.reasons["C_requirements"] = reason_c
+
+    # D-F: stubs
+    for check_id in ("D_effects", "E_safety", "F_narrative"):
         report.checks[check_id] = ValidationResult.UNKNOWN
         report.reasons[check_id] = "not yet implemented"
 

@@ -76,21 +76,24 @@ def test_duplicate_proposal_id_rejects_overall():
     assert report.overall == ValidationResult.REJECT
 
 
-def test_b_uniqueness_pass_still_leaves_overall_unknown_because_c_through_f_are_unknown():
-    report = validate_proposal(valid_proposal(), active_action_ids={"open_locked_door"})
+def test_b_uniqueness_pass_still_leaves_overall_unknown_because_d_through_f_are_unknown():
+    report = validate_proposal(
+        valid_proposal(),
+        active_action_ids={"open_locked_door"},
+        known_requirement_keys={"location"},
+    )
 
     assert report.checks["B_uniqueness"] == ValidationResult.PASS
-    assert report.checks["C_requirements"] == ValidationResult.UNKNOWN
+    assert report.checks["C_requirements"] == ValidationResult.PASS
     assert report.checks["D_effects"] == ValidationResult.UNKNOWN
     assert report.checks["E_safety"] == ValidationResult.UNKNOWN
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
     assert report.overall == ValidationResult.UNKNOWN
 
 
-def test_current_c_through_f_checks_are_unknown():
+def test_current_d_through_f_checks_are_unknown():
     report = validate_proposal(valid_proposal())
 
-    assert report.checks["C_requirements"] == ValidationResult.UNKNOWN
     assert report.checks["D_effects"] == ValidationResult.UNKNOWN
     assert report.checks["E_safety"] == ValidationResult.UNKNOWN
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
@@ -100,4 +103,102 @@ def test_valid_proposal_overall_is_unknown_because_b_through_f_are_unknown():
     report = validate_proposal(valid_proposal())
 
     assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.overall == ValidationResult.UNKNOWN
+
+
+def test_c_requirements_passes_when_requirements_are_missing():
+    report = validate_proposal(valid_proposal())
+
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+
+
+def test_c_requirements_passes_when_requirements_are_none():
+    proposal = valid_proposal()
+    proposal["requirements"] = None
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+
+
+def test_c_requirements_passes_when_requirements_are_empty_dict():
+    proposal = valid_proposal()
+    proposal["requirements"] = {}
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+
+
+def test_c_requirements_rejects_non_dict_requirements():
+    proposal = valid_proposal()
+    proposal["requirements"] = ["location"]
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["C_requirements"] == ValidationResult.REJECT
+    assert report.reasons["C_requirements"] == "requirements must be a dict"
+
+
+def test_c_requirements_unknown_when_known_requirement_keys_are_not_provided():
+    proposal = valid_proposal()
+    proposal["requirements"] = {"location": "事件現場_路地裏"}
+
+    report = validate_proposal(proposal, known_requirement_keys=None)
+
+    assert report.checks["C_requirements"] == ValidationResult.UNKNOWN
+    assert report.reasons["C_requirements"] == "known_requirement_keys not provided"
+
+
+def test_c_requirements_rejects_unknown_requirement_key():
+    proposal = valid_proposal()
+    proposal["requirements"] = {"location": "事件現場_路地裏", "unknown_key": True}
+
+    report = validate_proposal(proposal, known_requirement_keys={"location"})
+
+    assert report.checks["C_requirements"] == ValidationResult.REJECT
+    assert "unknown_key" in report.reasons["C_requirements"]
+
+
+def test_c_requirements_passes_when_all_requirement_keys_are_known():
+    proposal = valid_proposal()
+    proposal["requirements"] = {"location": "事件現場_路地裏", "flag": True}
+
+    report = validate_proposal(proposal, known_requirement_keys={"location", "flag"})
+
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+
+
+def test_c_requirements_reject_makes_overall_reject():
+    proposal = valid_proposal()
+    proposal["requirements"] = {"unknown_key": True}
+
+    report = validate_proposal(
+        proposal,
+        active_action_ids={"open_locked_door"},
+        known_requirement_keys={"location"},
+    )
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.REJECT
+    assert report.overall == ValidationResult.REJECT
+
+
+def test_a_b_c_pass_still_leaves_overall_unknown_because_d_through_f_are_unknown():
+    proposal = valid_proposal()
+    proposal["requirements"] = {"location": "事件現場_路地裏"}
+
+    report = validate_proposal(
+        proposal,
+        active_action_ids={"open_locked_door"},
+        known_requirement_keys={"location"},
+    )
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+    assert report.checks["D_effects"] == ValidationResult.UNKNOWN
+    assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
     assert report.overall == ValidationResult.UNKNOWN
