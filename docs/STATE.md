@@ -21,6 +21,18 @@
   - 4.コーチングの可逆性（助言者↔育成対象）
     - 通常はROがアドバイスを与える側だが、人間がROをコーチングし育成することもある。
 
+# Future Design Note: RC / switch_character
+
+フルRCの処理設計について重要な方針が固まりつつある。
+
+- フルRCは、プレイヤーと同一シーンにいる場合はローカル行動AIとして細かく動く。
+- プレイヤーの視界外・別地点にいる場合は、戦略的/物語的な行動ログ生成モードで動く。
+- ログ生成は switch_character 時の後付けではなく、ゲーム時間の進行に合わせて実際に生成される。
+- switch_character 時には、その蓄積ログと現在状態を参照し、その時点からローカル操作へ切り替える。
+
+詳細は `general_documents/future_goals/RC_switch_character_design_principles.md` に整理する。
+
+
 ## 1. すぐ動かす（入口コマンド）
 - Run:
   - `python -m src.simulation`

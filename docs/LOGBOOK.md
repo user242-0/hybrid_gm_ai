@@ -147,3 +147,4 @@
 
 ---
 
+- [ICEBOX] GM-AI世界を用いた人工エージェントの自己連続性 C(t) 研究構想。詳細は `\general_documents\future_goals\RESEARCH_NOTES.md` を参照。
