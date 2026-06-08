@@ -59,8 +59,11 @@ def validate_syntax(proposal: dict[str, Any]) -> tuple[ValidationResult, str]:
     return ValidationResult.PASS, ""
 
 
-def validate_proposal(proposal: dict[str, Any]) -> ValidationReport:
-    """Run all validation checks (A implemented, B-F stubs)."""
+def validate_proposal(
+    proposal: dict[str, Any],
+    active_action_ids: set[str] | list[str] | tuple[str, ...] | None = None,
+) -> ValidationReport:
+    """Run all validation checks (A-B implemented, C-F stubs)."""
     report = ValidationReport()
 
     # A: Syntax
@@ -69,8 +72,20 @@ def validate_proposal(proposal: dict[str, Any]) -> ValidationReport:
     if reason_a:
         report.reasons["A_syntax"] = reason_a
 
-    # B-F: stubs
-    for check_id in ("B_uniqueness", "C_requirements", "D_effects", "E_safety", "F_narrative"):
+    # B: Uniqueness
+    if active_action_ids is None:
+        report.checks["B_uniqueness"] = ValidationResult.UNKNOWN
+        report.reasons["B_uniqueness"] = "active_action_ids not provided"
+    else:
+        proposal_id = proposal.get("id") if isinstance(proposal, dict) else None
+        if proposal_id in active_action_ids:
+            report.checks["B_uniqueness"] = ValidationResult.REJECT
+            report.reasons["B_uniqueness"] = f"duplicate action id: {proposal_id!r}"
+        else:
+            report.checks["B_uniqueness"] = ValidationResult.PASS
+
+    # C-F: stubs
+    for check_id in ("C_requirements", "D_effects", "E_safety", "F_narrative"):
         report.checks[check_id] = ValidationResult.UNKNOWN
         report.reasons[check_id] = "not yet implemented"
 

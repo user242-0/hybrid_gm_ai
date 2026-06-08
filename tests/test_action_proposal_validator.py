@@ -47,10 +47,49 @@ def test_negative_or_non_integer_time_min_rejects_overall(time_min):
     assert report.overall == ValidationResult.REJECT
 
 
-def test_current_b_through_f_checks_are_unknown():
-    report = validate_proposal(valid_proposal())
+def test_b_uniqueness_is_unknown_when_active_action_ids_is_none():
+    report = validate_proposal(valid_proposal(), active_action_ids=None)
 
     assert report.checks["B_uniqueness"] == ValidationResult.UNKNOWN
+    assert report.reasons["B_uniqueness"] == "active_action_ids not provided"
+
+
+def test_b_uniqueness_rejects_duplicate_proposal_id():
+    proposal = valid_proposal()
+
+    report = validate_proposal(proposal, active_action_ids={"search_hidden_room"})
+
+    assert report.checks["B_uniqueness"] == ValidationResult.REJECT
+    assert "search_hidden_room" in report.reasons["B_uniqueness"]
+
+
+def test_b_uniqueness_passes_when_proposal_id_is_new():
+    report = validate_proposal(valid_proposal(), active_action_ids={"open_locked_door"})
+
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+
+
+def test_duplicate_proposal_id_rejects_overall():
+    report = validate_proposal(valid_proposal(), active_action_ids={"search_hidden_room"})
+
+    assert report.checks["B_uniqueness"] == ValidationResult.REJECT
+    assert report.overall == ValidationResult.REJECT
+
+
+def test_b_uniqueness_pass_still_leaves_overall_unknown_because_c_through_f_are_unknown():
+    report = validate_proposal(valid_proposal(), active_action_ids={"open_locked_door"})
+
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.UNKNOWN
+    assert report.checks["D_effects"] == ValidationResult.UNKNOWN
+    assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
+    assert report.overall == ValidationResult.UNKNOWN
+
+
+def test_current_c_through_f_checks_are_unknown():
+    report = validate_proposal(valid_proposal())
+
     assert report.checks["C_requirements"] == ValidationResult.UNKNOWN
     assert report.checks["D_effects"] == ValidationResult.UNKNOWN
     assert report.checks["E_safety"] == ValidationResult.UNKNOWN
