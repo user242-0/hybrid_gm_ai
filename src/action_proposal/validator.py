@@ -82,12 +82,63 @@ def validate_requirements(
     return ValidationResult.PASS, ""
 
 
+def validate_effects(
+    proposal: dict[str, Any],
+    known_effect_paths: set[str] | list[str] | tuple[str, ...] | None = None,
+) -> tuple[ValidationResult, str]:
+    """Check D: effect shape and known target paths."""
+    effects = proposal.get("effects") if isinstance(proposal, dict) else None
+    if effects is None or effects == {} or effects == []:
+        return ValidationResult.PASS, ""
+
+    if isinstance(effects, dict):
+        if known_effect_paths is None:
+            return ValidationResult.UNKNOWN, "known_effect_paths not provided"
+
+        known_paths = set(known_effect_paths)
+        unknown_paths = sorted(set(effects.keys()) - known_paths)
+        if unknown_paths:
+            return ValidationResult.REJECT, f"unknown effect paths: {unknown_paths}"
+
+        return ValidationResult.PASS, ""
+
+    if isinstance(effects, list):
+        effect_paths: list[str] = []
+        for item in effects:
+            if not isinstance(item, dict):
+                return ValidationResult.REJECT, "effect item must be a dict"
+            if "op" not in item:
+                return ValidationResult.REJECT, "effect item missing op"
+            if "path" not in item:
+                return ValidationResult.REJECT, "effect item missing path"
+            if item["op"] not in {"add", "set"}:
+                return ValidationResult.REJECT, f"unknown effect op: {item['op']!r}"
+
+            path = item["path"]
+            if not isinstance(path, str) or not path:
+                return ValidationResult.REJECT, "effect path must be a non-empty string"
+            effect_paths.append(path)
+
+        if known_effect_paths is None:
+            return ValidationResult.UNKNOWN, "known_effect_paths not provided"
+
+        known_paths = set(known_effect_paths)
+        unknown_paths = sorted(set(effect_paths) - known_paths)
+        if unknown_paths:
+            return ValidationResult.REJECT, f"unknown effect paths: {unknown_paths}"
+
+        return ValidationResult.PASS, ""
+
+    return ValidationResult.REJECT, "effects must be a dict or list"
+
+
 def validate_proposal(
     proposal: dict[str, Any],
     active_action_ids: set[str] | list[str] | tuple[str, ...] | None = None,
     known_requirement_keys: set[str] | list[str] | tuple[str, ...] | None = None,
+    known_effect_paths: set[str] | list[str] | tuple[str, ...] | None = None,
 ) -> ValidationReport:
-    """Run all validation checks (A-C implemented, D-F stubs)."""
+    """Run all validation checks (A-D implemented, E-F stubs)."""
     report = ValidationReport()
 
     # A: Syntax
@@ -114,8 +165,14 @@ def validate_proposal(
     if reason_c:
         report.reasons["C_requirements"] = reason_c
 
-    # D-F: stubs
-    for check_id in ("D_effects", "E_safety", "F_narrative"):
+    # D: Effects
+    result_d, reason_d = validate_effects(proposal, known_effect_paths)
+    report.checks["D_effects"] = result_d
+    if reason_d:
+        report.reasons["D_effects"] = reason_d
+
+    # E-F: stubs
+    for check_id in ("E_safety", "F_narrative"):
         report.checks[check_id] = ValidationResult.UNKNOWN
         report.reasons[check_id] = "not yet implemented"
 

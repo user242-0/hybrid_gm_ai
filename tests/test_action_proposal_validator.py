@@ -76,7 +76,7 @@ def test_duplicate_proposal_id_rejects_overall():
     assert report.overall == ValidationResult.REJECT
 
 
-def test_b_uniqueness_pass_still_leaves_overall_unknown_because_d_through_f_are_unknown():
+def test_b_uniqueness_pass_still_leaves_overall_unknown_because_e_and_f_are_unknown():
     report = validate_proposal(
         valid_proposal(),
         active_action_ids={"open_locked_door"},
@@ -85,16 +85,208 @@ def test_b_uniqueness_pass_still_leaves_overall_unknown_because_d_through_f_are_
 
     assert report.checks["B_uniqueness"] == ValidationResult.PASS
     assert report.checks["C_requirements"] == ValidationResult.PASS
-    assert report.checks["D_effects"] == ValidationResult.UNKNOWN
+    assert report.checks["D_effects"] == ValidationResult.PASS
     assert report.checks["E_safety"] == ValidationResult.UNKNOWN
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
     assert report.overall == ValidationResult.UNKNOWN
 
 
-def test_current_d_through_f_checks_are_unknown():
+def test_d_effects_passes_when_effects_are_missing():
     report = validate_proposal(valid_proposal())
 
+    assert report.checks["D_effects"] == ValidationResult.PASS
+
+
+def test_d_effects_passes_when_effects_are_none():
+    proposal = valid_proposal()
+    proposal["effects"] = None
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.PASS
+
+
+def test_d_effects_passes_when_effects_are_empty_dict():
+    proposal = valid_proposal()
+    proposal["effects"] = {}
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.PASS
+
+
+def test_d_effects_passes_when_effects_are_empty_list():
+    proposal = valid_proposal()
+    proposal["effects"] = []
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.PASS
+
+
+def test_d_effects_dict_unknown_when_known_effect_paths_are_not_provided():
+    proposal = valid_proposal()
+    proposal["effects"] = {"evidence_score": "+3"}
+
+    report = validate_proposal(proposal, known_effect_paths=None)
+
     assert report.checks["D_effects"] == ValidationResult.UNKNOWN
+    assert report.reasons["D_effects"] == "known_effect_paths not provided"
+
+
+def test_d_effects_dict_rejects_unknown_path():
+    proposal = valid_proposal()
+    proposal["effects"] = {"evidence_score": "+3", "unknown_path": True}
+
+    report = validate_proposal(proposal, known_effect_paths={"evidence_score"})
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+    assert "unknown_path" in report.reasons["D_effects"]
+
+
+def test_d_effects_dict_passes_when_all_paths_are_known():
+    proposal = valid_proposal()
+    proposal["effects"] = {"evidence_score": "+3"}
+
+    report = validate_proposal(proposal, known_effect_paths={"evidence_score"})
+
+    assert report.checks["D_effects"] == ValidationResult.PASS
+
+
+def test_d_effects_list_unknown_when_known_effect_paths_are_not_provided():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "evidence_score", "value": 3}]
+
+    report = validate_proposal(proposal, known_effect_paths=None)
+
+    assert report.checks["D_effects"] == ValidationResult.UNKNOWN
+    assert report.reasons["D_effects"] == "known_effect_paths not provided"
+
+
+def test_d_effects_list_passes_when_all_paths_are_known():
+    proposal = valid_proposal()
+    proposal["effects"] = [
+        {"op": "add", "path": "evidence_score", "value": 3},
+        {"op": "set", "path": "alarm_state", "value": "raised"},
+    ]
+
+    report = validate_proposal(
+        proposal,
+        known_effect_paths={"evidence_score", "alarm_state"},
+    )
+
+    assert report.checks["D_effects"] == ValidationResult.PASS
+
+
+def test_d_effects_list_rejects_unknown_path():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "unknown_path", "value": 3}]
+
+    report = validate_proposal(proposal, known_effect_paths={"evidence_score"})
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+    assert "unknown_path" in report.reasons["D_effects"]
+
+
+def test_d_effects_rejects_non_dict_or_list_effects():
+    proposal = valid_proposal()
+    proposal["effects"] = "evidence_score +3"
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+    assert report.reasons["D_effects"] == "effects must be a dict or list"
+
+
+def test_d_effects_list_rejects_non_dict_item():
+    proposal = valid_proposal()
+    proposal["effects"] = ["evidence_score"]
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+
+
+def test_d_effects_list_rejects_item_without_op():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"path": "evidence_score", "value": 3}]
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+
+
+def test_d_effects_list_rejects_item_without_path():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "value": 3}]
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+
+
+def test_d_effects_list_rejects_unknown_op():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "remove", "path": "evidence_score", "value": 3}]
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+
+
+@pytest.mark.parametrize("path", ["", 123])
+def test_d_effects_list_rejects_empty_or_non_string_path(path):
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": path, "value": 3}]
+
+    report = validate_proposal(proposal)
+
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+
+
+def test_d_effects_reject_makes_overall_reject():
+    proposal = valid_proposal()
+    proposal["effects"] = {"unknown_path": True}
+
+    report = validate_proposal(
+        proposal,
+        active_action_ids={"open_locked_door"},
+        known_requirement_keys={"location"},
+        known_effect_paths={"evidence_score"},
+    )
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+    assert report.checks["D_effects"] == ValidationResult.REJECT
+    assert report.overall == ValidationResult.REJECT
+
+
+def test_a_b_c_d_pass_still_leaves_overall_unknown_because_e_and_f_are_unknown():
+    proposal = valid_proposal()
+    proposal["requirements"] = {"location": "room"}
+    proposal["effects"] = {"evidence_score": "+3"}
+
+    report = validate_proposal(
+        proposal,
+        active_action_ids={"open_locked_door"},
+        known_requirement_keys={"location"},
+        known_effect_paths={"evidence_score"},
+    )
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+    assert report.checks["D_effects"] == ValidationResult.PASS
+    assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
+    assert report.overall == ValidationResult.UNKNOWN
+
+
+def test_current_e_and_f_checks_are_unknown():
+    report = validate_proposal(valid_proposal())
+
+    assert report.checks["D_effects"] == ValidationResult.PASS
     assert report.checks["E_safety"] == ValidationResult.UNKNOWN
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
 
@@ -185,7 +377,7 @@ def test_c_requirements_reject_makes_overall_reject():
     assert report.overall == ValidationResult.REJECT
 
 
-def test_a_b_c_pass_still_leaves_overall_unknown_because_d_through_f_are_unknown():
+def test_a_b_c_pass_still_leaves_overall_unknown_because_e_and_f_are_unknown():
     proposal = valid_proposal()
     proposal["requirements"] = {"location": "事件現場_路地裏"}
 
@@ -198,7 +390,7 @@ def test_a_b_c_pass_still_leaves_overall_unknown_because_d_through_f_are_unknown
     assert report.checks["A_syntax"] == ValidationResult.PASS
     assert report.checks["B_uniqueness"] == ValidationResult.PASS
     assert report.checks["C_requirements"] == ValidationResult.PASS
-    assert report.checks["D_effects"] == ValidationResult.UNKNOWN
+    assert report.checks["D_effects"] == ValidationResult.PASS
     assert report.checks["E_safety"] == ValidationResult.UNKNOWN
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
     assert report.overall == ValidationResult.UNKNOWN
