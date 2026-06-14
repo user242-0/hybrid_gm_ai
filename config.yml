@@ -55,7 +55,7 @@ ro:
   log_window: 50
 
 debug:
-  hud_debug: true
+  hud_debug: false
 
 logging:
   # full ログの出力を有効化（default: false）
