@@ -47,14 +47,14 @@ proposal:
 
 ## Validation Checks
 
-| ID | Name         | Description                              | v0.1         |
-| -- | ------------ | ---------------------------------------- | ------------ |
-| A  | Syntax       | Required fields present, types correct   | Implemented  |
-| B  | Uniqueness   | No duplicate `id` in active actions      | Implemented  |
-| C  | Requirements | `requirements` keys are valid            | Implemented  |
-| D  | Effects      | effects targets exist in world state     | UNKNOWN stub |
-| E  | Safety       | No harmful side effects (harm threshold) | UNKNOWN stub |
-| F  | Narrative    | Consistent with current mode/tone        | UNKNOWN stub |
+| ID | Name         | Description                                                                   | v0.1        |
+| -- | ------------ | ----------------------------------------------------------------------------- | ----------- |
+| A  | Syntax       | Required fields present, types correct                                        | Implemented |
+| B  | Uniqueness   | No duplicate `id` in active actions                                           | Implemented |
+| C  | Requirements | `requirements` keys are valid                                                 | Implemented |
+| D  | Effects      | `effects` structure and target paths are valid                                | Implemented |
+| E  | Safety       | Effects do not violate safety limits                                          | Implemented |
+| F  | Narrative    | Tags, source, mode, tone, and rationale are consistent with narrative context | Implemented |
 
 ### Check B: Uniqueness
 
@@ -75,6 +75,44 @@ proposal:
 * If all requirement keys are known, C returns `PASS`.
 
 v0.1 only validates requirement key names. It does not validate requirement values or connect to `RequirementsChecker` yet.
+
+### Check D: Effects
+
+`validate_proposal()` accepts optional `known_effect_paths`.
+
+* If `effects` is missing, `None`, `{}`, or `[]`, D returns `PASS`.
+* Dict-style effects use keys as effect paths.
+* List-style effects require each item to be a dict with `op` and `path`.
+* Supported list-style ops in v0.1 are `add` and `set`.
+* If `known_effect_paths` is not provided for non-empty effects, D returns `UNKNOWN`.
+* If an effect path is unknown, D returns `REJECT`.
+* v0.1 validates structure and target paths only. It does not apply effects to world state.
+
+### Check E: Safety
+
+`validate_proposal()` accepts optional `safety_limits`.
+
+* If `effects` is missing, `None`, `{}`, or `[]`, E returns `PASS`.
+* If non-empty effects exist but `safety_limits` is not provided, E returns `UNKNOWN`.
+* `forbidden_effect_paths` rejects attempts to modify prohibited paths.
+* `max_abs_delta` rejects excessive numeric `add` deltas.
+* `max_abs_delta_by_path` overrides the global delta limit for specific paths.
+* `set` effects are not checked by delta limit in v0.1.
+* If an `add` value cannot be interpreted numerically, E returns `UNKNOWN`.
+* v0.1 does not inspect or mutate live world state.
+
+### Check F: Narrative
+
+`validate_proposal()` accepts optional `narrative_context`.
+
+* If `narrative_context` is not provided or is not a dict, F returns `UNKNOWN`.
+* `allowed_sources` can reject proposal sources outside the allowed set.
+* `require_rationale` can require a non-empty `rationale`.
+* `modes` can constrain which current narrative mode the proposal is valid for.
+* `allowed_modes` can reject unknown or unsupported proposal modes.
+* `tone_tags` can be checked against the current tone set.
+* `tags` can be checked against `forbidden_tags`.
+* v0.1 only checks mechanical tag/context consistency. It does not judge whether an action is “interesting” or “good storytelling,” and it does not call an LLM.
 
 ## Result Values
 

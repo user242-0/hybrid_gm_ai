@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-06-14（Session 35-37: Action Proposal DSL Check D/E/F）
+
+### 今日やったこと（結果）
+
+* Action Proposal DSL v0.1 の Check D: Effects を実装。
+
+  * `validate_proposal(..., known_effect_paths=None)` に拡張。
+  * dict/list形式の effects を検査。
+  * dict形式では key を effect path として扱う。
+  * list形式では各 item の `op` / `path` 構造を検査。
+  * `op` は `add` / `set` のみ許可。
+  * world state への適用や registry/pipeline連携は未実施。
+  * `pytest tests/test_action_proposal_validator.py -q`: 45 passed。
+
+* Action Proposal DSL v0.1 の Check E: Safety を実装。
+
+  * `validate_proposal(..., safety_limits=None)` に拡張。
+  * `forbidden_effect_paths` による禁止path検査を追加。
+  * `max_abs_delta` / `max_abs_delta_by_path` による add delta上限検査を追加。
+  * `set` はdelta上限対象外。
+  * 判定不能な add value は UNKNOWN。
+  * world state参照や実適用は未実施。
+  * `pytest tests/test_action_proposal_validator.py -q`: 62 passed。
+
+* Action Proposal DSL v0.1 の Check F: Narrative を実装。
+
+  * `validate_proposal(..., narrative_context=None)` に拡張。
+  * source / rationale / modes / allowed_modes / tone_tags / tags / forbidden_tags の機械的整合性を検査。
+  * 「物語的に面白いか」は判定しない。
+  * LLM / Director / HUD / ActionPipeline 連携は未実施。
+  * `pytest tests/test_action_proposal_validator.py -q`: 81 passed。
+
+### 気づき
+
+* A-F checks がすべて実装済みになった。
+* validator はまだ実行系に接続していないため、Shadow mode の入口として安全に育てられる。
+* 次にいきなりHUDやActionPipelineへつなぐより、まず `ValidationReport` と reason文言の contract を固定した方がよい。
+* `config.yml` の HUD_DEBUG off は別件変更。必要なら別コミットで扱う。
+
+### 次回の最初の一手
+
+* Action Proposal DSL validator の contract を固める。
+
+  * 公開APIとしての `validate_proposal()` 引数を確認する。
+  * `ValidationReport.checks` / `ValidationReport.reasons` / `overall` の形式を固定する。
+  * reason文言がテストで依存してよいものか、またはコード化された reason code を追加するか検討する。
+  * まだ HUD / ActionPipeline / Director には接続しない。
+
+
 ## 2026-06-08（Session 34: Action Proposal DSL Check B/C）
 
 ### 今日やったこと（結果）

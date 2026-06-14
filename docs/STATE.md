@@ -48,36 +48,49 @@
 
   * `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
   * 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
-  * **Action Proposal DSL v0.1**: Check A Syntax / Check B Uniqueness / Check C Requirements まで実装済み
+  * **Action Proposal DSL v0.1**: Check A-F まで実装済み
 
-    * B: `active_action_ids` 指定時に action id 重複を検出
-    * C: `known_requirement_keys` 指定時に requirements key の妥当性を検査
-    * D-F は UNKNOWN stub のまま
+    * A: syntax
+    * B: uniqueness
+    * C: requirements key validation
+    * D: effects structure / path validation
+    * E: safety limits
+    * F: narrative tag/context consistency
+    * `pytest tests/test_action_proposal_validator.py -q` は 81 passed
 
 * ⚠️ いまの課題:
 
-  * Action Proposal DSL の Check D-F が未実装
-  * requirements の値検証や `RequirementsChecker` 連携は未実施
+  * A-F check の reason 文言・report形式の contract がまだ固定されていない
   * proposal を HUD / ActionPipeline / Director に接続する導線はまだ未実装
+  * Shadow mode の `propose_action` 導線は未実装
+  * requirements の値検証や `RequirementsChecker` 連携は未実施
+  * effects の world state 適用や `action_registry` 連携は未実施
   * ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
-  * action_result trigger の実動作未確認（examine_scene / review_footage が action_definitions に未定義）
-  * move_low_profile の移動先決定ロジック未実装
 
 * 🎯 今やっている目的:
 
-  * Action Proposal DSL の検問を A→F の順に小さく実装し、将来的な「アクション提案アクション」の安全な入口を作る
+  * Action Proposal DSL v0.1 の validator contract を固め、次段階の Shadow mode / propose_action 導線に安全につなげる
 
 ## 3. 直近の変更（最新3つだけ）
 
-* 2026-06-08: Session 34: Action Proposal DSL Check B / C 実装。`active_action_ids` による重複検査、`known_requirement_keys` による requirements key 検査を追加。`pytest tests/test_action_proposal_validator.py -q` は 26 passed。
-* 2026-06-07: Codex CLI trial: Action Proposal DSL validator の現状仕様テストを追加。`tests/test_action_proposal_validator.py` 作成、`pytest tests/test_action_proposal_validator.py -q` 成功。
-* 2026-04-02: Session33: Pack単一化、Recommended governance修正、check_tip二重源泉解消、Action Proposal DSL v0.1種まき
+* 2026-06-14: Session 37: Action Proposal DSL Check F 実装。`narrative_context` による source / rationale / modes / tone_tags / tags の機械的整合性チェックを追加。A-F checks がすべて実装済みになり、`pytest tests/test_action_proposal_validator.py -q` は 81 passed。
+* 2026-06-14: Session 36: Action Proposal DSL Check E 実装。`safety_limits` による forbidden path / delta上限チェックを追加。`pytest tests/test_action_proposal_validator.py -q` は 62 passed。
+* 2026-06-14: Session 35: Action Proposal DSL Check D 実装。`known_effect_paths` による effects構造・path検査を追加。`pytest tests/test_action_proposal_validator.py -q` は 45 passed。
 
 ## 4. 次にやること（最大3つ・小さく）
 
-1. Action Proposal DSL の Check D: Effects を「構造だけ検証する」粒度で実装
-2. Check E: Safety / Check F: Narrative を段階的に実装
-3. Shadow mode の `propose_action` 導線を作り、proposal を検問してログ保存できるようにする
+1. Action Proposal DSL validator の contract を固定する
+
+   * `ValidationReport` の形式
+   * check名
+   * reason文言の安定化
+   * 呼び出し側が依存してよい公開API
+2. Shadow mode の `propose_action` 導線を設計する
+
+   * proposalを検問する
+   * 結果をログ保存する
+   * まだHUD/ActionPipelineには接続しない
+3. A-F実装完了後の共有ファイルを選定し直し、ChatGPTプロジェクト共有フォルダを更新する
 
 
 ## 5. ブロッカー（止まってる理由があれば）
