@@ -132,13 +132,109 @@ def validate_effects(
     return ValidationResult.REJECT, "effects must be a dict or list"
 
 
+def _parse_add_delta(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+def _delta_limit_for_path(path: str, safety_limits: dict[str, Any]) -> Any:
+    limits_by_path = safety_limits.get("max_abs_delta_by_path")
+    if isinstance(limits_by_path, dict) and path in limits_by_path:
+        return limits_by_path[path]
+    return safety_limits.get("max_abs_delta")
+
+
+def _check_add_delta(path: str, value: Any, safety_limits: dict[str, Any]) -> tuple[ValidationResult, str]:
+    limit = _delta_limit_for_path(path, safety_limits)
+    if limit is None:
+        return ValidationResult.PASS, ""
+
+    delta = _parse_add_delta(value)
+    if delta is None:
+        return ValidationResult.UNKNOWN, f"add value for {path!r} is not numeric"
+
+    limit_value = _parse_add_delta(limit)
+    if limit_value is None:
+        return ValidationResult.UNKNOWN, f"delta limit for {path!r} is not numeric"
+
+    if abs(delta) > limit_value:
+        return ValidationResult.REJECT, f"add delta for {path!r} exceeds max_abs_delta {limit_value:g}: {value!r}"
+
+    return ValidationResult.PASS, ""
+
+
+def validate_safety(
+    proposal: dict[str, Any],
+    safety_limits: dict[str, Any] | None = None,
+) -> tuple[ValidationResult, str]:
+    """Check E: coarse effect-only safety limits."""
+    effects = proposal.get("effects") if isinstance(proposal, dict) else None
+    if effects is None or effects == {} or effects == []:
+        return ValidationResult.PASS, ""
+
+    if safety_limits is None:
+        return ValidationResult.UNKNOWN, "safety_limits not provided"
+    if not isinstance(safety_limits, dict):
+        return ValidationResult.UNKNOWN, "safety_limits must be a dict"
+
+    forbidden_paths = set(safety_limits.get("forbidden_effect_paths") or ())
+
+    if isinstance(effects, dict):
+        changed_paths = set(effects.keys())
+        forbidden_changed_paths = sorted(changed_paths & forbidden_paths)
+        if forbidden_changed_paths:
+            return ValidationResult.REJECT, f"forbidden effect paths changed: {forbidden_changed_paths}"
+
+        for path, value in effects.items():
+            result, reason = _check_add_delta(path, value, safety_limits)
+            if result != ValidationResult.PASS:
+                return result, reason
+
+        return ValidationResult.PASS, ""
+
+    if isinstance(effects, list):
+        for item in effects:
+            if not isinstance(item, dict):
+                return ValidationResult.UNKNOWN, "effect item must be a dict for safety check"
+
+            path = item.get("path")
+            if not isinstance(path, str) or not path:
+                return ValidationResult.UNKNOWN, "effect path unavailable for safety check"
+
+            if path in forbidden_paths:
+                return ValidationResult.REJECT, f"forbidden effect path changed: {path!r}"
+
+            if item.get("op") == "add":
+                if "value" not in item:
+                    return ValidationResult.UNKNOWN, f"add value for {path!r} unavailable for safety check"
+                result, reason = _check_add_delta(path, item["value"], safety_limits)
+                if result != ValidationResult.PASS:
+                    return result, reason
+
+        return ValidationResult.PASS, ""
+
+    return ValidationResult.UNKNOWN, "effects unavailable for safety check"
+
+
 def validate_proposal(
     proposal: dict[str, Any],
     active_action_ids: set[str] | list[str] | tuple[str, ...] | None = None,
     known_requirement_keys: set[str] | list[str] | tuple[str, ...] | None = None,
     known_effect_paths: set[str] | list[str] | tuple[str, ...] | None = None,
+    safety_limits: dict[str, Any] | None = None,
 ) -> ValidationReport:
-    """Run all validation checks (A-D implemented, E-F stubs)."""
+    """Run all validation checks (A-E implemented, F stub)."""
     report = ValidationReport()
 
     # A: Syntax
@@ -171,9 +267,14 @@ def validate_proposal(
     if reason_d:
         report.reasons["D_effects"] = reason_d
 
-    # E-F: stubs
-    for check_id in ("E_safety", "F_narrative"):
-        report.checks[check_id] = ValidationResult.UNKNOWN
-        report.reasons[check_id] = "not yet implemented"
+    # E: Safety
+    result_e, reason_e = validate_safety(proposal, safety_limits)
+    report.checks["E_safety"] = result_e
+    if reason_e:
+        report.reasons["E_safety"] = reason_e
+
+    # F: Narrative stub
+    report.checks["F_narrative"] = ValidationResult.UNKNOWN
+    report.reasons["F_narrative"] = "not yet implemented"
 
     return report

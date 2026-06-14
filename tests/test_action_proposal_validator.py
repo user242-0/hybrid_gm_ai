@@ -76,7 +76,7 @@ def test_duplicate_proposal_id_rejects_overall():
     assert report.overall == ValidationResult.REJECT
 
 
-def test_b_uniqueness_pass_still_leaves_overall_unknown_because_e_and_f_are_unknown():
+def test_b_uniqueness_pass_still_leaves_overall_unknown_because_f_is_unknown():
     report = validate_proposal(
         valid_proposal(),
         active_action_ids={"open_locked_door"},
@@ -86,7 +86,7 @@ def test_b_uniqueness_pass_still_leaves_overall_unknown_because_e_and_f_are_unkn
     assert report.checks["B_uniqueness"] == ValidationResult.PASS
     assert report.checks["C_requirements"] == ValidationResult.PASS
     assert report.checks["D_effects"] == ValidationResult.PASS
-    assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert report.checks["E_safety"] == ValidationResult.PASS
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
     assert report.overall == ValidationResult.UNKNOWN
 
@@ -283,11 +283,11 @@ def test_a_b_c_d_pass_still_leaves_overall_unknown_because_e_and_f_are_unknown()
     assert report.overall == ValidationResult.UNKNOWN
 
 
-def test_current_e_and_f_checks_are_unknown():
+def test_empty_effects_make_e_pass_and_f_remains_unknown():
     report = validate_proposal(valid_proposal())
 
     assert report.checks["D_effects"] == ValidationResult.PASS
-    assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert report.checks["E_safety"] == ValidationResult.PASS
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
 
 
@@ -377,7 +377,7 @@ def test_c_requirements_reject_makes_overall_reject():
     assert report.overall == ValidationResult.REJECT
 
 
-def test_a_b_c_pass_still_leaves_overall_unknown_because_e_and_f_are_unknown():
+def test_a_b_c_pass_still_leaves_overall_unknown_because_f_is_unknown():
     proposal = valid_proposal()
     proposal["requirements"] = {"location": "事件現場_路地裏"}
 
@@ -391,6 +391,198 @@ def test_a_b_c_pass_still_leaves_overall_unknown_because_e_and_f_are_unknown():
     assert report.checks["B_uniqueness"] == ValidationResult.PASS
     assert report.checks["C_requirements"] == ValidationResult.PASS
     assert report.checks["D_effects"] == ValidationResult.PASS
+    assert report.checks["E_safety"] == ValidationResult.PASS
+    assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
+    assert report.overall == ValidationResult.UNKNOWN
+
+
+def fully_known_report(proposal, safety_limits=None):
+    return validate_proposal(
+        proposal,
+        active_action_ids={"open_locked_door"},
+        known_requirement_keys={"location", "flag"},
+        known_effect_paths={
+            "alarm_state",
+            "death_count",
+            "evidence_score",
+            "harm.value",
+            "suspicion.value",
+        },
+        safety_limits=safety_limits,
+    )
+
+
+def test_e_safety_passes_when_effects_are_missing():
+    report = fully_known_report(valid_proposal(), safety_limits={})
+
+    assert report.checks["E_safety"] == ValidationResult.PASS
+
+
+def test_e_safety_passes_when_effects_are_none():
+    proposal = valid_proposal()
+    proposal["effects"] = None
+
+    report = fully_known_report(proposal, safety_limits={})
+
+    assert report.checks["E_safety"] == ValidationResult.PASS
+
+
+def test_e_safety_passes_when_effects_are_empty_dict():
+    proposal = valid_proposal()
+    proposal["effects"] = {}
+
+    report = fully_known_report(proposal, safety_limits={})
+
+    assert report.checks["E_safety"] == ValidationResult.PASS
+
+
+def test_e_safety_passes_when_effects_are_empty_list():
+    proposal = valid_proposal()
+    proposal["effects"] = []
+
+    report = fully_known_report(proposal, safety_limits={})
+
+    assert report.checks["E_safety"] == ValidationResult.PASS
+
+
+def test_e_safety_unknown_for_non_empty_effects_without_safety_limits():
+    proposal = valid_proposal()
+    proposal["effects"] = {"evidence_score": "+3"}
+
+    report = fully_known_report(proposal, safety_limits=None)
+
     assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert report.reasons["E_safety"] == "safety_limits not provided"
+
+
+def test_e_safety_unknown_when_safety_limits_is_not_a_dict():
+    proposal = valid_proposal()
+    proposal["effects"] = {"evidence_score": "+3"}
+
+    report = fully_known_report(proposal, safety_limits=["not", "a", "dict"])
+
+    assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert report.reasons["E_safety"] == "safety_limits must be a dict"
+
+
+def test_e_safety_rejects_forbidden_path_in_dict_effects():
+    proposal = valid_proposal()
+    proposal["effects"] = {"harm.value": "+1"}
+
+    report = fully_known_report(proposal, safety_limits={"forbidden_effect_paths": {"harm.value"}})
+
+    assert report.checks["E_safety"] == ValidationResult.REJECT
+    assert "harm.value" in report.reasons["E_safety"]
+
+
+def test_e_safety_rejects_forbidden_path_in_list_effects():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "death_count", "value": 1}]
+
+    report = fully_known_report(proposal, safety_limits={"forbidden_effect_paths": {"death_count"}})
+
+    assert report.checks["E_safety"] == ValidationResult.REJECT
+    assert "death_count" in report.reasons["E_safety"]
+
+
+def test_e_safety_passes_dict_add_string_within_global_delta_limit():
+    proposal = valid_proposal()
+    proposal["effects"] = {"evidence_score": "+3"}
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["E_safety"] == ValidationResult.PASS
+
+
+def test_e_safety_rejects_dict_add_string_over_global_delta_limit():
+    proposal = valid_proposal()
+    proposal["effects"] = {"evidence_score": "+99"}
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["E_safety"] == ValidationResult.REJECT
+    assert "evidence_score" in report.reasons["E_safety"]
+
+
+def test_e_safety_passes_list_add_within_global_delta_limit():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "evidence_score", "value": 3}]
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["E_safety"] == ValidationResult.PASS
+
+
+def test_e_safety_rejects_list_add_over_global_delta_limit():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "evidence_score", "value": 99}]
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["E_safety"] == ValidationResult.REJECT
+    assert "evidence_score" in report.reasons["E_safety"]
+
+
+def test_e_safety_path_specific_delta_limit_overrides_global_limit():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "suspicion.value", "value": 4}]
+
+    report = fully_known_report(
+        proposal,
+        safety_limits={
+            "max_abs_delta": 10,
+            "max_abs_delta_by_path": {"suspicion.value": 3},
+        },
+    )
+
+    assert report.checks["E_safety"] == ValidationResult.REJECT
+    assert "suspicion.value" in report.reasons["E_safety"]
+
+
+def test_e_safety_does_not_apply_delta_limit_to_set_op():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "set", "path": "evidence_score", "value": 99}]
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["E_safety"] == ValidationResult.PASS
+
+
+def test_e_safety_unknown_when_add_value_is_not_numeric():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "evidence_score", "value": "many"}]
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["E_safety"] == ValidationResult.UNKNOWN
+    assert "not numeric" in report.reasons["E_safety"]
+
+
+def test_e_safety_reject_makes_overall_reject():
+    proposal = valid_proposal()
+    proposal["effects"] = [{"op": "add", "path": "evidence_score", "value": 99}]
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+    assert report.checks["D_effects"] == ValidationResult.PASS
+    assert report.checks["E_safety"] == ValidationResult.REJECT
+    assert report.overall == ValidationResult.REJECT
+
+
+def test_a_b_c_d_e_pass_still_leaves_overall_unknown_because_f_is_unknown():
+    proposal = valid_proposal()
+    proposal["requirements"] = {"location": "room"}
+    proposal["effects"] = [{"op": "add", "path": "evidence_score", "value": 3}]
+
+    report = fully_known_report(proposal, safety_limits={"max_abs_delta": 10})
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+    assert report.checks["D_effects"] == ValidationResult.PASS
+    assert report.checks["E_safety"] == ValidationResult.PASS
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
     assert report.overall == ValidationResult.UNKNOWN
