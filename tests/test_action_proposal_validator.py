@@ -1,6 +1,6 @@
 import pytest
 
-from src.action_proposal.validator import ValidationResult, validate_proposal
+from src.action_proposal.validator import CHECK_ORDER, ValidationResult, validate_proposal
 
 
 def valid_proposal():
@@ -807,3 +807,105 @@ def test_a_b_c_d_e_f_all_pass_make_overall_pass():
     assert report.checks["E_safety"] == ValidationResult.PASS
     assert report.checks["F_narrative"] == ValidationResult.PASS
     assert report.overall == ValidationResult.PASS
+
+
+def test_contract_checks_always_include_all_six_checks():
+    report = validate_proposal(valid_proposal())
+
+    assert set(report.checks) == set(CHECK_ORDER)
+
+
+def test_contract_check_key_order_matches_check_order():
+    report = validate_proposal(valid_proposal())
+
+    assert tuple(report.checks) == CHECK_ORDER
+
+
+def test_contract_overall_reject_when_any_check_rejects():
+    proposal = valid_proposal()
+    proposal["id"] = "InvalidId"
+
+    report = validate_proposal(proposal)
+
+    assert report.overall == ValidationResult.REJECT
+
+
+def test_contract_overall_pass_when_all_checks_pass():
+    report = fully_known_narrative_report()
+
+    assert set(report.checks.values()) == {ValidationResult.PASS}
+    assert report.overall == ValidationResult.PASS
+
+
+def test_contract_overall_unknown_when_pass_and_unknown_without_reject():
+    report = validate_proposal(valid_proposal())
+
+    assert ValidationResult.PASS in report.checks.values()
+    assert ValidationResult.UNKNOWN in report.checks.values()
+    assert ValidationResult.REJECT not in report.checks.values()
+    assert report.overall == ValidationResult.UNKNOWN
+
+
+def test_contract_reject_reason_has_reason_code():
+    report = validate_proposal(valid_proposal(), active_action_ids={"search_hidden_room"})
+
+    assert report.checks["B_uniqueness"] == ValidationResult.REJECT
+    assert report.reasons["B_uniqueness"]
+    assert report.reason_codes["B_uniqueness"] == "duplicate_action_id"
+
+
+def test_contract_unknown_reason_has_reason_code():
+    report = validate_proposal(valid_proposal(), active_action_ids=None)
+
+    assert report.checks["B_uniqueness"] == ValidationResult.UNKNOWN
+    assert report.reasons["B_uniqueness"]
+    assert report.reason_codes["B_uniqueness"] == "active_action_ids_not_provided"
+
+
+def test_contract_pass_checks_do_not_have_reasons_or_reason_codes():
+    report = fully_known_narrative_report()
+
+    for check_id, result in report.checks.items():
+        if result == ValidationResult.PASS:
+            assert check_id not in report.reasons
+            assert check_id not in report.reason_codes
+
+
+def test_contract_to_dict_returns_plain_dict():
+    report_dict = validate_proposal(valid_proposal()).to_dict()
+
+    assert type(report_dict) is dict
+    assert type(report_dict["checks"]) is dict
+    assert type(report_dict["reasons"]) is dict
+    assert type(report_dict["reason_codes"]) is dict
+
+
+def test_contract_to_dict_overall_is_string():
+    report_dict = validate_proposal(valid_proposal()).to_dict()
+
+    assert isinstance(report_dict["overall"], str)
+
+
+def test_contract_to_dict_check_values_are_strings():
+    report_dict = validate_proposal(valid_proposal()).to_dict()
+
+    assert all(isinstance(value, str) for value in report_dict["checks"].values())
+
+
+def test_contract_to_dict_contains_public_report_keys():
+    report_dict = validate_proposal(valid_proposal()).to_dict()
+
+    assert {"overall", "checks", "reasons", "reason_codes"} <= set(report_dict)
+
+
+def test_contract_minimal_validate_proposal_call_still_works():
+    report = validate_proposal(valid_proposal())
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+
+
+def test_contract_all_pass_input_has_pass_overall_in_report_and_dict():
+    report = fully_known_narrative_report()
+
+    assert report.overall == ValidationResult.PASS
+    assert report.to_dict()["overall"] == "PASS"

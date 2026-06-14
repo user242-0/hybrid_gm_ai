@@ -14,20 +14,118 @@ class ValidationResult(Enum):
     UNKNOWN = "UNKNOWN"
 
 
+CHECK_ORDER = (
+    "A_syntax",
+    "B_uniqueness",
+    "C_requirements",
+    "D_effects",
+    "E_safety",
+    "F_narrative",
+)
+
+
+_REASON_CODE_BY_REASON = {
+    "proposal must be a dict": "missing_required_fields",
+    "label must be a non-empty string": "missing_required_fields",
+    "requirements must be a dict": "unknown_requirement_keys",
+    "known_requirement_keys not provided": "known_requirement_keys_not_provided",
+    "known_effect_paths not provided": "known_effect_paths_not_provided",
+    "effects must be a dict or list": "unknown_effect_paths",
+    "effect item must be a dict": "unknown_effect_paths",
+    "effect item missing op": "unknown_effect_paths",
+    "effect item missing path": "unknown_effect_paths",
+    "effect path must be a non-empty string": "unknown_effect_paths",
+    "safety_limits not provided": "safety_limits_not_provided",
+    "safety_limits must be a dict": "safety_limits_not_provided",
+    "effect item must be a dict for safety check": "unknown_effect_paths",
+    "effect path unavailable for safety check": "unknown_effect_paths",
+    "effects unavailable for safety check": "unknown_effect_paths",
+    "narrative_context not provided": "narrative_context_not_provided",
+    "narrative_context must be a dict": "narrative_context_not_provided",
+    "proposal unavailable for narrative check": "narrative_context_not_provided",
+    "rationale required": "missing_rationale",
+    "modes must be a list, tuple, or set": "mode_not_allowed",
+    "tone_tags must be a list, tuple, or set": "tone_mismatch",
+    "tone_tags do not overlap narrative tone": "tone_mismatch",
+    "tags must be a list, tuple, or set": "forbidden_tag",
+}
+
+
+def _reason_code_for_reason(reason: str) -> str:
+    if reason in _REASON_CODE_BY_REASON:
+        return _REASON_CODE_BY_REASON[reason]
+    if reason.startswith("missing required fields:"):
+        return "missing_required_fields"
+    if reason.startswith("id must be ASCII snake_case"):
+        return "invalid_id"
+    if reason.startswith("time_min must be a non-negative int"):
+        return "missing_required_fields"
+    if reason.startswith("duplicate action id:"):
+        return "duplicate_action_id"
+    if reason.startswith("unknown requirement keys:"):
+        return "unknown_requirement_keys"
+    if reason.startswith("unknown effect paths:"):
+        return "unknown_effect_paths"
+    if reason.startswith("unknown effect op:"):
+        return "unknown_effect_paths"
+    if reason.startswith("forbidden effect path"):
+        return "forbidden_effect_path"
+    if reason.startswith("forbidden effect paths"):
+        return "forbidden_effect_path"
+    if "exceeds max_abs_delta" in reason:
+        return "delta_exceeds_limit"
+    if "not numeric" in reason:
+        return "delta_exceeds_limit"
+    if "unavailable for safety check" in reason:
+        return "delta_exceeds_limit"
+    if reason.startswith("source not allowed:"):
+        return "invalid_source"
+    if reason.startswith("current_mode not in proposal modes:"):
+        return "mode_not_allowed"
+    if reason.startswith("modes outside allowed_modes:"):
+        return "mode_not_allowed"
+    if reason.startswith("forbidden tags present:"):
+        return "forbidden_tag"
+    return "validation_failed"
+
+
 @dataclass
 class ValidationReport:
     """Aggregated validation result for a proposal."""
 
     checks: dict[str, ValidationResult] = field(default_factory=dict)
     reasons: dict[str, str] = field(default_factory=dict)
+    reason_codes: dict[str, str] = field(default_factory=dict)
 
     @property
     def overall(self) -> ValidationResult:
         if any(v == ValidationResult.REJECT for v in self.checks.values()):
             return ValidationResult.REJECT
-        if all(v == ValidationResult.PASS for v in self.checks.values()):
+        if self.checks and all(v == ValidationResult.PASS for v in self.checks.values()):
             return ValidationResult.PASS
         return ValidationResult.UNKNOWN
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON/log friendly representation of the report."""
+        return {
+            "overall": self.overall.value,
+            "checks": {check_id: result.value for check_id, result in self.checks.items()},
+            "reasons": dict(self.reasons),
+            "reason_codes": dict(self.reason_codes),
+        }
+
+
+def _record_check(
+    report: ValidationReport,
+    check_id: str,
+    result: ValidationResult,
+    reason: str = "",
+    reason_code: str | None = None,
+) -> None:
+    report.checks[check_id] = result
+    if reason:
+        report.reasons[check_id] = reason
+        report.reason_codes[check_id] = reason_code or _reason_code_for_reason(reason)
 
 
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -306,44 +404,44 @@ def validate_proposal(
 
     # A: Syntax
     result_a, reason_a = validate_syntax(proposal)
-    report.checks["A_syntax"] = result_a
-    if reason_a:
-        report.reasons["A_syntax"] = reason_a
+    _record_check(report, "A_syntax", result_a, reason_a)
 
     # B: Uniqueness
     if active_action_ids is None:
-        report.checks["B_uniqueness"] = ValidationResult.UNKNOWN
-        report.reasons["B_uniqueness"] = "active_action_ids not provided"
+        _record_check(
+            report,
+            "B_uniqueness",
+            ValidationResult.UNKNOWN,
+            "active_action_ids not provided",
+            "active_action_ids_not_provided",
+        )
     else:
         proposal_id = proposal.get("id") if isinstance(proposal, dict) else None
         if proposal_id in active_action_ids:
-            report.checks["B_uniqueness"] = ValidationResult.REJECT
-            report.reasons["B_uniqueness"] = f"duplicate action id: {proposal_id!r}"
+            _record_check(
+                report,
+                "B_uniqueness",
+                ValidationResult.REJECT,
+                f"duplicate action id: {proposal_id!r}",
+                "duplicate_action_id",
+            )
         else:
-            report.checks["B_uniqueness"] = ValidationResult.PASS
+            _record_check(report, "B_uniqueness", ValidationResult.PASS)
 
     # C: Requirements
     result_c, reason_c = validate_requirements(proposal, known_requirement_keys)
-    report.checks["C_requirements"] = result_c
-    if reason_c:
-        report.reasons["C_requirements"] = reason_c
+    _record_check(report, "C_requirements", result_c, reason_c)
 
     # D: Effects
     result_d, reason_d = validate_effects(proposal, known_effect_paths)
-    report.checks["D_effects"] = result_d
-    if reason_d:
-        report.reasons["D_effects"] = reason_d
+    _record_check(report, "D_effects", result_d, reason_d)
 
     # E: Safety
     result_e, reason_e = validate_safety(proposal, safety_limits)
-    report.checks["E_safety"] = result_e
-    if reason_e:
-        report.reasons["E_safety"] = reason_e
+    _record_check(report, "E_safety", result_e, reason_e)
 
     # F: Narrative
     result_f, reason_f = validate_narrative(proposal, narrative_context)
-    report.checks["F_narrative"] = result_f
-    if reason_f:
-        report.reasons["F_narrative"] = reason_f
+    _record_check(report, "F_narrative", result_f, reason_f)
 
     return report
