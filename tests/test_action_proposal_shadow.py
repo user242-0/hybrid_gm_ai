@@ -1,7 +1,15 @@
 import json
 import sys
 
-from src.action_proposal.shadow import append_shadow_log, validate_proposal_shadow
+import src.action_proposal.shadow as shadow
+from src.action_proposal.shadow import (
+    SHADOW_LOG_FILENAME,
+    append_shadow_log,
+    build_shadow_record,
+    default_shadow_log_path,
+    validate_and_build_shadow_record,
+    validate_proposal_shadow,
+)
 
 
 def pass_proposal():
@@ -127,3 +135,129 @@ def test_shadow_adapter_does_not_import_runtime_registration_systems():
 
     assert "src.action_registry" not in sys.modules
     assert "src.ui.action_pipeline" not in sys.modules
+
+
+def test_default_shadow_log_path_uses_standard_filename():
+    assert default_shadow_log_path().name == SHADOW_LOG_FILENAME
+    assert default_shadow_log_path().name == "action_proposal_shadow.jsonl"
+
+
+def test_build_shadow_record_contains_schema_and_stage():
+    proposal = pass_proposal()
+    result = validate_proposal_shadow(proposal, context=pass_context())
+
+    record = build_shadow_record(proposal, result)
+
+    assert record["schema"] == "action_proposal_shadow.v0.1"
+    assert record["stage"] == "shadow"
+
+
+def test_build_shadow_record_contains_proposal_id_and_label():
+    proposal = pass_proposal()
+    result = validate_proposal_shadow(proposal, context=pass_context())
+
+    record = build_shadow_record(proposal, result)
+
+    assert record["proposal_id"] == proposal["id"]
+    assert record["proposal_label"] == proposal["label"]
+
+
+def test_build_shadow_record_copies_result_fields():
+    proposal = pass_proposal()
+    result = {
+        "accepted": True,
+        "overall": "PASS",
+        "report": {"overall": "PASS", "checks": {"syntax": "PASS"}},
+    }
+
+    record = build_shadow_record(proposal, result)
+
+    assert record["accepted"] is True
+    assert record["overall"] == "PASS"
+    assert record["report"] == result["report"]
+
+
+def test_build_shadow_record_source_argument_overrides_proposal_source():
+    proposal = pass_proposal()
+    result = validate_proposal_shadow(proposal, context=pass_context())
+
+    record = build_shadow_record(proposal, result, source="human")
+
+    assert record["source"] == "human"
+
+
+def test_build_shadow_record_uses_proposal_source_without_source_argument():
+    proposal = pass_proposal()
+    result = validate_proposal_shadow(proposal, context=pass_context())
+
+    record = build_shadow_record(proposal, result)
+
+    assert record["source"] == proposal["source"]
+
+
+def test_build_shadow_record_defaults_context_summary_to_empty_dict():
+    proposal = pass_proposal()
+    result = validate_proposal_shadow(proposal, context=pass_context())
+
+    record = build_shadow_record(proposal, result)
+
+    assert record["context_summary"] == {}
+
+
+def test_build_shadow_record_includes_original_proposal():
+    proposal = pass_proposal()
+    result = validate_proposal_shadow(proposal, context=pass_context())
+
+    record = build_shadow_record(proposal, result)
+
+    assert record["proposal"] == proposal
+
+
+def test_validate_and_build_shadow_record_accepts_pass_proposal():
+    record = validate_and_build_shadow_record(pass_proposal(), context=pass_context())
+
+    assert record["accepted"] is True
+    assert record["overall"] == "PASS"
+
+
+def test_validate_and_build_shadow_record_rejects_duplicate_proposal():
+    record = validate_and_build_shadow_record(
+        pass_proposal(),
+        context=pass_context(active_action_ids={"search_dumpster"}),
+    )
+
+    assert record["accepted"] is False
+    assert record["overall"] == "REJECT"
+
+
+def test_append_shadow_log_default_path_writes_jsonl_record(tmp_path, monkeypatch):
+    monkeypatch.setattr(shadow, "default_shadow_log_path", lambda: tmp_path / SHADOW_LOG_FILENAME)
+    proposal = pass_proposal()
+    result = validate_proposal_shadow(proposal, context=pass_context())
+    record = build_shadow_record(proposal, result)
+    default_path = shadow.default_shadow_log_path()
+
+    append_shadow_log(default_path, record)
+
+    lines = default_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    saved = json.loads(lines[0])
+    assert saved["schema"] == "action_proposal_shadow.v0.1"
+    assert saved["stage"] == "shadow"
+    assert saved["proposal_id"] == "search_dumpster"
+    assert saved["overall"] == "PASS"
+
+
+def test_append_shadow_log_default_path_preserves_japanese_record_label(tmp_path, monkeypatch):
+    monkeypatch.setattr(shadow, "default_shadow_log_path", lambda: tmp_path / SHADOW_LOG_FILENAME)
+    proposal = pass_proposal()
+    proposal["label"] = "ゴミ箱を漁る"
+    result = validate_proposal_shadow(proposal, context=pass_context())
+    record = build_shadow_record(proposal, result)
+    default_path = shadow.default_shadow_log_path()
+
+    append_shadow_log(default_path, record)
+
+    text = default_path.read_text(encoding="utf-8")
+    assert "ゴミ箱を漁る" in text
+    assert "\\u30b4" not in text

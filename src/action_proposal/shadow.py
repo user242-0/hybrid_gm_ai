@@ -8,6 +8,16 @@ from typing import Any
 
 from src.action_proposal.validator import validate_proposal
 
+SHADOW_LOG_FILENAME = "action_proposal_shadow.jsonl"
+SHADOW_RECORD_SCHEMA = "action_proposal_shadow.v0.1"
+
+
+def default_shadow_log_path() -> Path:
+    """Return the standard JSONL path for Action Proposal shadow records."""
+    from src.utility.config_loader import job_root_from_cfg
+
+    return Path(job_root_from_cfg()) / SHADOW_LOG_FILENAME
+
 
 def validate_proposal_shadow(
     proposal: dict,
@@ -40,6 +50,49 @@ def validate_proposal_shadow(
         "overall": overall,
         "report": report_dict,
     }
+
+
+def build_shadow_record(
+    proposal: dict,
+    result: dict,
+    *,
+    context_summary: dict | None = None,
+    run_id: str | None = None,
+    source: str | None = None,
+) -> dict[str, Any]:
+    """Build the stable Action Proposal shadow JSONL record schema."""
+    return {
+        "schema": SHADOW_RECORD_SCHEMA,
+        "stage": "shadow",
+        "run_id": run_id,
+        "source": source if source is not None else proposal.get("source"),
+        "proposal_id": proposal.get("id"),
+        "proposal_label": proposal.get("label"),
+        "accepted": result.get("accepted"),
+        "overall": result.get("overall"),
+        "report": result.get("report"),
+        "context_summary": context_summary or {},
+        "proposal": proposal,
+    }
+
+
+def validate_and_build_shadow_record(
+    proposal: dict,
+    *,
+    context: dict | None = None,
+    context_summary: dict | None = None,
+    run_id: str | None = None,
+    source: str | None = None,
+) -> dict[str, Any]:
+    """Validate a proposal in shadow mode and return a stable log record."""
+    result = validate_proposal_shadow(proposal, context=context)
+    return build_shadow_record(
+        proposal,
+        result,
+        context_summary=context_summary,
+        run_id=run_id,
+        source=source,
+    )
 
 
 def append_shadow_log(path: str | Path, record: dict) -> None:
@@ -78,8 +131,14 @@ def _demo() -> None:
             "require_rationale": True,
         },
     }
-    result = validate_proposal_shadow(proposal, context=context)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    record = validate_and_build_shadow_record(
+        proposal,
+        context=context,
+        context_summary={"mode": "PURSUE", "location": "alley"},
+        run_id="demo",
+    )
+    print(f"default_shadow_log_path: {default_shadow_log_path()}")
+    print(json.dumps(record, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
