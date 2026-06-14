@@ -227,14 +227,81 @@ def validate_safety(
     return ValidationResult.UNKNOWN, "effects unavailable for safety check"
 
 
+def _as_set(value: Any) -> set[Any]:
+    return set(value or ())
+
+
+def validate_narrative(
+    proposal: dict[str, Any],
+    narrative_context: dict[str, Any] | None = None,
+) -> tuple[ValidationResult, str]:
+    """Check F: mechanical tag/context consistency only."""
+    if narrative_context is None:
+        return ValidationResult.UNKNOWN, "narrative_context not provided"
+    if not isinstance(narrative_context, dict):
+        return ValidationResult.UNKNOWN, "narrative_context must be a dict"
+    if not isinstance(proposal, dict):
+        return ValidationResult.UNKNOWN, "proposal unavailable for narrative check"
+
+    source = proposal.get("source")
+    if "allowed_sources" in narrative_context and source is not None:
+        allowed_sources = _as_set(narrative_context.get("allowed_sources"))
+        if source not in allowed_sources:
+            return ValidationResult.REJECT, f"source not allowed: {source!r}"
+
+    if narrative_context.get("require_rationale") is True:
+        rationale = proposal.get("rationale")
+        if not isinstance(rationale, str) or not rationale.strip():
+            return ValidationResult.REJECT, "rationale required"
+
+    modes = proposal.get("modes")
+    if modes is not None:
+        if not isinstance(modes, list | tuple | set):
+            return ValidationResult.REJECT, "modes must be a list, tuple, or set"
+
+        mode_set = set(modes)
+        current_mode = narrative_context.get("current_mode")
+        if current_mode not in mode_set:
+            return ValidationResult.REJECT, f"current_mode not in proposal modes: {current_mode!r}"
+
+        if "allowed_modes" in narrative_context:
+            allowed_modes = _as_set(narrative_context.get("allowed_modes"))
+            disallowed_modes = sorted(mode_set - allowed_modes)
+            if disallowed_modes:
+                return ValidationResult.REJECT, f"modes outside allowed_modes: {disallowed_modes}"
+
+    tone_tags = proposal.get("tone_tags")
+    if tone_tags is not None:
+        if not isinstance(tone_tags, list | tuple | set):
+            return ValidationResult.REJECT, "tone_tags must be a list, tuple, or set"
+
+        if "tone" in narrative_context:
+            tone = _as_set(narrative_context.get("tone"))
+            if tone and not (set(tone_tags) & tone):
+                return ValidationResult.UNKNOWN, "tone_tags do not overlap narrative tone"
+
+    tags = proposal.get("tags")
+    if tags is not None:
+        if not isinstance(tags, list | tuple | set):
+            return ValidationResult.REJECT, "tags must be a list, tuple, or set"
+
+        forbidden_tags = _as_set(narrative_context.get("forbidden_tags"))
+        blocked_tags = sorted(set(tags) & forbidden_tags)
+        if blocked_tags:
+            return ValidationResult.REJECT, f"forbidden tags present: {blocked_tags}"
+
+    return ValidationResult.PASS, ""
+
+
 def validate_proposal(
     proposal: dict[str, Any],
     active_action_ids: set[str] | list[str] | tuple[str, ...] | None = None,
     known_requirement_keys: set[str] | list[str] | tuple[str, ...] | None = None,
     known_effect_paths: set[str] | list[str] | tuple[str, ...] | None = None,
     safety_limits: dict[str, Any] | None = None,
+    narrative_context: dict[str, Any] | None = None,
 ) -> ValidationReport:
-    """Run all validation checks (A-E implemented, F stub)."""
+    """Run all validation checks."""
     report = ValidationReport()
 
     # A: Syntax
@@ -273,8 +340,10 @@ def validate_proposal(
     if reason_e:
         report.reasons["E_safety"] = reason_e
 
-    # F: Narrative stub
-    report.checks["F_narrative"] = ValidationResult.UNKNOWN
-    report.reasons["F_narrative"] = "not yet implemented"
+    # F: Narrative
+    result_f, reason_f = validate_narrative(proposal, narrative_context)
+    report.checks["F_narrative"] = result_f
+    if reason_f:
+        report.reasons["F_narrative"] = reason_f
 
     return report

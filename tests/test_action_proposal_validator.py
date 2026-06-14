@@ -396,7 +396,7 @@ def test_a_b_c_pass_still_leaves_overall_unknown_because_f_is_unknown():
     assert report.overall == ValidationResult.UNKNOWN
 
 
-def fully_known_report(proposal, safety_limits=None):
+def fully_known_report(proposal, safety_limits=None, narrative_context=None):
     return validate_proposal(
         proposal,
         active_action_ids={"open_locked_door"},
@@ -409,6 +409,28 @@ def fully_known_report(proposal, safety_limits=None):
             "suspicion.value",
         },
         safety_limits=safety_limits,
+        narrative_context=narrative_context,
+    )
+
+
+def base_narrative_context(**overrides):
+    context = {
+        "current_mode": "PURSUE",
+        "allowed_modes": {"FREEZE", "FLEE", "PURSUE", "WITNESS"},
+        "tone": {"neo-noir", "slow_burn"},
+        "forbidden_tags": {"world_breaking", "comedy_gag"},
+        "allowed_sources": {"RO", "LLM", "pack", "human"},
+        "require_rationale": False,
+    }
+    context.update(overrides)
+    return context
+
+
+def fully_known_narrative_report(proposal=None, narrative_context=None):
+    return fully_known_report(
+        proposal or valid_proposal(),
+        safety_limits={},
+        narrative_context=base_narrative_context() if narrative_context is None else narrative_context,
     )
 
 
@@ -586,3 +608,202 @@ def test_a_b_c_d_e_pass_still_leaves_overall_unknown_because_f_is_unknown():
     assert report.checks["E_safety"] == ValidationResult.PASS
     assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
     assert report.overall == ValidationResult.UNKNOWN
+
+
+def test_f_narrative_unknown_when_context_is_none():
+    report = fully_known_report(valid_proposal(), safety_limits={}, narrative_context=None)
+
+    assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
+    assert report.reasons["F_narrative"] == "narrative_context not provided"
+
+
+def test_f_narrative_unknown_when_context_is_not_dict():
+    report = fully_known_report(valid_proposal(), safety_limits={}, narrative_context=["not", "a", "dict"])
+
+    assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
+    assert report.reasons["F_narrative"] == "narrative_context must be a dict"
+
+
+def test_f_narrative_rejects_source_outside_allowed_sources():
+    proposal = valid_proposal()
+    proposal["source"] = "rogue"
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_passes_source_inside_allowed_sources():
+    proposal = valid_proposal()
+    proposal["source"] = "RO"
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.PASS
+
+
+def test_f_narrative_rejects_missing_required_rationale():
+    report = fully_known_narrative_report(
+        valid_proposal(),
+        narrative_context=base_narrative_context(require_rationale=True),
+    )
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_rejects_empty_required_rationale():
+    proposal = valid_proposal()
+    proposal["rationale"] = "   "
+
+    report = fully_known_narrative_report(
+        proposal,
+        narrative_context=base_narrative_context(require_rationale=True),
+    )
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_passes_non_empty_required_rationale():
+    proposal = valid_proposal()
+    proposal["rationale"] = "Evidence may still be hidden on site."
+
+    report = fully_known_narrative_report(
+        proposal,
+        narrative_context=base_narrative_context(require_rationale=True),
+    )
+
+    assert report.checks["F_narrative"] == ValidationResult.PASS
+
+
+def test_f_narrative_rejects_modes_that_are_not_collection():
+    proposal = valid_proposal()
+    proposal["modes"] = "PURSUE"
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_rejects_when_current_mode_is_not_in_modes():
+    proposal = valid_proposal()
+    proposal["modes"] = ["FLEE"]
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_passes_when_current_mode_is_in_modes():
+    proposal = valid_proposal()
+    proposal["modes"] = ["PURSUE"]
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.PASS
+
+
+def test_f_narrative_rejects_modes_outside_allowed_modes():
+    proposal = valid_proposal()
+    proposal["modes"] = ["PURSUE", "TIME_TRAVEL"]
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_rejects_tone_tags_that_are_not_collection():
+    proposal = valid_proposal()
+    proposal["tone_tags"] = "neo-noir"
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_unknown_when_tone_tags_do_not_overlap_context_tone():
+    proposal = valid_proposal()
+    proposal["tone_tags"] = ["high_fantasy"]
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.UNKNOWN
+
+
+def test_f_narrative_passes_when_tone_tags_overlap_context_tone():
+    proposal = valid_proposal()
+    proposal["tone_tags"] = ["neo-noir"]
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.PASS
+
+
+def test_f_narrative_rejects_tags_that_are_not_collection():
+    proposal = valid_proposal()
+    proposal["tags"] = "investigation"
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_rejects_forbidden_tags():
+    proposal = valid_proposal()
+    proposal["tags"] = ["investigation", "world_breaking"]
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+
+
+def test_f_narrative_passes_when_tags_do_not_include_forbidden_tags():
+    proposal = valid_proposal()
+    proposal["tags"] = ["investigation"]
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["F_narrative"] == ValidationResult.PASS
+
+
+def test_f_narrative_reject_makes_overall_reject():
+    proposal = valid_proposal()
+    proposal["source"] = "rogue"
+
+    report = fully_known_narrative_report(proposal)
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+    assert report.checks["D_effects"] == ValidationResult.PASS
+    assert report.checks["E_safety"] == ValidationResult.PASS
+    assert report.checks["F_narrative"] == ValidationResult.REJECT
+    assert report.overall == ValidationResult.REJECT
+
+
+def test_a_b_c_d_e_f_all_pass_make_overall_pass():
+    proposal = valid_proposal()
+    proposal.update(
+        {
+            "requirements": {"location": "room", "flag": True},
+            "effects": [{"op": "add", "path": "evidence_score", "value": 3}],
+            "source": "RO",
+            "rationale": "Evidence may still be hidden on site.",
+            "modes": ["PURSUE"],
+            "tone_tags": ["neo-noir"],
+            "tags": ["investigation"],
+        }
+    )
+
+    report = fully_known_report(
+        proposal,
+        safety_limits={"max_abs_delta": 10},
+        narrative_context=base_narrative_context(require_rationale=True),
+    )
+
+    assert report.checks["A_syntax"] == ValidationResult.PASS
+    assert report.checks["B_uniqueness"] == ValidationResult.PASS
+    assert report.checks["C_requirements"] == ValidationResult.PASS
+    assert report.checks["D_effects"] == ValidationResult.PASS
+    assert report.checks["E_safety"] == ValidationResult.PASS
+    assert report.checks["F_narrative"] == ValidationResult.PASS
+    assert report.overall == ValidationResult.PASS
