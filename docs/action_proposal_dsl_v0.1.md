@@ -56,6 +56,53 @@ proposal:
 | E  | Safety       | Effects do not violate safety limits                                          | Implemented |
 | F  | Narrative    | Tags, source, mode, tone, and rationale are consistent with narrative context | Implemented |
 
+### Validator Contract
+
+`validate_proposal()` returns a `ValidationReport`.
+
+The report contract is stable in v0.1:
+
+```python
+{
+    "overall": "PASS" | "UNKNOWN" | "REJECT",
+    "checks": {
+        "A_syntax": "PASS" | "UNKNOWN" | "REJECT",
+        "B_uniqueness": "PASS" | "UNKNOWN" | "REJECT",
+        "C_requirements": "PASS" | "UNKNOWN" | "REJECT",
+        "D_effects": "PASS" | "UNKNOWN" | "REJECT",
+        "E_safety": "PASS" | "UNKNOWN" | "REJECT",
+        "F_narrative": "PASS" | "UNKNOWN" | "REJECT",
+    },
+    "reasons": {
+        "...": "human-readable reason"
+    },
+    "reason_codes": {
+        "...": "stable_machine_readable_reason_code"
+    }
+}
+```
+
+Check order is fixed:
+
+```python
+CHECK_ORDER = (
+    "A_syntax",
+    "B_uniqueness",
+    "C_requirements",
+    "D_effects",
+    "E_safety",
+    "F_narrative",
+)
+```
+
+`overall` is determined as follows:
+
+* If any check is `REJECT`, overall is `REJECT`.
+* If all checks are `PASS`, overall is `PASS`.
+* Otherwise, overall is `UNKNOWN`.
+
+Human-readable `reasons` may change over time. Callers should depend on `reason_codes`, check IDs, and result values instead.
+
 ### Check B: Uniqueness
 
 `validate_proposal()` accepts optional `active_action_ids`.
@@ -86,7 +133,8 @@ v0.1 only validates requirement key names. It does not validate requirement valu
 * Supported list-style ops in v0.1 are `add` and `set`.
 * If `known_effect_paths` is not provided for non-empty effects, D returns `UNKNOWN`.
 * If an effect path is unknown, D returns `REJECT`.
-* v0.1 validates structure and target paths only. It does not apply effects to world state.
+
+v0.1 validates effects structure and target paths only. It does not apply effects to world state.
 
 ### Check E: Safety
 
@@ -99,7 +147,8 @@ v0.1 only validates requirement key names. It does not validate requirement valu
 * `max_abs_delta_by_path` overrides the global delta limit for specific paths.
 * `set` effects are not checked by delta limit in v0.1.
 * If an `add` value cannot be interpreted numerically, E returns `UNKNOWN`.
-* v0.1 does not inspect or mutate live world state.
+
+v0.1 does not inspect or mutate live world state.
 
 ### Check F: Narrative
 
@@ -112,29 +161,119 @@ v0.1 only validates requirement key names. It does not validate requirement valu
 * `allowed_modes` can reject unknown or unsupported proposal modes.
 * `tone_tags` can be checked against the current tone set.
 * `tags` can be checked against `forbidden_tags`.
-* v0.1 only checks mechanical tag/context consistency. It does not judge whether an action is “interesting” or “good storytelling,” and it does not call an LLM.
 
-## Result Values
+v0.1 only checks mechanical tag/context consistency. It does not judge whether an action is interesting, dramatic, or good storytelling, and it does not call an LLM.
 
-Each check returns one of three values:
+## Runtime-facing v0.1 Adapters
 
-- **PASS** - Check succeeded
-- **REJECT** - Check failed with a reason
-- **UNKNOWN** - Check not yet implemented or inconclusive
+Action Proposal DSL v0.1 now has a staged runtime-facing pipeline.
 
-## Adoption Stages
+```text
+proposal
+→ validator A-F
+→ shadow record
+→ shadow log
+→ advisory item
+→ advisory feed
+→ read-only provider
+→ HUD read-only display
+```
 
-1. **Shadow** - Proposals are validated but not executed. Results logged only.
-2. **Advisory** - Validated proposals shown to player as suggestions.
-3. **Provisional** - Proposals auto-added to action list but marked as provisional.
-4. **Promotion** - Proven proposals become permanent pack actions.
+### Shadow Adapter
 
-## Design Principles
+Shadow mode validates proposals but does not execute them.
 
-1. Proposals are data, not code
-2. Validation is deterministic and reproducible
-3. Each check is independent and can be run in any order
-4. UNKNOWN is a valid result (not a failure)
-5. Shadow mode must be safe (no world state mutation)
-6. Proposals carry their rationale for auditability
-7. The DSL is versioned; breaking changes bump the version
+* `validate_proposal_shadow(proposal, context=None) -> dict`
+* `append_shadow_log(path, record) -> None`
+* `build_shadow_record(...) -> dict`
+* `validate_and_build_shadow_record(...) -> dict`
+
+Standard shadow log filename:
+
+```text
+action_proposal_shadow.jsonl
+```
+
+Default location:
+
+```text
+jobs/%Y%m%d_quick/action_proposal_shadow.jsonl
+```
+
+Shadow record schema:
+
+```text
+action_proposal_shadow.v0.1
+```
+
+Shadow records are audit logs. They should not be treated as temporary scratch files in the same way as generated scene graph debug artifacts.
+
+### Advisory Adapter
+
+Advisory mode converts accepted shadow records into display candidates.
+
+* `build_advisory_item(shadow_record) -> dict | None`
+* `build_advisory_items(shadow_records) -> list[dict]`
+* `validate_proposal_to_advisory(...) -> dict | None`
+
+Only shadow records with `accepted is True` and `overall == "PASS"` become advisory items.
+
+Advisory item schema:
+
+```text
+action_proposal_advisory.v0.1
+```
+
+### Advisory Feed
+
+The advisory feed converts advisory items into stable HUD-facing display items.
+
+* `build_display_item(advisory_item) -> dict | None`
+* `build_advisory_feed(advisory_items, limit=5, run_id=None) -> dict`
+* `build_advisory_feed_from_shadow_records(...) -> dict`
+* `load_jsonl_records(path) -> list[dict]`
+* `build_advisory_feed_from_shadow_log(...) -> dict`
+
+Feed schema:
+
+```text
+action_proposal_advisory_feed.v0.1
+```
+
+Display item schema:
+
+```text
+action_proposal_advisory_display_item.v0.1
+```
+
+### Read-only Advisory Provider
+
+The provider is the safe read-only entry point for HUD.
+
+* `get_advisory_feed(...) -> dict`
+* `get_advisory_display_items(...) -> list[dict]`
+* `has_advisory_items(...) -> bool`
+
+Provider schema:
+
+```text
+action_proposal_advisory_provider.v0.1
+```
+
+The provider reads shadow logs and returns display items. It does not write logs, mutate game state, register actions, or call ActionPipeline.
+
+### HUD Read-only Display
+
+Director HUD can display advisory items in an `AI提案` section.
+
+Current constraints:
+
+* Display only
+* Not clickable
+* Not executable
+* Not mixed into the Actions listbox
+* No ActionPipeline connection
+* No action_registry connection
+* No world state mutation
+
+This is still Advisory display, not Provisional action adoption.

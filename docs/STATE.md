@@ -46,51 +46,69 @@
 
 * ✅ 動くもの:
 
-  * `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由でアクション実行できる
+  * `python -m src.simulation` で起動し、HUDから選択→ActionPipeline経由で既存アクションを実行できる
   * 初期stateが `cop_trickster` パック準拠（刑事/愉快犯・ロケーション・関係性タグ）で立ち上がる
-  * **Action Proposal DSL v0.1**: Check A-F まで実装済み
+  * **Action Proposal DSL v0.1**: A-F validator / Shadow / Advisory / Feed / Provider / HUD read-only表示 まで実装済み
 
-    * A: syntax
-    * B: uniqueness
-    * C: requirements key validation
-    * D: effects structure / path validation
-    * E: safety limits
-    * F: narrative tag/context consistency
-    * `pytest tests/test_action_proposal_validator.py -q` は 81 passed
+    * A: Syntax
+    * B: Uniqueness
+    * C: Requirements
+    * D: Effects
+    * E: Safety
+    * F: Narrative
+    * `ValidationReport` contract 固定済み
+    * `reason_codes` / `to_dict()` 実装済み
+    * Shadow log: `jobs/%Y%m%d_quick/action_proposal_shadow.jsonl`
+    * HUDに「AI提案」欄を表示できる
+    * ただし、現時点では表示のみ。クリック不可・実行不可・Actions listboxには混ぜない
 
 * ⚠️ いまの課題:
 
-  * A-F check の reason 文言・report形式の contract がまだ固定されていない
-  * proposal を HUD / ActionPipeline / Director に接続する導線はまだ未実装
-  * Shadow mode の `propose_action` 導線は未実装
+  * HUDのAI提案欄は read-only 表示まで。提案をプレイヤーが採用・実行する導線は未実装
+  * shadow log は手動またはデモ経由で作る段階。ゲーム本体から自然に proposal を生成する導線は未実装
+  * `jobs/%Y%m%d_quick/action_proposal_shadow.jsonl` はプレイセッション監査ログとして扱う必要が出てきた
   * requirements の値検証や `RequirementsChecker` 連携は未実施
   * effects の world state 適用や `action_registry` 連携は未実施
-  * ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）が未実装
+  * ROがRC_AIの行動選択に影響を与える仕組み（policy_patch）は未実装
+  * `pytest -q` は既存と思われる3件が失敗中
+
+    * `tests/test_npc_switch.py::test_npc_switch`
+    * `tests/test_requirements_time_weather.py::test_statue_actions_are_gated_by_time_and_weather`
+    * `tests/test_scene_graph_roundtrip.py::test_scene_graph_roundtrip_minimal`
 
 * 🎯 今やっている目的:
 
-  * Action Proposal DSL v0.1 の validator contract を固め、次段階の Shadow mode / propose_action 導線に安全につなげる
+  * Action Proposal DSL v0.1 を、実行系へ直結させる前に「提案→検問→ログ→表示」まで安全に通す
+  * 次は、HUDに見えているAI提案を、どうやって自然に生成するか、またはプレイヤーがどう採用するかを段階的に設計する
 
 ## 3. 直近の変更（最新3つだけ）
 
-* 2026-06-14: Session 37: Action Proposal DSL Check F 実装。`narrative_context` による source / rationale / modes / tone_tags / tags の機械的整合性チェックを追加。A-F checks がすべて実装済みになり、`pytest tests/test_action_proposal_validator.py -q` は 81 passed。
-* 2026-06-14: Session 36: Action Proposal DSL Check E 実装。`safety_limits` による forbidden path / delta上限チェックを追加。`pytest tests/test_action_proposal_validator.py -q` は 62 passed。
-* 2026-06-14: Session 35: Action Proposal DSL Check D 実装。`known_effect_paths` による effects構造・path検査を追加。`pytest tests/test_action_proposal_validator.py -q` は 45 passed。
+* 2026-06-15: Session 44: HUD Advisory read-only表示を実装。`advisory_provider.get_advisory_display_items(limit=3)` をHUDCallbacksからread-onlyに呼び、Director HUDに「AI提案」欄を追加。Actions listboxには混ぜず、クリック不可・実行不可。手動shadow logによるHUD表示を目視確認し、日本語文字化けはテストデータ作成時のPowerShell文字コード問題として回避済み。
+* 2026-06-15: Session 41-43: Advisory Adapter / Advisory Feed / Read-only Providerを実装。shadow recordからPASS済み提案だけをadvisory item化し、HUDが読むdisplay feedに整形し、provider経由で安全にitemsを取得できるようにした。
+* 2026-06-15: Session 38-40: Validator contract / Shadow Adapter / Shadow Log Contractを実装。A-F checkの順序・`reason_codes`・`to_dict()`を固定し、proposalを検問して `jobs/%Y%m%d_quick/action_proposal_shadow.jsonl` にJSONL保存できる土台を作った。
 
 ## 4. 次にやること（最大3つ・小さく）
 
-1. Action Proposal DSL validator の contract を固定する
+1. Action Proposal Demo Producer / Seed を作る
 
-   * `ValidationReport` の形式
-   * check名
-   * reason文言の安定化
-   * 呼び出し側が依存してよい公開API
-2. Shadow mode の `propose_action` 導線を設計する
+   * 手動PowerShellではなく、デモ関数またはdebug操作で proposal を1件生成
+   * validator A-Fに通す
+   * shadow logへ保存
+   * HUDのAI提案欄に表示されるところまで確認
+   * まだActionPipelineには接続しない
 
-   * proposalを検問する
-   * 結果をログ保存する
-   * まだHUD/ActionPipelineには接続しない
-3. A-F実装完了後の共有ファイルを選定し直し、ChatGPTプロジェクト共有フォルダを更新する
+2. HUD AI提案欄の見た目を軽く整える
+
+   * 長文detailのwrap
+   * RO表示との間隔
+   * 「AI提案なし」時の表示方針
+   * ウィンドウ高さ・minsize調整
+
+3. main統合前チェックの準備
+
+   * targeted tests は通っていることを確認
+   * `pytest -q` の既存3失敗を別件として整理
+   * `jobs/` の扱いを「一時生成物」と「プレイセッション監査ログ」に分ける
 
 
 ## 5. ブロッカー（止まってる理由があれば）
