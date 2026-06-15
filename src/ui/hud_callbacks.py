@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, Callable
 
+from src.action_proposal.advisory_provider import get_advisory_display_items
 from src.utility.config_loader import is_hud_debug_enabled
 
 if TYPE_CHECKING:
@@ -53,6 +54,7 @@ class HUDCallbacks:
             ctx.director_hud.set_progress(None)
             ctx.director_hud.set_recommended(None, enabled=False)
             ctx.director_hud.set_actions([])
+            ctx.director_hud.set_advisory_items([])
             ctx.game_state["hud_cached_progress"] = None
             ctx.game_state["hud_cached_actions"] = []
             ctx.game_state["hud_cached_recommended"] = {
@@ -182,6 +184,7 @@ class HUDCallbacks:
         cached_actions = ctx.game_state.get("hud_cached_actions") or []
         ctx.current_actions[:] = list(cached_actions)
         ctx.director_hud.set_actions(list(cached_actions))
+        self._refresh_advisory_items()
 
         # RO 助言表示
         ro_rec = ctx.game_state.get("ro_recommendation")
@@ -196,6 +199,18 @@ class HUDCallbacks:
         # Location 表示
         loc = ctx.game_state.get("current_location", "")
         ctx.director_hud.set_location(loc)
+
+    def _refresh_advisory_items(self) -> None:
+        hud = self.ctx.director_hud
+        if hud is None:
+            return
+        try:
+            items = get_advisory_display_items(limit=3)
+        except Exception as exc:
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] advisory provider failed: {exc}")
+            items = []
+        hud.set_advisory_items(items)
 
     def hud_adjust_value(self, path: list, delta: float, *, minimum=None, maximum=None) -> None:
         """HUD から値を調整する"""

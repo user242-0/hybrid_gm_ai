@@ -16,6 +16,34 @@ MODE_COLORS = {
     "WITNESS": "#5a2a83",
 }
 
+MAX_ADVISORY_DISPLAY_ITEMS = 3
+
+
+def _display_text(value: object) -> str:
+    return "" if value is None else str(value)
+
+
+def _format_advisory_items(items: list[dict] | None) -> str:
+    if not items:
+        return ""
+
+    lines: list[str] = []
+    for item in items[:MAX_ADVISORY_DISPLAY_ITEMS]:
+        if not isinstance(item, dict):
+            continue
+        title = _display_text(item.get("title"))
+        subtitle = _display_text(item.get("subtitle"))
+        detail = _display_text(item.get("detail"))
+
+        first_line = f"• {title}"
+        if subtitle:
+            first_line = f"{first_line} — {subtitle}"
+        lines.append(first_line)
+        if detail:
+            lines.append(f"  {detail}")
+
+    return "\n".join(lines)
+
 
 class DirectorHUD:
     """Small top-level window that exposes quick director controls."""
@@ -25,8 +53,8 @@ class DirectorHUD:
         self.root.title(title)
         # The HUD shows multiple stacked rows; ensure the window is tall enough so the
         # Auto/Next controls and help text are visible without manual resizing.
-        self.root.geometry("520x420")
-        self.root.minsize(520, 380)
+        self.root.geometry("520x480")
+        self.root.minsize(520, 430)
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -45,6 +73,7 @@ class DirectorHUD:
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
         self.progress_var = tk.StringVar(value="")
         self.ro_var = tk.StringVar(value="")
+        self.advisory_var = tk.StringVar(value="")
         self.auto_var = tk.BooleanVar(value=False)
         self.location_var = tk.StringVar(value="")
 
@@ -155,6 +184,18 @@ class DirectorHUD:
             wraplength=420, justify="left",
         )
         self.ro_label.pack(side="left", padx=6)
+
+        row_advisory = tk.Frame(frame, bg=frame["bg"])
+        row_advisory.pack(fill="x", **pad)
+        tk.Label(
+            row_advisory, text="AI提案:", fg="#9FE7FF", bg=frame["bg"],
+            font=("TkDefaultFont", 9, "bold"),
+        ).pack(side="left")
+        self.advisory_label = tk.Label(
+            row_advisory, textvariable=self.advisory_var, fg="#9FE7FF", bg=frame["bg"],
+            wraplength=420, justify="left",
+        )
+        self.advisory_label.pack(side="left", padx=6)
 
         row_actions = tk.Frame(frame, bg=frame["bg"])
         row_actions.pack(fill="both", expand=True, **pad)
@@ -286,6 +327,10 @@ class DirectorHUD:
 
     def set_ro_recommendation(self, text: Optional[str]) -> None:
         self._run_or_enqueue(lambda: self.ro_var.set(text or ""))
+
+    def set_advisory_items(self, items: list[dict] | None) -> None:
+        text = _format_advisory_items(items)
+        self._run_or_enqueue(lambda: self.advisory_var.set(text))
 
     def set_location(self, text: str) -> None:
         def apply() -> None:
