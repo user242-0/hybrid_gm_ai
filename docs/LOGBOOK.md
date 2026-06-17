@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-06-17（Session 45: actor_id付きAI提案HUD）
+
+### 今日やったこと
+
+* Action Proposal advisory pipeline に `actor_id` を追加。
+* `proposal["actor_id"]` を shadow record / advisory item / display item へ伝播。
+* provider に `actor_id` optional filter を追加。
+* HUDCallbacks から `game_state["active_char"].name` を provider に渡すようにした。
+* AI提案は引き続きread-only表示。Actions listboxには混ぜず、ActionPipelineにも未接続。
+
+### テスト
+
+* targeted tests: 92 passed。
+* `pytest -q` は既存失敗2件あり。
+  * `tests/test_npc_switch.py`
+  * `tests/test_requirements_time_weather.py`
+
+### 次回の最初の一手
+
+* actor_id付き Demo Proposal / Seed を作る。
+* 刑事向け・愉快犯向けのサンプルproposalをshadow logへ保存し、操作RCに応じてHUD AI提案欄が切り替わることを確認する。
+
 ### 検討メモ: switch_character と AI提案HUD
 
 HUDに全RCのAI提案を併記すると肥大化するため、
