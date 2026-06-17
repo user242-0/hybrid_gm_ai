@@ -103,6 +103,12 @@ def test_proposal_id_and_label_fall_back_to_proposal():
     assert item["proposal_label"] == "Search the dumpster"
 
 
+def test_actor_id_copies_from_shadow_record():
+    item = build_advisory_item(pass_shadow_record(actor_id="Hero"))
+
+    assert item["actor_id"] == "Hero"
+
+
 def test_source_prefers_shadow_record():
     item = build_advisory_item(pass_shadow_record(source="shadow_source"))
 

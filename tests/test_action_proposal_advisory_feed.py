@@ -87,6 +87,12 @@ def test_build_display_item_builds_from_valid_advisory_item():
     assert item["status"] == "suggested"
 
 
+def test_build_display_item_copies_actor_id():
+    item = build_display_item(advisory_item(actor_id="Hero"))
+
+    assert item["actor_id"] == "Hero"
+
+
 def test_build_display_item_returns_none_for_non_advisory_stage():
     assert build_display_item(advisory_item(stage="shadow")) is None
 

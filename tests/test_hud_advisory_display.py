@@ -82,6 +82,7 @@ def make_callbacks(hud=None):
             "hud_cache_rev": 1,
             "hud_last_rendered_rev": -1,
             "current_location": "alley",
+            "active_char": SimpleNamespace(name="Hero"),
         },
         current_actions=[],
     )
@@ -157,15 +158,15 @@ def test_refresh_hud_reads_provider_and_sets_advisory_items(monkeypatch):
     provider_items = [{"title": "Search", "subtitle": "RO proposal", "detail": "Because"}]
     calls = []
 
-    def fake_get_advisory_display_items(*, limit):
-        calls.append(limit)
+    def fake_get_advisory_display_items(*, actor_id, limit):
+        calls.append((actor_id, limit))
         return provider_items
 
     monkeypatch.setattr(hud_callbacks, "get_advisory_display_items", fake_get_advisory_display_items)
 
     callbacks.refresh_hud()
 
-    assert calls == [3]
+    assert calls == [("Hero", 3)]
     assert hud.advisory_calls == [provider_items]
 
 
@@ -173,7 +174,7 @@ def test_refresh_hud_clears_advisory_when_provider_raises(monkeypatch):
     hud = RecordingHUD()
     callbacks, _ctx = make_callbacks(hud)
 
-    def fake_get_advisory_display_items(*, limit):
+    def fake_get_advisory_display_items(*, actor_id, limit):
         raise RuntimeError("provider failed")
 
     monkeypatch.setattr(hud_callbacks, "get_advisory_display_items", fake_get_advisory_display_items)
@@ -191,7 +192,7 @@ def test_refresh_hud_clears_advisory_when_world_is_none(monkeypatch):
     monkeypatch.setattr(
         hud_callbacks,
         "get_advisory_display_items",
-        lambda *, limit: [{"title": "should not read"}],
+        lambda *, actor_id, limit: [{"title": "should not read"}],
     )
 
     callbacks.refresh_hud()
@@ -206,7 +207,7 @@ def test_advisory_items_do_not_mix_into_current_actions(monkeypatch):
     monkeypatch.setattr(
         hud_callbacks,
         "get_advisory_display_items",
-        lambda *, limit: [advisory_item],
+        lambda *, actor_id, limit: [advisory_item],
     )
 
     callbacks.refresh_hud()

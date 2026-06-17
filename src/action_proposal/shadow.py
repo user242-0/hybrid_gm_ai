@@ -47,6 +47,7 @@ def validate_proposal_shadow(
         "accepted": overall == "PASS",
         "proposal_id": proposal.get("id") if isinstance(proposal, dict) else None,
         "proposal_label": proposal.get("label") if isinstance(proposal, dict) else None,
+        "actor_id": proposal.get("actor_id") if isinstance(proposal, dict) else None,
         "overall": overall,
         "report": report_dict,
     }
@@ -68,6 +69,7 @@ def build_shadow_record(
         "source": source if source is not None else proposal.get("source"),
         "proposal_id": proposal.get("id"),
         "proposal_label": proposal.get("label"),
+        "actor_id": proposal.get("actor_id"),
         "accepted": result.get("accepted"),
         "overall": result.get("overall"),
         "report": result.get("report"),

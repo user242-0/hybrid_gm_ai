@@ -42,6 +42,9 @@ def build_display_item(advisory_item: dict) -> dict[str, Any] | None:
     report = _dict_or_empty(advisory_item.get("report"))
 
     proposal_id = advisory_item.get("proposal_id") or proposal.get("id")
+    actor_id = advisory_item.get("actor_id")
+    if actor_id is None:
+        actor_id = proposal.get("actor_id")
     source = advisory_item.get("source") or proposal.get("source")
     title = _first_text(
         display.get("title"),
@@ -69,6 +72,7 @@ def build_display_item(advisory_item: dict) -> dict[str, Any] | None:
         "stage": "advisory",
         "status": "suggested",
         "proposal_id": proposal_id,
+        "actor_id": actor_id,
         "title": title,
         "subtitle": subtitle,
         "detail": detail,

@@ -29,6 +29,9 @@ def build_advisory_item(shadow_record: dict) -> dict[str, Any] | None:
     proposal = _proposal_from_shadow(shadow_record)
     proposal_id = shadow_record.get("proposal_id") or proposal.get("id")
     proposal_label = shadow_record.get("proposal_label") or proposal.get("label")
+    actor_id = shadow_record.get("actor_id")
+    if actor_id is None:
+        actor_id = proposal.get("actor_id")
     source = shadow_record.get("source") or proposal.get("source")
     rationale = proposal.get("rationale") or ""
     subtitle = f"{source} proposal" if source else "Action proposal"
@@ -39,6 +42,7 @@ def build_advisory_item(shadow_record: dict) -> dict[str, Any] | None:
         "status": "suggested",
         "proposal_id": proposal_id,
         "proposal_label": proposal_label,
+        "actor_id": actor_id,
         "source": source,
         "rationale": rationale,
         "display": {

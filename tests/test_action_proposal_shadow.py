@@ -162,6 +162,16 @@ def test_build_shadow_record_contains_proposal_id_and_label():
     assert record["proposal_label"] == proposal["label"]
 
 
+def test_build_shadow_record_contains_actor_id_when_proposal_has_actor_id():
+    proposal = pass_proposal()
+    proposal["actor_id"] = "Hero"
+    result = validate_proposal_shadow(proposal, context=pass_context())
+
+    record = build_shadow_record(proposal, result)
+
+    assert record["actor_id"] == "Hero"
+
+
 def test_build_shadow_record_copies_result_fields():
     proposal = pass_proposal()
     result = {

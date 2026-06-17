@@ -141,6 +141,23 @@ def test_limit_none_returns_all_items(tmp_path):
     assert [item["proposal_id"] for item in feed["items"]] == ["one", "two"]
 
 
+def test_actor_id_filter_returns_only_matching_actor_items(tmp_path):
+    path = tmp_path / "shadow.jsonl"
+    write_jsonl(
+        path,
+        [
+            shadow_record(proposal_id="hero_one", actor_id="Hero"),
+            shadow_record(proposal_id="villain_one", actor_id="Villain"),
+            shadow_record(proposal_id="hero_two", actor_id="Hero"),
+        ],
+    )
+
+    items = get_advisory_display_items(path=path, actor_id="Hero", limit=None)
+
+    assert [item["proposal_id"] for item in items] == ["hero_one", "hero_two"]
+    assert {item["actor_id"] for item in items} == {"Hero"}
+
+
 def test_run_id_is_reflected_in_feed(tmp_path):
     feed = get_advisory_feed(path=tmp_path / "missing.jsonl", run_id="provider-test")
 

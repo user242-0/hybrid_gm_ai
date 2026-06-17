@@ -204,8 +204,10 @@ class HUDCallbacks:
         hud = self.ctx.director_hud
         if hud is None:
             return
+        actor_obj = self.ctx.game_state.get("active_char")
+        actor_id = actor_obj.name if actor_obj and hasattr(actor_obj, "name") else None
         try:
-            items = get_advisory_display_items(limit=3)
+            items = get_advisory_display_items(actor_id=actor_id, limit=3)
         except Exception as exc:
             if is_hud_debug_enabled():
                 print(f"[HUD_DEBUG] advisory provider failed: {exc}")
