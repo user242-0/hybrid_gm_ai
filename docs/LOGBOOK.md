@@ -6,6 +6,19 @@
 - 長文になったら、`general_documents/diary/` に退避してリンクを貼る
 
 ---
+
+### 検討メモ: switch_character と AI提案HUD
+
+HUDに全RCのAI提案を併記すると肥大化するため、
+AI提案は「現在操作中RC」に限定して表示する方針が有力。
+
+switch_character により操作RCが刑事から愉快犯へ切り替わった場合、
+HUDのAI提案欄も刑事向けから愉快犯向けへ切り替わる。
+
+次の実装は、提案アクションをすぐ実行可能にするより、
+まず proposal/advisory/display item に `actor_id` を持たせ、
+HUD provider が current active_char に一致する提案だけを返す導線を検討する。
+
 ## 2026-06-15（Session 38-44: Action Proposal DSL → HUD read-only表示）
 
 ### 今日やったこと（結果）

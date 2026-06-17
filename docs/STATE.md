@@ -32,6 +32,20 @@
 
 詳細は `general_documents/future_goals/RC_switch_character_design_principles.md` に整理する。
 
+### Design Note: actor別 HUD Action Proposal
+
+AI提案HUDは、将来的に「現在操作中RC」の提案だけを表示する方針。
+
+- 操作RC = 刑事 → 刑事向けAI提案のみ表示
+- 操作RC = 愉快犯 → 愉快犯向けAI提案のみ表示
+- 非操作中RCの提案は通常HUDに混ぜず、必要なら Debug / GM View / RC Activity Panel に分離する
+
+次工程では、Action Proposal / Shadow / Advisory / Display item に `actor_id` を持たせ、
+provider側で `current active_char` に一致する提案だけをHUDへ返すことを検討する。
+
+この方針により、AI提案の実行可能化へ進む前に、
+「誰が実行する提案なのか」を明確にできる。
+
 
 ## 1. すぐ動かす（入口コマンド）
 - Run:
