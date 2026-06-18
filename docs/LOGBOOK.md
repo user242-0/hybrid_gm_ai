@@ -7,23 +7,62 @@
 
 ---
 
-## 2026-06-18（Session 45後半: actor_id付きDemo Seed）
+## 2026-06-18（Session 45: actor_id付きAI提案HUD / Demo Seed）
 
 ### 今日やったこと
 
-* `python -m src.action_proposal.demo_seed` を追加。
-* 刑事向け `compare_witness_timestamps` と愉快犯向け `plant_false_trace` をA-F validatorへ通し、PASS recordだけを標準shadow logへ追記する。
-* providerのactor_id filterで、刑事/愉快犯向け表示を分離するテストを追加。
-* read-only表示を維持し、ActionPipeline / action_registry / Actions listboxには未接続。
-* 既存の `fix_cam_clock` は再定義していない。
+* Action Proposal advisory pipeline に `actor_id` を追加した。
 
-### テスト
+  * proposal
+  * shadow record
+  * advisory item
+  * display item
+  * provider
+  * HUDCallbacks
 
-* Action Proposal / shadow / advisory / feed / provider / HUD targeted tests: 192 passed。
+* HUDCallbacks から `game_state["active_char"].name` を provider に渡し、現在操作中RCに一致するAI提案だけをHUDへ表示できるようにした。
+
+* `src/action_proposal/demo_seed.py` を追加し、actor_id付きDemo Proposalを生成できるようにした。
+
+  * 刑事向け: `compare_witness_timestamps` / 「証言時刻を照合する」
+  * 愉快犯向け: `plant_false_trace` / 「偽の痕跡を残す」
+
+* demo_seed を冪等化した。
+
+  * 何度実行しても、同一 `actor_id + proposal_id` の既知seedは重複追加されない。
+  * 既に重複している既知seed recordも、1件に正規化される。
+  * seed以外のshadow recordは保持する。
+
+### HUD確認
+
+* `python -m src.action_proposal.demo_seed`
+* `python -m src.simulation`
+
+確認結果:
+
+* 操作RC = 刑事
+
+  * AI提案欄に「証言時刻を照合する」が1件だけ表示された。
+* 操作RC = 愉快犯
+
+  * AI提案欄に「偽の痕跡を残す」が1件だけ表示された。
+* 二重表記は解消した。
+
+### 気づき
+
+* `switch_character` と `actor_id` により、「RCごとに別のHUD/別の物語を体験する」土台ができた。
+* 現時点ではAI提案欄のみactor_id対応だが、将来的には全HUDアクションを現在操作中RCに応じて切り替える方向が自然。
+* 既存の `fix_cam_clock` / 監視カメラ時刻ズレ補正は既にTPO素材として存在するが、GUIから discovery を立てる通常プレイ導線が弱い。これは後続タスクで整理する。
+* TPOコンテンツは、AI提案実行化の前に最低1本は縦切りで整えておくとよい。
 
 ### 次回の最初の一手
 
-* ゲームを起動し、実HUDでactive character切替時の表示を目視確認する。
+* 別セッションで既存失敗testを修正し、`pytest -q` の all green を目指す。
+
+  * `tests/test_npc_switch.py`
+  * `tests/test_requirements_time_weather.py`
+* all green後、mainブランチへ取り込む。
+
 
 ## 2026-06-17（Session 45: actor_id付きAI提案HUD）
 
