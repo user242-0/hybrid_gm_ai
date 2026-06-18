@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-06-18（Session 45後半: actor_id付きDemo Seed）
+
+### 今日やったこと
+
+* `python -m src.action_proposal.demo_seed` を追加。
+* 刑事向け `compare_witness_timestamps` と愉快犯向け `plant_false_trace` をA-F validatorへ通し、PASS recordだけを標準shadow logへ追記する。
+* providerのactor_id filterで、刑事/愉快犯向け表示を分離するテストを追加。
+* read-only表示を維持し、ActionPipeline / action_registry / Actions listboxには未接続。
+* 既存の `fix_cam_clock` は再定義していない。
+
+### テスト
+
+* Action Proposal / shadow / advisory / feed / provider / HUD targeted tests: 192 passed。
+
+### 次回の最初の一手
+
+* ゲームを起動し、実HUDでactive character切替時の表示を目視確認する。
+
 ## 2026-06-17（Session 45: actor_id付きAI提案HUD）
 
 ### 今日やったこと
