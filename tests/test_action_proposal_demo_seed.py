@@ -56,6 +56,81 @@ def test_seed_writes_multiple_actor_records_to_shadow_log(tmp_path):
     assert all(record["overall"] == "PASS" for record in saved)
 
 
+def test_seed_is_idempotent_for_actor_and_proposal_id(tmp_path):
+    path = tmp_path / "action_proposal_shadow.jsonl"
+
+    _, first_records = seed_demo_shadow_log(path, run_id="first-demo")
+    _, second_records = seed_demo_shadow_log(path, run_id="second-demo")
+
+    saved = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(first_records) == 2
+    assert second_records == []
+    assert [
+        (record["actor_id"], record["proposal_id"])
+        for record in saved
+    ] == [
+        ("刑事", "compare_witness_timestamps"),
+        ("愉快犯", "plant_false_trace"),
+    ]
+
+
+def test_seed_normalizes_existing_duplicates_and_preserves_other_records(tmp_path):
+    path = tmp_path / "action_proposal_shadow.jsonl"
+    detective, trickster = build_demo_shadow_records(run_id="existing-demo")
+    other_record = {
+        "schema": "action_proposal_shadow.v0.1",
+        "stage": "shadow",
+        "run_id": "other",
+        "actor_id": "刑事",
+        "proposal_id": "inspect_alibi",
+        "accepted": True,
+        "overall": "PASS",
+    }
+    existing_records = [
+        detective,
+        other_record,
+        detective,
+        trickster,
+        trickster,
+    ]
+    path.write_text(
+        "".join(
+            f"{json.dumps(record, ensure_ascii=False)}\n"
+            for record in existing_records
+        ),
+        encoding="utf-8",
+    )
+
+    _, appended_records = seed_demo_shadow_log(path, run_id="normalize-demo")
+
+    saved = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert appended_records == []
+    assert sum(
+        record.get("actor_id") == "刑事"
+        and record.get("proposal_id") == "compare_witness_timestamps"
+        and record.get("accepted") is True
+        and record.get("overall") == "PASS"
+        for record in saved
+    ) == 1
+    assert sum(
+        record.get("actor_id") == "愉快犯"
+        and record.get("proposal_id") == "plant_false_trace"
+        and record.get("accepted") is True
+        and record.get("overall") == "PASS"
+        for record in saved
+    ) == 1
+    assert other_record in saved
+    assert len(saved) == 3
+
+
 def test_provider_filters_seeded_items_by_actor_id(tmp_path):
     path = tmp_path / "action_proposal_shadow.jsonl"
     seed_demo_shadow_log(path, run_id="test-demo")

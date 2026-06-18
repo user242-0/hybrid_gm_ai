@@ -115,17 +115,68 @@ def build_demo_shadow_records(*, run_id: str = DEMO_RUN_ID) -> list[dict[str, An
     return records
 
 
+def _normalize_existing_seed_pass_records(
+    path: Path,
+    seed_keys: set[tuple[Any, Any]],
+) -> set[tuple[Any, Any]]:
+    if not path.exists():
+        return set()
+
+    existing_keys = set()
+    retained_lines = []
+    removed_duplicate = False
+    for line in path.read_bytes().splitlines(keepends=True):
+        stripped = line.strip()
+        if not stripped:
+            retained_lines.append(line)
+            continue
+
+        record = json.loads(stripped)
+        key = None
+        if (
+            isinstance(record, dict)
+            and record.get("accepted") is True
+            and record.get("overall") == "PASS"
+        ):
+            candidate_key = (record.get("actor_id"), record.get("proposal_id"))
+            if candidate_key in seed_keys:
+                key = candidate_key
+
+        if key is not None and key in existing_keys:
+            removed_duplicate = True
+            continue
+
+        retained_lines.append(line)
+        if key is not None:
+            existing_keys.add(key)
+
+    if removed_duplicate:
+        path.write_bytes(b"".join(retained_lines))
+    return existing_keys
+
+
 def seed_demo_shadow_log(
     path: str | Path | None = None,
     *,
     run_id: str = DEMO_RUN_ID,
 ) -> tuple[Path, list[dict[str, Any]]]:
-    """Append validated demo records to the standard shadow log or an override."""
+    """Append only demo PASS records not already present for the same actor."""
     log_path = Path(path) if path is not None else default_shadow_log_path()
     records = build_demo_shadow_records(run_id=run_id)
+    seed_keys = {
+        (record.get("actor_id"), record.get("proposal_id"))
+        for record in records
+    }
+    existing_keys = _normalize_existing_seed_pass_records(log_path, seed_keys)
+    appended_records = []
     for record in records:
+        key = (record.get("actor_id"), record.get("proposal_id"))
+        if key in existing_keys:
+            continue
         append_shadow_log(log_path, record)
-    return log_path, records
+        existing_keys.add(key)
+        appended_records.append(record)
+    return log_path, appended_records
 
 
 def _main() -> None:
