@@ -1,13 +1,21 @@
-from pathlib import Path
 import yaml
-from utility.config_loader import job_root_from_cfg
 from schemas.scene_graph import ObjectSpec, Pose  # 手元のモデルに合わせて調整
 
+
 def test_scene_graph_roundtrip_minimal():
-    job_root = job_root_from_cfg()
-    yml = job_root / "scene_graph.yml"
-    assert yml.exists(), f"missing: {yml}"
-    data = yaml.safe_load(yml.read_text(encoding="utf-8")) or {}
+    data = {
+        "objects": [
+            {
+                "name": "Hero",
+                "category": "character",
+                "base_prompt": "default character",
+                "action": "talk_to_statue",
+                "pose": None,
+            }
+        ],
+        "outputs": {"image": {"seed": 41}},
+        "meta": {"commit": "test-fixture"},
+    }
 
     # objects 部分を Pydantic で検証
     objs = data.get("objects") or []

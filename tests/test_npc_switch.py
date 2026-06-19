@@ -22,7 +22,7 @@ def test_npc_switch(monkeypatch):
     hero = gs["party"]["Hero"]
 
     local_sched = Scheduler()
-    monkeypatch.setattr(sim, "scheduler", local_sched)
+    monkeypatch.setattr(sim.ctx, "scheduler", local_sched)
 
     switch_choice = Choice("switch_character", "switch_character", "green", 255)
     monkeypatch.setattr(sim, "select_action", lambda *args, **kwargs: switch_choice)

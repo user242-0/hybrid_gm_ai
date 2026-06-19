@@ -105,15 +105,15 @@ def test_statue_actions_are_gated_by_time_and_weather():
     }
 
     checker = RequirementsChecker(base_state, player)
-    assert checker.check_all(actions["石像に話す"]["requirements"])
-    assert checker.check_all(actions["石像に話す（クールダウン）"]["requirements"])
+    assert checker.check_all(actions["talk_to_statue"]["requirements"])
+    assert checker.check_all(actions["talk_to_statue_cooldown"]["requirements"])
 
     daytime_state = copy.deepcopy(base_state)
     daytime_state["time_of_day"] = "morning"
     daytime_checker = RequirementsChecker(daytime_state, player)
-    assert not daytime_checker.check_all(actions["石像に話す"]["requirements"])
+    assert not daytime_checker.check_all(actions["talk_to_statue"]["requirements"])
 
     storm_state = copy.deepcopy(base_state)
     storm_state["world"]["weather"]["kind"] = "storm"
     storm_checker = RequirementsChecker(storm_state, player)
-    assert not storm_checker.check_all(actions["石像に話す（クールダウン）"]["requirements"])
+    assert not storm_checker.check_all(actions["talk_to_statue_cooldown"]["requirements"])
