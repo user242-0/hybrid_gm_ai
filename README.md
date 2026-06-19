@@ -26,9 +26,12 @@ python -m src.simulation --premise-text "..."
 
 ### Exit
 
-メイン GUI の入力欄に `q` と入力し、Enter キーを押すと終了します。`quit` と `exit` も使用できます。
+メイン GUI の下部入力欄に `q` と入力し、Enter キーを押すと終了します。`quit` と `exit` も使用できます。
+
+注: `q` を入力するのは Director HUD ではなく、テキストログと入力欄があるメイン GUI 側です。Director HUD はモード、MicroGoal、AI提案、Actions などを表示する補助ウィンドウです。
 
 現行コードでは `USE_CLI = False` のため、通常起動は GUI 入力です。コード上で CLI モードを有効にした場合は、端末の `>>` プロンプトに同じ終了コマンドを入力します。
+
 
 ## Tests
 
