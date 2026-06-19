@@ -2,7 +2,6 @@ actions
 adapters
 datalab
 director
-gmcore
 hybrid-gm-ai
 logic
 runners

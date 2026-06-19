@@ -1,4 +1,4 @@
-# blueprints/story.yml
+# Legacy hand-written blueprint for story.yml.
 story_id: "<auto>"
 theme: "古城の回廊での稽古"
 beats: []

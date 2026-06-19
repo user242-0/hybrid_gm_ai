@@ -21,7 +21,6 @@ src/datalab/registry/scene_resolver.py
 src/director/__init__.py
 src/director/director.py
 src/director/registry.py
-src/gmcore/context_eval.py
 src/hybrid_gm_ai.egg-info/PKG-INFO
 src/hybrid_gm_ai.egg-info/SOURCES.txt
 src/hybrid_gm_ai.egg-info/dependency_links.txt

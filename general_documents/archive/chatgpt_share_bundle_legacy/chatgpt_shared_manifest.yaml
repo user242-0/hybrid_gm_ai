@@ -1,4 +1,8 @@
-# chatgpt_shared_manifest.yml
+# Legacy ChatGPT share-bundle manifest.
+#
+# Archived on 2026-06-19 because this workflow is not used by runtime.
+# The companion script retains its historical `.yml` filename expectation,
+# which does not match this file's `.yaml` suffix.
 version: 1
 must_share:
   - config.yml

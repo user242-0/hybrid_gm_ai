@@ -1,4 +1,4 @@
-# scripts/make_share_bundle.py
+# Legacy share-bundle generator archived from scripts/make_share_bundle.py.
 from __future__ import annotations
 import yaml, zipfile
 from pathlib import Path
