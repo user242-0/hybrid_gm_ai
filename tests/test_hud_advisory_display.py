@@ -217,6 +217,44 @@ def test_advisory_items_do_not_mix_into_current_actions(monkeypatch):
     assert hud.advisory_calls == [[advisory_item]]
 
 
+def test_refresh_hud_switches_actions_and_advisories_by_active_actor(monkeypatch):
+    class ActorDirector(DummyDirector):
+        def list_actions_for_actor(self, actor_id, _mode):
+            action_id = "inspect_scene" if actor_id == "刑事" else "move_low_profile"
+            return [{"action": action_id, "text": action_id, "time_min": 5}]
+
+    hud = RecordingHUD()
+    callbacks, ctx = make_callbacks(hud)
+    ctx.director = ActorDirector()
+    ctx.game_state["active_char"] = SimpleNamespace(name="刑事")
+    provider_calls = []
+
+    def fake_get_advisory_display_items(*, actor_id, limit):
+        provider_calls.append((actor_id, limit))
+        return [{"title": actor_id}]
+
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        fake_get_advisory_display_items,
+    )
+
+    callbacks.refresh_hud()
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+
+    assert hud.actions_calls == [
+        [("inspect_scene", "inspect_scene", 5)],
+        [("move_low_profile", "move_low_profile", 5)],
+    ]
+    assert provider_calls == [("刑事", 3), ("愉快犯", 3)]
+    assert hud.advisory_calls == [
+        [{"title": "刑事"}],
+        [{"title": "愉快犯"}],
+    ]
+
+
 def test_hud_advisory_code_does_not_import_runtime_action_systems():
     source = hud_callbacks.__loader__.get_source(hud_callbacks.__name__)
 

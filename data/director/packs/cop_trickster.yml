@@ -1,4 +1,12 @@
 actions: {}
+hud_actions:
+  actors:
+    刑事:
+      - FREEZE
+      - PURSUE
+      - WITNESS
+    愉快犯:
+      - FLEE
 modes:
   FLEE:
     goals:

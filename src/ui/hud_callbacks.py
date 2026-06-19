@@ -99,8 +99,21 @@ class HUDCallbacks:
                 }
             ctx.game_state["hud_cached_recommended"] = recommended
 
+            actor_obj = ctx.game_state.get("active_char")
+            actor_id = actor_obj.name if actor_obj and hasattr(actor_obj, "name") else None
+            list_for_actor = getattr(ctx.director, "list_actions_for_actor", None)
+            if callable(list_for_actor):
+                action_records = list_for_actor(actor_id, ctx.director.mode)
+            else:
+                action_records = ctx.director.list_actions_for_mode(ctx.director.mode)
+            allowed_action_ids = {
+                record.get("action") or record.get("id") or record.get("action_id")
+                for record in action_records
+                if isinstance(record, dict)
+            }
+
             ctx.current_actions.clear()
-            for record in ctx.director.list_actions_for_mode(ctx.director.mode):
+            for record in action_records:
                 action_id = None
                 label = None
                 minutes = None
@@ -147,6 +160,11 @@ class HUDCallbacks:
                 ctx.current_actions[:] = merge_with_director_actions(
                     ctx.current_actions, opportunities, governed,
                 )
+                ctx.current_actions[:] = [
+                    action
+                    for action in ctx.current_actions
+                    if action[0] in allowed_action_ids
+                ]
 
             # Affordance: contextual label overrides
             label_rules = aff_rules.get("label_rules", [])

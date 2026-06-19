@@ -28,12 +28,14 @@ def load_pack(pack_id: str) -> Dict:
 
 
 def extract_goals_from_pack(pack_data: dict) -> dict:
-    """Extract the goals_dict (modes + affordances) from unified pack data."""
+    """Extract Director runtime data from unified pack data."""
     goals: Dict = {}
     if pack_data.get("modes"):
         goals["modes"] = pack_data["modes"]
     if pack_data.get("affordances"):
         goals["affordances"] = pack_data["affordances"]
+    if pack_data.get("hud_actions"):
+        goals["hud_actions"] = pack_data["hud_actions"]
     return goals
 
 
