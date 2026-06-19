@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-06-20（Session 47-B: 愉快犯用の基本HUDアクション）
+
+### 今日やったこと
+
+* 愉快犯FLEE用に「証拠を隠す」「偽の痕跡を残す」「目撃者を避ける」「潜伏先を変える」「次の標的を観察する」を追加。
+* effectsはsuspicion低下と小さな進行カウンタに限定した。
+* affordance discovery未取得時でも基本5件はActions listboxに残り、刑事用アクションと混ざらないことをテストした。
+* AI提案HUDとdemo_seedはread-onlyのまま維持した。
+
+### 気づき
+
+* 従来FLEEの2件は両方opportunity管理下にあり、discovery未取得時はHUD mergeで抑制されるため、Actions listboxが空になっていた。
+* `plant_false_trace` はdemo proposalとruntime ActionSpecで同じ意味なので、canonical IDを共有する方が将来の採用導線を単純化できる。
+
+### 次回の最初の一手
+
+* RC別MicroGoalの本格設計は分離し、先に愉快犯向けTPOコンテンツ縦切りで場所・時間・条件による抑制を追加する。
+
 ## 2026-06-19（Session 46:repo cleanup / LOGBOOK archive）
 
 ### 今日やったこと

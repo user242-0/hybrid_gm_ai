@@ -1,4 +1,108 @@
-actions: {}
+actions:
+  hide_evidence:
+    label: "証拠を隠す"
+    description: "目立つ痕跡を片づけ、追跡の手掛かりを減らす。"
+    time_min: 6
+    emotion_delta:
+      R: -2
+      G: 3
+      B: 1
+    effects:
+      - op: add
+        path: suspicion.value
+        value: -1
+        min: 0
+    tags:
+      - flee
+      - concealment
+    ui_visible: false
+    heart:
+      axis: green
+      value: 70
+  plant_false_trace:
+    label: "偽の痕跡を残す"
+    description: "追跡の焦点をずらすため、矛盾する痕跡を残す。"
+    time_min: 8
+    emotion_delta:
+      R: 1
+      G: 2
+      B: 1
+    effects:
+      - op: add
+        path: false_traces
+        value: 1
+    tags:
+      - flee
+      - deception
+    ui_visible: false
+    heart:
+      axis: green
+      value: 80
+  avoid_witness:
+    label: "目撃者を避ける"
+    description: "人目の少ない経路を選び、接触を避ける。"
+    time_min: 5
+    emotion_delta:
+      R: -2
+      G: 3
+      B: 0
+    effects:
+      - op: add
+        path: witnesses_avoided
+        value: 1
+      - op: add
+        path: suspicion.value
+        value: -1
+        min: 0
+    tags:
+      - flee
+      - evasion
+    ui_visible: false
+    heart:
+      axis: green
+      value: 70
+  change_hideout:
+    label: "潜伏先を変える"
+    description: "追跡を避けるため、別の潜伏先へ移る。"
+    time_min: 12
+    emotion_delta:
+      R: -1
+      G: 4
+      B: 0
+    effects:
+      - op: add
+        path: hideout_changes
+        value: 1
+      - op: add
+        path: suspicion.value
+        value: -1
+        min: 0
+    tags:
+      - flee
+      - hideout
+    ui_visible: false
+    heart:
+      axis: green
+      value: 90
+  observe_next_target:
+    label: "次の標的を観察する"
+    description: "距離を保ったまま周囲の動きと状況を観察する。"
+    time_min: 7
+    emotion_delta:
+      R: 1
+      G: 1
+      B: 3
+    effects:
+      - op: add
+        path: target_observations
+        value: 1
+    tags:
+      - flee
+      - observation
+    ui_visible: false
+    heart:
+      axis: blue
+      value: 80
 hud_actions:
   actors:
     刑事:
@@ -19,6 +123,31 @@ modes:
         id: low_profile
         type: Maintain
     micro:
+      -
+        action: hide_evidence
+        done: suspicion.value <= 4
+        text: 証拠を隠す
+        time_min: 6
+      -
+        action: plant_false_trace
+        done: false_traces >= 1
+        text: 偽の痕跡を残す
+        time_min: 8
+      -
+        action: avoid_witness
+        done: witnesses_avoided >= 1
+        text: 目撃者を避ける
+        time_min: 5
+      -
+        action: change_hideout
+        done: hideout_changes >= 1
+        text: 潜伏先を変える
+        time_min: 12
+      -
+        action: observe_next_target
+        done: target_observations >= 1
+        text: 次の標的を観察する
+        time_min: 7
       -
         action: move_low_profile
         done: suspicion.value <= 2
@@ -132,6 +261,7 @@ world_defaults:
   entropy:
     value: 0
   evidence_score: 0
+  false_traces: 0
   flags:
     tips_unread_exists: true
     crime_scene_blue_fiber_exists: true
@@ -141,14 +271,17 @@ world_defaults:
   harm:
     threshold_warn: 20
     value: 0
+  hideout_changes: 0
   partner_calls: 0
   report_submitted: 0
   sobriety_days: 0
   suspicion:
     value: 5
+  target_observations: 0
   tips_checked: 0
   victim_names_logged: 0
   witness_value: 0
+  witnesses_avoided: 0
 affordances:
   canonical_facts:
     tips_unread_exists: true
