@@ -8,7 +8,7 @@
 
 ---
 
-## 2026-06-19（repo cleanup / LOGBOOK archive）
+## 2026-06-19（Session 46:repo cleanup / LOGBOOK archive）
 
 ### 今日やったこと
 
