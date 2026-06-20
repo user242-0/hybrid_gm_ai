@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-06-20（Session 49: RC別MicroGoal）
+
+### 今日やったこと
+
+* 60秒YouTubeデモの優先実装として、active actor + ActorModeに対応するRC別MicroGoalを追加した。
+* `director_world["actor_micro_goals"]` にactorごとのMicroGoal、mode、進捗baseline、抽選履歴を保存し、save/load対象にした。
+* HUD表示を `MicroGoal(刑事): ...` / `MicroGoal(愉快犯): ...` とし、switch_characterとActorMode変更後に再表示するようにした。
+* 既存グローバルMicroGoal API、ActorMode未設定時の `Director.mode` fallback、AI提案HUDのactor_idフィルタ/read-onlyを維持した。
+
+### 次回の最初の一手
+
+* TPOコンテンツ縦切りとROのRC別実装を後続タスクとして進める。
+
 ## 2026-06-20（Session 48-C: ActorMode HUD verification）
 
 ### 今日やったこと

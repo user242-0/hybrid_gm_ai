@@ -15,6 +15,7 @@ class RecordingHUD:
     def __init__(self):
         self.actions = []
         self.actor_mode = None
+        self.microgoal = None
 
     def set_progress(self, _value):
         pass
@@ -40,6 +41,9 @@ class RecordingHUD:
     def set_clock(self, _text):
         pass
 
+    def set_microgoal(self, text):
+        self.microgoal = text
+
 
 def make_hud_callbacks(director, world, pack, actor_id):
     hud = RecordingHUD()
@@ -56,12 +60,23 @@ def make_hud_callbacks(director, world, pack, actor_id):
         current_actions=[],
     )
     specs = get_action_specs(pack)
+
+    def show_micro(micro, game_state, active_actor_id=None):
+        game_state["director_micro_goal"] = micro
+        game_state["director_micro_goal_actor_id"] = active_actor_id
+        display = (
+            f"MicroGoal({active_actor_id}): {micro}"
+            if active_actor_id
+            else micro
+        )
+        hud.set_microgoal(display)
+
     callbacks = HUDCallbacks(
         ctx,
         get_action_spec=specs.get,
         pick_action=lambda *_args, **_kwargs: (None, None, None),
         dispatch_action=lambda *_args, **_kwargs: None,
-        ui_show_micro=lambda *_args, **_kwargs: None,
+        ui_show_micro=show_micro,
         director_clock_string=lambda _world: "Day1 00:00",
         save_director_world=lambda _world: None,
         load_director_world=lambda _world: None,
@@ -357,12 +372,76 @@ def test_actor_modes_survive_hud_save_load_roundtrip(monkeypatch):
     )
 
     director.set_actor_mode(world, "刑事", "PURSUE")
+    cop_micro = director.get_micro_goal_for_actor(world, "刑事")
     callbacks.on_save()
     director.set_actor_mode(world, "刑事", "FREEZE")
+    director.clear_micro_goal_for_actor(world, "刑事")
     callbacks.on_load()
 
     assert ctx.director_world["actor_modes"]["刑事"] == "PURSUE"
+    assert ctx.director_world["actor_micro_goals"]["刑事"]["text"] == cop_micro
     assert hud.actor_mode == ("刑事", "PURSUE")
+
+
+def test_hud_microgoal_switches_with_active_actor_and_restores_previous_goal(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.on_show_micro()
+    cop_micro = ctx.game_state["director_micro_goal"]
+    assert hud.microgoal == f"MicroGoal(刑事): {cop_micro}"
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    callbacks.on_show_micro()
+    trickster_micro = ctx.game_state["director_micro_goal"]
+    assert hud.microgoal == f"MicroGoal(愉快犯): {trickster_micro}"
+    assert world["actor_micro_goals"]["刑事"]["text"] == cop_micro
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="刑事")
+    callbacks.on_show_micro()
+    assert ctx.game_state["director_micro_goal"] == cop_micro
+    assert hud.microgoal == f"MicroGoal(刑事): {cop_micro}"
+
+
+def test_actor_mode_dropdown_recomputes_active_actor_microgoal(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.goals_dict["affordances"] = {}
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, _hud = make_hud_callbacks(director, world, pack, "刑事")
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.on_show_micro()
+    callbacks.on_actor_mode_dropdown("PURSUE")
+
+    state = world["actor_micro_goals"]["刑事"]
+    pursue_texts = {
+        entry["text"] for entry in director.goals_dict["modes"]["PURSUE"]["micro"]
+    }
+    assert state["mode"] == "PURSUE"
+    assert state["text"] in pursue_texts
+    assert ctx.game_state["director_micro_goal"] == state["text"]
 
 
 def test_refresh_hud_keeps_location_dependent_label_with_actor_mode(monkeypatch):

@@ -134,10 +134,12 @@ def _update_microgoal(micro_goal, gs: dict) -> None:
         _bump_hud_cache_rev(gs, reason="microgoal_change")
 
 
-def ui_show_micro(micro_goal, gs):
+def ui_show_micro(micro_goal, gs, actor_id=None):
     _update_microgoal(micro_goal, gs)
+    gs["director_micro_goal_actor_id"] = actor_id
     if ctx.director_hud is not None:
-        ctx.director_hud.set_microgoal(micro_goal)
+        display = f"MicroGoal({actor_id}): {micro_goal}" if actor_id else micro_goal
+        ctx.director_hud.set_microgoal(display)
 
 
 def _director_world_path() -> Path:
@@ -207,6 +209,7 @@ if director_enabled:
     ctx.game_state["director_world"] = ctx.director_world
     ctx.game_state["world"] = ctx.director_world
     ctx.game_state["director_micro_goal"] = None
+    ctx.game_state["director_micro_goal_actor_id"] = None
     ctx.bump_hud_cache_rev(reason="director_init")
 
     if DirectorHUD is not None:
@@ -223,6 +226,7 @@ if director_enabled:
 else:
     ctx.game_state["director_world"] = None
     ctx.game_state["director_micro_goal"] = None
+    ctx.game_state["director_micro_goal_actor_id"] = None
     print("[Director] disabled")
 
 
@@ -478,8 +482,13 @@ def player_loop(gs):
         actor = gs["active_char"]
         dw = gs.get("director_world")
         if ctx.director is not None and dw is not None:
-            micro_goal = ctx.director.get_micro_goal(dw, reroll=False)
-            ui_show_micro(micro_goal, gs)
+            actor_id = actor.name if actor is not None and hasattr(actor, "name") else None
+            get_for_actor = getattr(ctx.director, "get_micro_goal_for_actor", None)
+            if callable(get_for_actor):
+                micro_goal = get_for_actor(dw, actor_id, reroll=False)
+            else:
+                micro_goal = ctx.director.get_micro_goal(dw, reroll=False)
+            ui_show_micro(micro_goal, gs, actor_id)
             if ctx.director_hud is not None:
                 ctx.director_hud.set_mode(ctx.director.mode)
                 ctx.director_hud.set_clock(_director_clock_string(dw))

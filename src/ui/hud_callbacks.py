@@ -60,6 +60,23 @@ class HUDCallbacks:
             mode = ctx.director.mode
         return actor_id, mode
 
+    def _active_actor_micro_goal(self, *, reroll: bool = False) -> tuple[str | None, str]:
+        actor_id, _mode = self._active_actor_mode()
+        get_for_actor = getattr(self.ctx.director, "get_micro_goal_for_actor", None)
+        if callable(get_for_actor):
+            micro = get_for_actor(self.ctx.director_world, actor_id, reroll=reroll)
+        else:
+            micro = self.ctx.director.get_micro_goal(
+                self.ctx.director_world,
+                reroll=reroll,
+            )
+        return actor_id, micro
+
+    def _show_active_micro_goal(self, *, reroll: bool = False) -> tuple[str | None, str]:
+        actor_id, micro = self._active_actor_micro_goal(reroll=reroll)
+        self._ui_show_micro(micro, self.ctx.game_state, actor_id)
+        return actor_id, micro
+
     def refresh_hud(self) -> None:
         """HUD の表示を更新する"""
         ctx = self.ctx
@@ -277,20 +294,18 @@ class HUDCallbacks:
         ctx = self.ctx
         if ctx.director_world is None:
             return
-        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
-        self._ui_show_micro(micro, ctx.game_state)
+        actor_id, micro = self._show_active_micro_goal(reroll=False)
         micro_text = micro or "(MicroGoal なし)"
-        print(f"[UI] MicroGoal: {micro_text}")
+        print(f"[UI] MicroGoal({actor_id or 'Director'}): {micro_text}")
 
     def on_reroll(self) -> None:
         """マイクロゴールを再抽選する"""
         ctx = self.ctx
         if ctx.director_world is None:
             return
-        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=True)
-        self._ui_show_micro(micro, ctx.game_state)
+        actor_id, micro = self._show_active_micro_goal(reroll=True)
         micro_text = micro or "(MicroGoal なし)"
-        print(f"[UI] MicroGoal (reroll): {micro_text}")
+        print(f"[UI] MicroGoal({actor_id or 'Director'}, reroll): {micro_text}")
         self.refresh_hud()
 
     def ai_step_once(self) -> None:
@@ -299,12 +314,17 @@ class HUDCallbacks:
         if ctx.director_world is None:
             return
 
+        actor_id, _actor_mode = self._active_actor_mode()
         actions = ctx.director.list_actions_for_mode(ctx.director.mode) or []
-        micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
+        _micro_actor_id, micro = self._active_actor_micro_goal(reroll=False)
         action_id, tmin, reason = self._pick_action(ctx.director_world, ctx.director.mode, actions, micro)
 
         if not action_id:
-            ctx.director.clear_micro_goal()
+            clear_for_actor = getattr(ctx.director, "clear_micro_goal_for_actor", None)
+            if callable(clear_for_actor):
+                clear_for_actor(ctx.director_world, actor_id)
+            else:
+                ctx.director.clear_micro_goal()
             self.on_show_micro()
             self.refresh_hud()
             print("[RC_AI] no action; rerolled micro")
@@ -345,9 +365,24 @@ class HUDCallbacks:
         if ctx.director_hud is not None:
             ctx.director_hud.set_clock(clock_label)
         non_progress_actions = {"switch_character", "感情を設定する"}
-        if action_id not in non_progress_actions and ctx.director.is_micro_goal_done(ctx.director_world):
-            ctx.director.clear_micro_goal()
-            next_micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
+        is_done_for_actor = getattr(ctx.director, "is_micro_goal_done_for_actor", None)
+        actor_micro_done = (
+            is_done_for_actor(ctx.director_world, actor_id)
+            if callable(is_done_for_actor)
+            else ctx.director.is_micro_goal_done(ctx.director_world)
+        )
+        if action_id not in non_progress_actions and actor_micro_done:
+            clear_for_actor = getattr(ctx.director, "clear_micro_goal_for_actor", None)
+            if callable(clear_for_actor):
+                clear_for_actor(ctx.director_world, actor_id)
+                next_micro = ctx.director.get_micro_goal_for_actor(
+                    ctx.director_world,
+                    actor_id,
+                    reroll=False,
+                )
+            else:
+                ctx.director.clear_micro_goal()
+                next_micro = ctx.director.get_micro_goal(ctx.director_world, reroll=False)
             if next_micro and next_micro != "(MicroGoal なし)":
                 print("[MICRO] completed -> next")
         self.on_show_micro()
@@ -486,6 +521,7 @@ class HUDCallbacks:
             return
         ctx.bump_hud_cache_rev(reason="actor_mode_change")
         print(f"[Director] actor_mode[{actor_id}] -> {new_mode}")
+        self.on_show_micro()
         self.refresh_hud()
 
     def _get_injectable_discoveries(self) -> list[str]:

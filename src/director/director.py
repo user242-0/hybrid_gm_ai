@@ -148,6 +148,11 @@ class Director:
             # 日が変わったので履歴をリセット
             for mode in self._recent_micro_ids:
                 self._recent_micro_ids[mode] = []
+            actor_goals = world.get("actor_micro_goals")
+            if isinstance(actor_goals, dict):
+                for state in actor_goals.values():
+                    if isinstance(state, dict):
+                        state["recent_ids"] = {}
             print(f"[Director] daily reset: day {self._last_day} -> {current_day}")
         self._last_day = current_day
 
@@ -387,6 +392,87 @@ class Director:
 
         return self._micro_cache[mode] or "(MicroGoal なし)"
 
+    def get_micro_goal_for_actor(
+        self,
+        world: Dict[str, Any],
+        actor_id: Optional[str],
+        reroll: bool = False,
+    ) -> str:
+        """Return and persist the MicroGoal for one actor.
+
+        Actor-specific state lives in the Director world so it survives save/load.
+        Missing actor IDs retain the legacy global MicroGoal behavior.
+        """
+
+        if not actor_id or not isinstance(world, dict):
+            return self.get_micro_goal(world, reroll=reroll)
+
+        self._check_daily_reset(world)
+        mode = self.get_actor_mode(world, actor_id, fallback_mode=self.mode)
+        actor_goals = world.setdefault("actor_micro_goals", {})
+        if not isinstance(actor_goals, dict):
+            actor_goals = {}
+            world["actor_micro_goals"] = actor_goals
+        state = actor_goals.get(actor_id)
+        if not isinstance(state, dict):
+            state = {}
+            actor_goals[actor_id] = state
+
+        mode_changed = state.get("mode") != mode
+        current = state.get("text")
+        if reroll or mode_changed or not isinstance(current, str) or not current:
+            bank = self._micro_bank(mode)
+            items = [entry["text"] for entry in bank if entry.get("text")]
+            recent_by_mode = state.setdefault("recent_ids", {})
+            if not isinstance(recent_by_mode, dict):
+                recent_by_mode = {}
+                state["recent_ids"] = recent_by_mode
+            history = recent_by_mode.setdefault(mode, [])
+            if not isinstance(history, list):
+                history = []
+                recent_by_mode[mode] = history
+
+            recent = set(history)
+            pool = [item for item in items if self._micro_id(item) not in recent]
+            if not pool and items:
+                last_id = history[-1] if history else None
+                pool = [item for item in items if self._micro_id(item) != last_id]
+
+            choice = None
+            baseline: Dict[str, Any] = {}
+            attempted: set[str] = set()
+            for candidate_pool in (pool or items, items):
+                if choice is not None:
+                    break
+                remaining = [item for item in candidate_pool if item not in attempted]
+                self.rng.shuffle(remaining)
+                for candidate in remaining:
+                    attempted.add(candidate)
+                    candidate_baseline = self._capture_micro_baseline(world, mode)
+                    if self._is_micro_goal_done_for_text(
+                        candidate,
+                        world,
+                        candidate_baseline,
+                        mode,
+                    ):
+                        continue
+                    choice = candidate
+                    baseline = candidate_baseline
+                    break
+
+            if choice is None:
+                choice = "(MicroGoal なし)"
+                baseline = {}
+
+            state["text"] = choice
+            state["mode"] = mode
+            state["baseline"] = baseline
+            history.append(self._micro_id(choice))
+            if len(history) > self._recent_k:
+                del history[0 : len(history) - self._recent_k]
+
+        return state.get("text") or "(MicroGoal なし)"
+
     def clear_micro_goal(self, mode: Optional[str] = None) -> None:
         target = mode or self.mode
         if target not in self._micro_cache:
@@ -396,12 +482,58 @@ class Director:
         self._micro_cache[target] = None
         self._micro_baseline[target] = {}
 
+    def clear_micro_goal_for_actor(
+        self,
+        world: Dict[str, Any],
+        actor_id: Optional[str],
+    ) -> None:
+        """Clear one actor's current MicroGoal without touching other actors."""
+
+        if not actor_id or not isinstance(world, dict):
+            self.clear_micro_goal()
+            return
+        actor_goals = world.get("actor_micro_goals")
+        if not isinstance(actor_goals, dict):
+            return
+        state = actor_goals.get(actor_id)
+        if not isinstance(state, dict):
+            return
+        state["text"] = None
+        state["baseline"] = {}
+
     def is_micro_goal_done(self, world: Dict[str, Any]) -> bool:
         mode = self.mode
         micro = self._micro_cache.get(mode)
         if not micro or micro == "(MicroGoal なし)":
             return False
         baseline = self._micro_baseline.get(mode, {})
+        done = self._is_micro_goal_done_for_text(micro, world, baseline, mode)
+        if done:
+            self._debug_micro_goal_done(world, baseline, micro, mode)
+        return done
+
+    def is_micro_goal_done_for_actor(
+        self,
+        world: Dict[str, Any],
+        actor_id: Optional[str],
+    ) -> bool:
+        """Return completion state for one actor's persisted MicroGoal."""
+
+        if not actor_id or not isinstance(world, dict):
+            return self.is_micro_goal_done(world)
+        actor_goals = world.get("actor_micro_goals")
+        state = actor_goals.get(actor_id) if isinstance(actor_goals, dict) else None
+        if not isinstance(state, dict):
+            return False
+        micro = state.get("text")
+        if not micro or micro == "(MicroGoal なし)":
+            return False
+        mode = state.get("mode")
+        if not isinstance(mode, str) or not mode:
+            mode = self.get_actor_mode(world, actor_id, fallback_mode=self.mode)
+        baseline = state.get("baseline")
+        if not isinstance(baseline, dict):
+            baseline = {}
         done = self._is_micro_goal_done_for_text(micro, world, baseline, mode)
         if done:
             self._debug_micro_goal_done(world, baseline, micro, mode)

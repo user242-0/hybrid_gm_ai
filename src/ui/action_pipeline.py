@@ -346,11 +346,33 @@ class ActionPipeline:
             if scenes and self.emit_director_scenes is not None:
                 self.emit_director_scenes(scenes)
 
-            micro_goal = self.director.get_micro_goal(world, reroll=False)
-            if self.director.is_micro_goal_done(world):
-                self.director.clear_micro_goal()
-                micro_goal = self.director.get_micro_goal(world, reroll=True)
+            active_actor = self.game_state.get("active_char")
+            micro_actor_id = (
+                active_actor.name
+                if active_actor is not None and hasattr(active_actor, "name")
+                else None
+            )
+            get_for_actor = getattr(self.director, "get_micro_goal_for_actor", None)
+            is_done_for_actor = getattr(self.director, "is_micro_goal_done_for_actor", None)
+            clear_for_actor = getattr(self.director, "clear_micro_goal_for_actor", None)
+            if callable(get_for_actor):
+                micro_goal = get_for_actor(world, micro_actor_id, reroll=False)
+            else:
+                micro_goal = self.director.get_micro_goal(world, reroll=False)
+            micro_done = (
+                is_done_for_actor(world, micro_actor_id)
+                if callable(is_done_for_actor)
+                else self.director.is_micro_goal_done(world)
+            )
+            if action_id != "switch_character" and micro_done:
+                if callable(clear_for_actor):
+                    clear_for_actor(world, micro_actor_id)
+                    micro_goal = get_for_actor(world, micro_actor_id, reroll=True)
+                else:
+                    self.director.clear_micro_goal()
+                    micro_goal = self.director.get_micro_goal(world, reroll=True)
             self.game_state["director_micro_goal"] = micro_goal
+            self.game_state["director_micro_goal_actor_id"] = micro_actor_id
 
         # Affordance discovery evaluation + opportunity spent tracking
         if action_executed and self.director is not None and world is not None:
@@ -442,7 +464,14 @@ class ActionPipeline:
                 if isinstance(refreshed, str):
                     self.hud_set_clock(refreshed)
         if self.hud_set_microgoal is not None:
-            self.hud_set_microgoal(self.game_state.get("director_micro_goal"))
+            micro_text = self.game_state.get("director_micro_goal")
+            micro_actor_id = self.game_state.get("director_micro_goal_actor_id")
+            display = (
+                f"MicroGoal({micro_actor_id}): {micro_text}"
+                if micro_actor_id
+                else micro_text
+            )
+            self.hud_set_microgoal(display)
         if self.ui_refresh is not None:
             self.ui_refresh()
 
