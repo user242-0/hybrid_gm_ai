@@ -32,6 +32,7 @@ class RecordingHUD:
         self.recommended_calls = []
         self.ro_calls = []
         self.location_calls = []
+        self.actor_mode_calls = []
 
     def set_progress(self, value) -> None:
         self.progress_calls.append(value)
@@ -50,6 +51,9 @@ class RecordingHUD:
 
     def set_location(self, text) -> None:
         self.location_calls.append(text)
+
+    def set_actor_mode(self, actor_id, mode) -> None:
+        self.actor_mode_calls.append((actor_id, mode))
 
 
 class DummyDirector:

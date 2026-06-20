@@ -1,9 +1,11 @@
+import copy
 from types import SimpleNamespace
 
 from director.director import Director, load_yaml
 from director.registry import load_pack, extract_goals_from_pack
 
 from src.action_definitions import get_action_spec, get_action_specs
+from src.affordance_bridge import inject_discovery
 from src.ui.action_pipeline import ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
 from src.world_defaults import apply_world_defaults
@@ -12,6 +14,7 @@ from src.world_defaults import apply_world_defaults
 class RecordingHUD:
     def __init__(self):
         self.actions = []
+        self.actor_mode = None
 
     def set_progress(self, _value):
         pass
@@ -29,6 +32,12 @@ class RecordingHUD:
         pass
 
     def set_location(self, _text):
+        pass
+
+    def set_actor_mode(self, actor_id, mode):
+        self.actor_mode = (actor_id, mode)
+
+    def set_clock(self, _text):
         pass
 
 
@@ -92,7 +101,7 @@ def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():
     }
     trickster_actions = {
         record["action"]
-        for record in director.list_actions_for_actor("愉快犯", "PURSUE")
+        for record in director.list_actions_for_actor("愉快犯", "FLEE")
     }
 
     assert {"collect_fiber", "fix_cam_clock", "call_partner"} <= cop_actions
@@ -106,6 +115,42 @@ def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():
         "mark_avoid_shop",
     } <= trickster_actions
     assert cop_actions.isdisjoint(trickster_actions)
+
+
+def test_actor_hud_actions_are_limited_to_the_effective_mode():
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    goals = extract_goals_from_pack(load_pack("cop_trickster"))
+    director = Director(premise=premise, goals_dict=goals)
+
+    assert {
+        record["action"]
+        for record in director.list_actions_for_actor("刑事", "FREEZE")
+    } == {"check_tip", "limit_drink", "log_victim", "rest"}
+    assert {
+        record["action"]
+        for record in director.list_actions_for_actor("刑事", "PURSUE")
+    } == {"collect_fiber", "fix_cam_clock", "call_partner"}
+    assert {
+        record["action"]
+        for record in director.list_actions_for_actor("愉快犯", "FLEE")
+    } == {
+        "hide_evidence",
+        "plant_false_trace",
+        "avoid_witness",
+        "change_hideout",
+        "observe_next_target",
+        "move_low_profile",
+        "mark_avoid_shop",
+    }
+
+
+def test_actor_hud_actions_are_empty_when_effective_mode_is_not_allowed():
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    goals = extract_goals_from_pack(load_pack("cop_trickster"))
+    director = Director(premise=premise, goals_dict=goals)
+
+    assert director.list_actions_for_actor("刑事", "FLEE") == []
+    assert director.list_actions_for_actor("愉快犯", "PURSUE") == []
 
 
 def test_actor_modes_are_stored_by_actor_and_fall_back_to_director_mode():
@@ -195,6 +240,155 @@ def test_refresh_hud_falls_back_to_director_mode_without_actor_modes(monkeypatch
     assert {
         action_id for action_id, _label, _minutes in hud.actions
     } == {"collect_fiber", "fix_cam_clock", "call_partner"}
+
+
+def test_refresh_hud_shows_camera_clock_affordance_for_cop_pursue_mode(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.mode = "FREEZE"
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    inject_discovery(world, "camera_skew_noticed")
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
+    ctx.game_state["current_location"] = "事件現場_路地裏"
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+
+    action_ids = {
+        action_id
+        for action_id, _label, _minutes in hud.actions
+    }
+    assert "fix_cam_clock" in action_ids
+
+
+def test_refresh_hud_hides_camera_clock_affordance_for_cop_freeze_mode(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    director.set_actor_mode(world, "刑事", "FREEZE")
+    inject_discovery(world, "camera_skew_noticed")
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
+    ctx.game_state["current_location"] = "事件現場_路地裏"
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+
+    assert hud.actor_mode == ("刑事", "FREEZE")
+    assert "fix_cam_clock" not in {
+        action_id for action_id, _label, _minutes in hud.actions
+    }
+
+
+def test_actor_mode_dropdown_updates_world_cache_and_actions(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.goals_dict["affordances"] = {}
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "愉快犯")
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+    assert {
+        action_id for action_id, _label, _minutes in hud.actions
+    } == {
+        "hide_evidence",
+        "plant_false_trace",
+        "avoid_witness",
+        "change_hideout",
+        "observe_next_target",
+        "move_low_profile",
+        "mark_avoid_shop",
+    }
+    rev_before = ctx.game_state["hud_cache_rev"]
+
+    callbacks.on_actor_mode_dropdown("PURSUE")
+
+    assert world["actor_modes"]["愉快犯"] == "PURSUE"
+    assert ctx.game_state["hud_cache_rev"] == rev_before + 1
+    assert hud.actor_mode == ("愉快犯", "PURSUE")
+    assert hud.actions == []
+
+
+def test_actor_modes_survive_hud_save_load_roundtrip(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    saved = {}
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    callbacks._save_director_world = lambda value: saved.update(copy.deepcopy(value))
+    callbacks._load_director_world = lambda _fallback: copy.deepcopy(saved)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    callbacks.on_save()
+    director.set_actor_mode(world, "刑事", "FREEZE")
+    callbacks.on_load()
+
+    assert ctx.director_world["actor_modes"]["刑事"] == "PURSUE"
+    assert hud.actor_mode == ("刑事", "PURSUE")
+
+
+def test_refresh_hud_keeps_location_dependent_label_with_actor_mode(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.mode = "PURSUE"
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    director.set_actor_mode(world, "刑事", "FREEZE")
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
+    ctx.game_state["current_location"] = "情報源_夜の酒場"
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+
+    actions = {
+        action_id: label
+        for action_id, label, _minutes in hud.actions
+    }
+    assert actions["rest"] == "酒場から家に帰る"
 
 
 def test_trickster_flee_actions_are_available_without_affordance_discoveries():

@@ -498,7 +498,7 @@ class Director:
         actor_id: Optional[str],
         mode: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Return HUD actions assigned to an actor, falling back to the current mode."""
+        """Return HUD actions for one mode when that mode is allowed for the actor."""
 
         current_mode = mode or self.mode
         actors = (self.goals_dict or {}).get("hud_actions", {}).get("actors", {})
@@ -511,18 +511,7 @@ class Director:
         if current_mode in actor_modes:
             return self.list_actions_for_mode(current_mode)
 
-        ordered_modes = list(actor_modes)
-
-        seen: set[str] = set()
-        actions: List[Dict[str, Any]] = []
-        for actor_mode in ordered_modes:
-            for record in self.list_actions_for_mode(actor_mode):
-                action_id = record.get("action")
-                if not action_id or action_id in seen:
-                    continue
-                seen.add(action_id)
-                actions.append(record)
-        return actions
+        return []
 
     def affordance_rules(self) -> Dict[str, Any]:
         """Return the affordances section from the pack YAML (goals_dict)."""

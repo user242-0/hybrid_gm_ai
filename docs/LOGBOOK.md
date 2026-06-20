@@ -8,6 +8,20 @@
 
 ---
 
+## 2026-06-20（Session 48-C: ActorMode HUD verification）
+
+### 今日やったこと
+
+* Director HUDの既存mode dropdownを `DirectorMode` と明示し、active actorの `ActorMode` を別行で表示した。
+* `HUD_DEBUG=1` のときだけActorMode dropdownを有効にし、変更時に `director_world["actor_modes"]`、HUD cache rev、Actions listboxを更新するようにした。
+* DirectorMode dropdownは世界全体mode、ActorModeはactive actorのHUD Actions用という責務分離を維持した。
+* 刑事PURSUE時の `fix_cam_clock` affordance表示、刑事FREEZE時の非表示、愉快犯をFLEE以外へ変更した際のFLEE actions非継続、未設定actorのDirector.mode fallback、save/load維持をテストした。
+* AI提案HUDのactor_idフィルタとread-only方針は変更していない。
+
+### 次回の最初の一手
+
+* RC別MicroGoalの本格設計は後続タスクとして扱う。
+
 ## 2026-06-20（Session 48: ActorMode by actor_id）
 
 ### 今日やったこと

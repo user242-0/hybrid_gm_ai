@@ -6,9 +6,15 @@ except ImportError:  # pragma: no cover - tkinter optional
     tk = None  # type: ignore
 
 try:
-    from src.ui.director_hud import DirectorHUD
+    from src.ui.director_hud import DirectorHUD, format_actor_mode_label
 except Exception:  # pragma: no cover - module depends on tkinter
     DirectorHUD = None  # type: ignore
+    format_actor_mode_label = None  # type: ignore
+
+
+def test_format_actor_mode_label():
+    assert format_actor_mode_label("刑事") == "ActorMode(刑事):"
+    assert format_actor_mode_label(None) == "ActorMode(?):"
 
 
 @pytest.mark.skipif(DirectorHUD is None or tk is None, reason="tkinter not available")
@@ -19,6 +25,7 @@ def test_director_hud_exposes_callbacks():
         pytest.skip("Tkinter display not available")
 
     mode_calls = []
+    actor_mode_calls = []
     ai_calls = []
     toggle_calls = []
     save_calls = []
@@ -26,6 +33,10 @@ def test_director_hud_exposes_callbacks():
     micro_calls = []
 
     hud.set_modes(["FREEZE", "FLEE"], on_change=lambda mode: mode_calls.append(mode))
+    hud.set_actor_modes(
+        ["FREEZE", "FLEE"],
+        on_change=lambda mode: actor_mode_calls.append(mode),
+    )
     hud.on_ai_step = lambda: ai_calls.append(True)
     hud.on_toggle_auto = lambda enabled: toggle_calls.append(enabled)
     hud.on_save = lambda: save_calls.append(True)
@@ -34,6 +45,9 @@ def test_director_hud_exposes_callbacks():
 
     hud._select_mode("FLEE", hud.on_mode_change)
     assert mode_calls == ["FLEE"]
+    hud.set_actor_mode("刑事", "PURSUE")
+    assert hud.actor_mode_label_var.get() == "ActorMode(刑事):"
+    assert hud.actor_mode_var.get() == "PURSUE"
 
     if hud.on_ai_step:
         hud.on_ai_step()

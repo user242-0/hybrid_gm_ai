@@ -19,6 +19,11 @@ MODE_COLORS = {
 MAX_ADVISORY_DISPLAY_ITEMS = 3
 
 
+def format_actor_mode_label(actor_id: object) -> str:
+    actor_name = _display_text(actor_id) or "?"
+    return f"ActorMode({actor_name}):"
+
+
 def _display_text(value: object) -> str:
     return "" if value is None else str(value)
 
@@ -53,8 +58,8 @@ class DirectorHUD:
         self.root.title(title)
         # The HUD shows multiple stacked rows; ensure the window is tall enough so the
         # Auto/Next controls and help text are visible without manual resizing.
-        self.root.geometry("520x480")
-        self.root.minsize(520, 430)
+        self.root.geometry("520x520")
+        self.root.minsize(520, 470)
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -67,8 +72,11 @@ class DirectorHUD:
         self.on_toggle_auto: Optional[Callable[[bool], None]] = None
         self.on_ai_step: Optional[Callable[[], None]] = None
         self.on_inject_discovery: Optional[Callable[[str], None]] = None
+        self.on_actor_mode_change: Optional[Callable[[str], None]] = None
 
         self.mode_var = tk.StringVar(value="")
+        self.actor_mode_label_var = tk.StringVar(value=format_actor_mode_label(None))
+        self.actor_mode_var = tk.StringVar(value="")
         self.clock_var = tk.StringVar(value="Day1 00:00")
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
         self.progress_var = tk.StringVar(value="")
@@ -103,7 +111,7 @@ class DirectorHUD:
 
         row1 = tk.Frame(frame, bg=frame["bg"])
         row1.pack(fill="x", **pad)
-        tk.Label(row1, text="Mode:", fg="white", bg=frame["bg"]).pack(side="left")
+        tk.Label(row1, text="DirectorMode:", fg="white", bg=frame["bg"]).pack(side="left")
         self.mode_menu = tk.OptionMenu(row1, self.mode_var, "")
         self.mode_menu.configure(highlightthickness=0)
         self.mode_menu.pack(side="left")
@@ -111,6 +119,35 @@ class DirectorHUD:
         tk.Label(row1, textvariable=self.clock_var, fg="white", bg=frame["bg"]).pack(
             side="left", padx=6
         )
+
+        row_actor_mode = tk.Frame(frame, bg=frame["bg"])
+        row_actor_mode.pack(fill="x", **pad)
+        tk.Label(
+            row_actor_mode,
+            textvariable=self.actor_mode_label_var,
+            fg="#80FF80" if self._debug else "white",
+            bg=frame["bg"],
+        ).pack(side="left")
+        if self._debug:
+            self.actor_mode_combo = ttk.Combobox(
+                row_actor_mode,
+                textvariable=self.actor_mode_var,
+                state="readonly",
+                width=14,
+            )
+            self.actor_mode_combo.pack(side="left", padx=4)
+            self.actor_mode_combo.bind(
+                "<<ComboboxSelected>>",
+                self._on_actor_mode_change,
+            )
+        else:
+            self.actor_mode_combo = None
+            tk.Label(
+                row_actor_mode,
+                textvariable=self.actor_mode_var,
+                fg="white",
+                bg=frame["bg"],
+            ).pack(side="left", padx=4)
 
         # --- Location row ---
         row_loc = tk.Frame(frame, bg=frame["bg"])
@@ -296,6 +333,34 @@ class DirectorHUD:
             self._last_mode_value = self.mode_var.get()
 
         self._run_or_enqueue(apply)
+
+    def set_actor_modes(
+        self,
+        modes,
+        on_change: Optional[Callable[[str], None]],
+    ) -> None:
+        self.on_actor_mode_change = on_change
+        if not self._debug or self.actor_mode_combo is None:
+            return
+        modes_list = list(modes or [])
+
+        def apply() -> None:
+            self.on_actor_mode_change = on_change
+            self.actor_mode_combo["values"] = modes_list
+
+        self._run_or_enqueue(apply)
+
+    def set_actor_mode(self, actor_id: Optional[str], mode: str) -> None:
+        def apply() -> None:
+            self.actor_mode_label_var.set(format_actor_mode_label(actor_id))
+            self.actor_mode_var.set(mode or "")
+
+        self._run_or_enqueue(apply)
+
+    def _on_actor_mode_change(self, _event: object) -> None:
+        value = self.actor_mode_var.get()
+        if value and self.on_actor_mode_change:
+            self.on_actor_mode_change(value)
 
     def _select_mode(
         self, value: str, on_change: Optional[Callable[[str], None]]

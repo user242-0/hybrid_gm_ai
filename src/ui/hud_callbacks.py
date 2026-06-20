@@ -45,6 +45,21 @@ class HUDCallbacks:
         self._ensure_clock = ensure_clock
         self._request_auto_step = request_auto_step
 
+    def _active_actor_mode(self) -> tuple[str | None, str]:
+        ctx = self.ctx
+        actor_obj = ctx.game_state.get("active_char")
+        actor_id = actor_obj.name if actor_obj and hasattr(actor_obj, "name") else None
+        get_actor_mode = getattr(ctx.director, "get_actor_mode", None)
+        if callable(get_actor_mode):
+            mode = get_actor_mode(
+                ctx.director_world,
+                actor_id,
+                fallback_mode=ctx.director.mode,
+            )
+        else:
+            mode = ctx.director.mode
+        return actor_id, mode
+
     def refresh_hud(self) -> None:
         """HUD の表示を更新する"""
         ctx = self.ctx
@@ -65,6 +80,11 @@ class HUDCallbacks:
             }
             ctx.game_state["hud_last_rendered_rev"] = ctx.game_state.get("hud_cache_rev", 0)
             return
+
+        actor_id, action_mode = self._active_actor_mode()
+        set_actor_mode = getattr(ctx.director_hud, "set_actor_mode", None)
+        if callable(set_actor_mode):
+            set_actor_mode(actor_id, action_mode)
 
         cache_rev = ctx.game_state.get("hud_cache_rev", 0)
         last_rendered_rev = ctx.game_state.get("hud_last_rendered_rev", -1)
@@ -99,23 +119,12 @@ class HUDCallbacks:
                 }
             ctx.game_state["hud_cached_recommended"] = recommended
 
-            actor_obj = ctx.game_state.get("active_char")
-            actor_id = actor_obj.name if actor_obj and hasattr(actor_obj, "name") else None
-            get_actor_mode = getattr(ctx.director, "get_actor_mode", None)
-            if callable(get_actor_mode):
-                action_mode = get_actor_mode(
-                    ctx.director_world,
-                    actor_id,
-                    fallback_mode=ctx.director.mode,
-                )
-            else:
-                action_mode = ctx.director.mode
             list_for_actor = getattr(ctx.director, "list_actions_for_actor", None)
             if callable(list_for_actor):
                 action_records = list_for_actor(actor_id, action_mode)
             else:
                 action_records = ctx.director.list_actions_for_mode(action_mode)
-            allowed_action_ids = {
+            mode_action_ids = {
                 record.get("action") or record.get("id") or record.get("action_id")
                 for record in action_records
                 if isinstance(record, dict)
@@ -158,6 +167,11 @@ class HUDCallbacks:
                     ctx.director_world, ctx.game_state,
                     opp_rules, mode=action_mode,
                 )
+                opportunities = [
+                    opportunity
+                    for opportunity in opportunities
+                    if opportunity.get("action_id") in mode_action_ids
+                ]
                 governed = {r["action_id"] for r in opp_rules if r.get("action_id")}
                 if is_hud_debug_enabled():
                     aff_state = ctx.director_world.get("affordances", {})
@@ -169,11 +183,6 @@ class HUDCallbacks:
                 ctx.current_actions[:] = merge_with_director_actions(
                     ctx.current_actions, opportunities, governed,
                 )
-                ctx.current_actions[:] = [
-                    action
-                    for action in ctx.current_actions
-                    if action[0] in allowed_action_ids
-                ]
 
             # Affordance: contextual label overrides
             label_rules = aff_rules.get("label_rules", [])
@@ -391,6 +400,7 @@ class HUDCallbacks:
             ctx.director_hud.set_clock(self._director_clock_string(ctx.director_world))
         ctx.director.clear_micro_goal()
         self.on_show_micro()
+        self.refresh_hud()
         reload_epoch = (
             ctx.director_world.get("reload_epoch") if isinstance(ctx.director_world, dict) else None
         )
@@ -461,6 +471,23 @@ class HUDCallbacks:
         self.on_show_micro()
         self.refresh_hud()
 
+    def on_actor_mode_dropdown(self, new_mode: str) -> None:
+        """HUD_DEBUG用: active actorのActorModeを切り替える。"""
+        ctx = self.ctx
+        if ctx.director_world is None:
+            return
+        actor_id, old_mode = self._active_actor_mode()
+        if not actor_id or new_mode == old_mode:
+            return
+        set_actor_mode = getattr(ctx.director, "set_actor_mode", None)
+        if not callable(set_actor_mode):
+            return
+        if not set_actor_mode(ctx.director_world, actor_id, new_mode):
+            return
+        ctx.bump_hud_cache_rev(reason="actor_mode_change")
+        print(f"[Director] actor_mode[{actor_id}] -> {new_mode}")
+        self.refresh_hud()
+
     def _get_injectable_discoveries(self) -> list[str]:
         """Pack YAML の discovery_rules から discovery ID を列挙する。"""
         ctx = self.ctx
@@ -483,9 +510,10 @@ class HUDCallbacks:
             print(f"[HUD_DEBUG]   spent_opp={aff_state.get('spent_opportunities', set())}")
             opp_rules = ctx.director.affordance_rules().get("opportunity_rules", [])
             if opp_rules:
+                _, action_mode = self._active_actor_mode()
                 opps = evaluate_opportunities(
                     ctx.director_world, ctx.game_state,
-                    opp_rules, mode=ctx.director.mode,
+                    opp_rules, mode=action_mode,
                 )
                 print(f"[HUD_DEBUG]   visible_opps={[o['action_id'] for o in opps]}")
             ctx.bump_hud_cache_rev(reason="debug_inject_discovery")
@@ -511,6 +539,10 @@ class HUDCallbacks:
             if locs:
                 hud.set_location_options(locs)
             hud.set_location_change_callback(self._on_debug_location_change)
+            hud.set_actor_modes(
+                self.ctx.director.available_modes(),
+                on_change=self.on_actor_mode_dropdown,
+            )
 
             disc_ids = self._get_injectable_discoveries()
             if disc_ids:
