@@ -3,7 +3,8 @@ from types import SimpleNamespace
 from director.director import Director, load_yaml
 from director.registry import load_pack, extract_goals_from_pack
 
-from src.action_definitions import get_action_specs
+from src.action_definitions import get_action_spec, get_action_specs
+from src.ui.action_pipeline import ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
 from src.world_defaults import apply_world_defaults
 
@@ -154,6 +155,55 @@ def test_refresh_hud_shows_basic_trickster_actions_when_governed_actions_are_hid
         "observe_next_target",
     }
     assert ctx.current_actions == hud.actions
+
+
+def test_hud_executes_trickster_action_after_core_specs_are_enumerated(
+    monkeypatch,
+    capsys,
+):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.mode = "FLEE"
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "諢牙ｿｫ迥ｯ")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    get_action_specs(pack)
+    get_action_specs()
+    pipeline = ActionPipeline(
+        game_state=ctx.game_state,
+        director=director,
+    )
+    callbacks._get_action_spec = get_action_spec
+    callbacks._dispatch_action = pipeline.request_action
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    ctx.game_state["emotions_by_actor"] = {
+        ctx.game_state["active_char"].name: {"R": 127, "G": 127, "B": 127},
+    }
+
+    callbacks.refresh_hud()
+    action_ids = [action_id for action_id, _label, _minutes in hud.actions]
+    action_index = action_ids.index("avoid_witness")
+    clock_before = world["clock"]
+    witnesses_before = world["witnesses_avoided"]
+    suspicion_before = world["suspicion"]["value"]
+
+    callbacks.on_action_select(action_index)
+
+    output = capsys.readouterr().out
+    assert "spec=OK" in output
+    assert "invalid action_id" not in output
+    assert world["clock"] != clock_before
+    assert world["witnesses_avoided"] == witnesses_before + 1
+    assert world["suspicion"]["value"] == max(0, suspicion_before - 1)
 
 
 def test_unknown_actor_falls_back_to_current_mode_actions():

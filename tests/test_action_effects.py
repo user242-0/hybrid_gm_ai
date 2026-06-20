@@ -1,6 +1,6 @@
 from director.registry import load_pack
 
-from src.action_definitions import get_action_specs
+from src.action_definitions import get_action_spec, get_action_specs
 from src.action_registry import execute_action
 from src.world_defaults import apply_world_defaults
 
@@ -25,7 +25,10 @@ def test_execute_action_applies_effects():
 
 def test_trickster_basic_actions_have_specs_and_apply_safe_effects():
     pack = load_pack("cop_trickster")
-    specs = get_action_specs(pack)
+    get_action_specs(pack)
+    # Core choice enumeration also calls this without a pack. It must not
+    # discard the active pack used by HUD and action execution.
+    get_action_specs()
     action_ids = {
         "hide_evidence",
         "plant_false_trace",
@@ -34,7 +37,7 @@ def test_trickster_basic_actions_have_specs_and_apply_safe_effects():
         "observe_next_target",
     }
 
-    assert action_ids <= specs.keys()
+    assert all(get_action_spec(action_id) is not None for action_id in action_ids)
 
     world = apply_world_defaults({}, pack)
     execute_action(world, "hide_evidence")

@@ -466,8 +466,14 @@ def _spec_from_legacy(action_id: str, data: Dict[str, Any]) -> ActionSpec:
 
 def get_action_specs(pack: Dict[str, Any] | None = None) -> Dict[str, ActionSpec]:
     global _LATEST_PACK_KEY
+    if pack is None and _LATEST_PACK_KEY != "none":
+        active_specs = _ACTION_SPECS_CACHE.get(_LATEST_PACK_KEY)
+        if active_specs is not None:
+            return active_specs
+
     pack_key = _pack_key(pack)
-    _LATEST_PACK_KEY = pack_key
+    if isinstance(pack, dict):
+        _LATEST_PACK_KEY = pack_key
     if pack_key in _ACTION_SPECS_CACHE:
         return _ACTION_SPECS_CACHE[pack_key]
 
