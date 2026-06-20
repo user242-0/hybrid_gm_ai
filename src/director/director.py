@@ -163,6 +163,39 @@ class Director:
             return True
         return False
 
+    def get_actor_mode(
+        self,
+        world: Dict[str, Any],
+        actor_id: Optional[str],
+        fallback_mode: Optional[str] = None,
+    ) -> str:
+        """Return an actor's current mode, falling back to Director.mode."""
+
+        actor_modes = world.get("actor_modes") if isinstance(world, dict) else None
+        if actor_id and isinstance(actor_modes, dict):
+            actor_mode = actor_modes.get(actor_id)
+            if isinstance(actor_mode, str) and actor_mode:
+                return actor_mode
+        return fallback_mode or self.mode
+
+    def set_actor_mode(
+        self,
+        world: Dict[str, Any],
+        actor_id: str,
+        mode: str,
+    ) -> bool:
+        """Persist an actor-specific mode in the Director world."""
+
+        if not isinstance(world, dict) or not actor_id or not isinstance(mode, str) or not mode:
+            return False
+        if self._available_modes and mode not in self._available_modes:
+            return False
+        actor_modes = world.setdefault("actor_modes", {})
+        if not isinstance(actor_modes, dict):
+            return False
+        actor_modes[actor_id] = mode
+        return True
+
     def synthesize_world(self) -> Dict[str, Any]:
         """最小の初期ワールド。数値は演出・分岐用（難度は弄らない）。"""
         self.rng.seed(self.premise.get("seed", 0))
@@ -475,10 +508,10 @@ class Director:
         if not isinstance(actor_modes, list) or not actor_modes:
             return self.list_actions_for_mode(current_mode)
 
+        if current_mode in actor_modes:
+            return self.list_actions_for_mode(current_mode)
+
         ordered_modes = list(actor_modes)
-        if current_mode in ordered_modes:
-            ordered_modes.remove(current_mode)
-            ordered_modes.insert(0, current_mode)
 
         seen: set[str] = set()
         actions: List[Dict[str, Any]] = []

@@ -108,6 +108,95 @@ def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():
     assert cop_actions.isdisjoint(trickster_actions)
 
 
+def test_actor_modes_are_stored_by_actor_and_fall_back_to_director_mode():
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    goals = extract_goals_from_pack(load_pack("cop_trickster"))
+    director = Director(premise=premise, goals_dict=goals)
+    world = {}
+
+    director.mode = "FREEZE"
+    assert director.get_actor_mode(world, "刑事") == "FREEZE"
+    assert director.set_actor_mode(world, "刑事", "PURSUE")
+    assert director.set_actor_mode(world, "愉快犯", "FLEE")
+    assert director.get_actor_mode(world, "刑事") == "PURSUE"
+    assert director.get_actor_mode(world, "愉快犯") == "FLEE"
+    assert director.get_actor_mode(world, "Unknown") == "FREEZE"
+
+
+def test_pack_initializes_actor_modes_in_director_world():
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+
+    world = apply_world_defaults(director.synthesize_world(), pack)
+
+    assert world["actor_modes"] == {"刑事": "FREEZE", "愉快犯": "FLEE"}
+
+
+def test_refresh_hud_uses_active_actor_mode_independently_of_director_mode(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.goals_dict["affordances"] = {}
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    director.set_actor_mode(world, "愉快犯", "FLEE")
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    director.mode = "FLEE"
+    callbacks.refresh_hud()
+    cop_action_ids = {action_id for action_id, _label, _minutes in hud.actions}
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    ctx.game_state["hud_cache_rev"] += 1
+    director.mode = "PURSUE"
+    callbacks.refresh_hud()
+    trickster_action_ids = {action_id for action_id, _label, _minutes in hud.actions}
+
+    assert cop_action_ids == {"collect_fiber", "fix_cam_clock", "call_partner"}
+    assert {
+        "hide_evidence",
+        "plant_false_trace",
+        "avoid_witness",
+        "change_hideout",
+        "observe_next_target",
+    } <= trickster_action_ids
+    assert cop_action_ids.isdisjoint(trickster_action_ids)
+
+
+def test_refresh_hud_falls_back_to_director_mode_without_actor_modes(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.goals_dict["affordances"] = {}
+    director.mode = "PURSUE"
+    world = director.synthesize_world()
+    callbacks, _ctx, hud = make_hud_callbacks(director, world, pack, "Unknown")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+
+    assert {
+        action_id for action_id, _label, _minutes in hud.actions
+    } == {"collect_fiber", "fix_cam_clock", "call_partner"}
+
+
 def test_trickster_flee_actions_are_available_without_affordance_discoveries():
     premise = load_yaml("data/director/premise.yml").get("premise", {})
     goals = extract_goals_from_pack(load_pack("cop_trickster"))

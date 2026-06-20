@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-06-20（Session 48: ActorMode by actor_id）
+
+### 今日やったこと
+
+* `director_world["actor_modes"]` をActorModeの保存先とし、セーブ/ロード対象のworld stateに統合した。
+* `Director.get_actor_mode()` / `set_actor_mode()` を追加し、未設定actorは `Director.mode` へフォールバックする互換性を維持した。
+* HUD Actionsはactive actorのActorModeを使って生成し、MicroGoal/Recommended/AI stepとmode dropdownはグローバルDirectorModeのまま維持した。
+* `cop_trickster` の初期ActorModeは刑事=`FREEZE`、愉快犯=`FLEE` とした。
+
+### 次回の最初の一手
+
+* RC別MicroGoalのキャッシュ・進捗・履歴の保存単位を設計する。TPOコンテンツ縦切りも後続で扱う。
+
 ## 2026-06-20（Session 47-B: 愉快犯用の基本HUDアクション）
 
 ### 今日やったこと

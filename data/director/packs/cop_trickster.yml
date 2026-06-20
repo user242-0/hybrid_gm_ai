@@ -255,6 +255,9 @@ tone:
   - neo-noir
   - slow_burn
 world_defaults:
+  actor_modes:
+    刑事: FREEZE
+    愉快犯: FLEE
   avoid_tags: 0
   cams_fixed: 0
   clock: 0

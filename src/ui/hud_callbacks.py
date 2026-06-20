@@ -101,11 +101,20 @@ class HUDCallbacks:
 
             actor_obj = ctx.game_state.get("active_char")
             actor_id = actor_obj.name if actor_obj and hasattr(actor_obj, "name") else None
+            get_actor_mode = getattr(ctx.director, "get_actor_mode", None)
+            if callable(get_actor_mode):
+                action_mode = get_actor_mode(
+                    ctx.director_world,
+                    actor_id,
+                    fallback_mode=ctx.director.mode,
+                )
+            else:
+                action_mode = ctx.director.mode
             list_for_actor = getattr(ctx.director, "list_actions_for_actor", None)
             if callable(list_for_actor):
-                action_records = list_for_actor(actor_id, ctx.director.mode)
+                action_records = list_for_actor(actor_id, action_mode)
             else:
-                action_records = ctx.director.list_actions_for_mode(ctx.director.mode)
+                action_records = ctx.director.list_actions_for_mode(action_mode)
             allowed_action_ids = {
                 record.get("action") or record.get("id") or record.get("action_id")
                 for record in action_records
@@ -147,7 +156,7 @@ class HUDCallbacks:
             if opp_rules:
                 opportunities = evaluate_opportunities(
                     ctx.director_world, ctx.game_state,
-                    opp_rules, mode=ctx.director.mode,
+                    opp_rules, mode=action_mode,
                 )
                 governed = {r["action_id"] for r in opp_rules if r.get("action_id")}
                 if is_hud_debug_enabled():
@@ -171,7 +180,7 @@ class HUDCallbacks:
             if label_rules:
                 ctx.current_actions[:] = apply_label_overrides(
                     ctx.current_actions, ctx.game_state,
-                    label_rules, mode=ctx.director.mode,
+                    label_rules, mode=action_mode,
                 )
 
             # Suppress recommended action if governed and not currently visible
