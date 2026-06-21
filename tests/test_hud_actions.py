@@ -508,7 +508,7 @@ def test_actor_mode_dropdown_recomputes_active_actor_microgoal(monkeypatch):
     )
     director.goals_dict["affordances"] = {}
     world = apply_world_defaults(director.synthesize_world(), pack)
-    callbacks, ctx, _hud = make_hud_callbacks(director, world, pack, "刑事")
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
     ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
         "hud_cache_rev",
         ctx.game_state.get("hud_cache_rev", 0) + 1,
@@ -518,7 +518,10 @@ def test_actor_mode_dropdown_recomputes_active_actor_microgoal(monkeypatch):
         lambda *, actor_id, limit: [],
     )
 
-    callbacks.on_show_micro()
+    callbacks.refresh_hud()
+    previous_actions = {action_id for action_id, _label, _minutes in hud.actions}
+    previous_rev = ctx.game_state["hud_cache_rev"]
+
     callbacks.on_actor_mode_dropdown("PURSUE")
 
     state = world["actor_micro_goals"]["刑事"]
@@ -528,6 +531,10 @@ def test_actor_mode_dropdown_recomputes_active_actor_microgoal(monkeypatch):
     assert state["mode"] == "PURSUE"
     assert state["text"] in pursue_texts
     assert ctx.game_state["director_micro_goal"] == state["text"]
+    assert world["actor_modes"]["刑事"] == "PURSUE"
+    assert ctx.game_state["hud_cache_rev"] == previous_rev + 1
+    assert {action_id for action_id, _label, _minutes in hud.actions} != previous_actions
+    assert hud.microgoal == f"MicroGoal(刑事): {state['text']}"
 
 
 def test_refresh_hud_keeps_location_dependent_label_with_actor_mode(monkeypatch):

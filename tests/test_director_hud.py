@@ -1,5 +1,8 @@
 import pytest
-from src.utility.config_loader import is_hud_demo_enabled
+from types import SimpleNamespace
+
+from src.utility import config_loader
+from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
 try:
     import tkinter as tk
@@ -45,17 +48,91 @@ def test_resolve_hud_display_mode(
     )
 
     assert mode.name == name
+    assert mode.show_actor_mode_control is demo_controls
     assert mode.show_demo_controls is demo_controls
     assert mode.show_wip_controls is wip_controls
     assert mode.show_debug_controls is debug_enabled
 
 
-def test_hud_demo_is_controlled_by_environment(monkeypatch):
+def test_demo_hud_shows_actor_mode_control_without_debug_controls():
+    mode = resolve_hud_display_mode(
+        debug_enabled=False,
+        demo_enabled=True,
+    )
+
+    assert mode.show_demo_controls is True
+    assert mode.show_debug_controls is False
+    assert mode.show_wip_controls is False
+
+
+def test_hud_demo_uses_config_when_environment_is_unset(monkeypatch):
+    monkeypatch.delenv("HUD_DEMO", raising=False)
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_demo": True}},
+    )
+
+    assert is_hud_demo_enabled() is True
+
+
+def test_hud_debug_uses_config_when_environment_is_unset(monkeypatch):
+    monkeypatch.delenv("HUD_DEBUG", raising=False)
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_debug": True}},
+    )
+
+    assert is_hud_debug_enabled() is True
+
+
+def test_hud_demo_environment_overrides_config(monkeypatch):
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_demo": False}},
+    )
     monkeypatch.setenv("HUD_DEMO", "1")
     assert is_hud_demo_enabled() is True
 
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_demo": True}},
+    )
     monkeypatch.setenv("HUD_DEMO", "0")
     assert is_hud_demo_enabled() is False
+
+
+def test_hud_debug_environment_overrides_config(monkeypatch):
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_debug": False}},
+    )
+    monkeypatch.setenv("HUD_DEBUG", "1")
+    assert is_hud_debug_enabled() is True
+
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_debug": True}},
+    )
+    monkeypatch.setenv("HUD_DEBUG", "0")
+    assert is_hud_debug_enabled() is False
+
+
+def test_actor_mode_selection_dispatches_bound_callback():
+    calls = []
+    hud = SimpleNamespace(
+        actor_mode_var=SimpleNamespace(get=lambda: "PURSUE"),
+        on_actor_mode_change=lambda mode: calls.append(mode),
+    )
+
+    DirectorHUD._on_actor_mode_change(hud, None)
+
+    assert calls == ["PURSUE"]
 
 
 @pytest.mark.skipif(DirectorHUD is None or tk is None, reason="tkinter not available")

@@ -542,7 +542,7 @@ class HUDCallbacks:
         self.refresh_hud()
 
     def on_actor_mode_dropdown(self, new_mode: str) -> None:
-        """HUD_DEBUG用: active actorのActorModeを切り替える。"""
+        """Demo/debug HUDでactive actorのActorModeを切り替える。"""
         ctx = self.ctx
         if ctx.director_world is None:
             return
@@ -556,7 +556,6 @@ class HUDCallbacks:
             return
         ctx.bump_hud_cache_rev(reason="actor_mode_change")
         print(f"[Director] actor_mode[{actor_id}] -> {new_mode}")
-        self.on_show_micro()
         self.refresh_hud()
 
     def _get_injectable_discoveries(self) -> list[str]:
@@ -604,21 +603,29 @@ class HUDCallbacks:
         hud.on_show_micro = self.on_show_micro
         hud.on_action_select = self.on_action_select
 
-        # Demo/debug location dropdown + discovery injection
-        interactive_hud = getattr(
+        # Demo/debug ActorMode dropdown
+        actor_mode_hud = getattr(
             hud,
-            "show_demo_controls",
+            "show_actor_mode_control",
             is_hud_debug_enabled() or is_hud_demo_enabled(),
         )
-        if interactive_hud:
-            locs = self.ctx.game_state.get("available_locations", [])
-            if locs:
-                hud.set_location_options(locs)
-            hud.set_location_change_callback(self._on_debug_location_change)
+        if actor_mode_hud:
             hud.set_actor_modes(
                 self.ctx.director.available_modes(),
                 on_change=self.on_actor_mode_dropdown,
             )
+
+        # Debug-only location dropdown + discovery injection
+        debug_hud = getattr(
+            hud,
+            "show_debug_controls",
+            is_hud_debug_enabled(),
+        )
+        if debug_hud:
+            locs = self.ctx.game_state.get("available_locations", [])
+            if locs:
+                hud.set_location_options(locs)
+            hud.set_location_change_callback(self._on_debug_location_change)
 
             disc_ids = self._get_injectable_discoveries()
             if disc_ids:

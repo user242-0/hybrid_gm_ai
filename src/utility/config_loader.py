@@ -66,9 +66,20 @@ def is_hud_debug_enabled() -> bool:
 
 
 def is_hud_demo_enabled() -> bool:
-    """Return whether the capture-oriented Director HUD controls are enabled."""
+    """
+    Return whether the capture-oriented Director HUD controls are enabled.
+
+    Priority: HUD_DEMO environment variable > config.yml debug.hud_demo.
+    """
     env_val = os.environ.get("HUD_DEMO", "").lower()
-    return env_val in ("1", "true", "yes", "on")
+    if env_val in ("1", "true", "yes", "on"):
+        return True
+    if env_val in ("0", "false", "no", "off"):
+        return False
+
+    cfg = get_cfg()
+    debug_cfg = cfg.get("debug", {})
+    return bool(debug_cfg.get("hud_demo", False))
 
 
 def _latest_job_directory(jobs_root: Path) -> Optional[Path]:

@@ -23,6 +23,7 @@ MAX_ADVISORY_DISPLAY_ITEMS = 3
 @dataclass(frozen=True)
 class HUDDisplayMode:
     name: str
+    show_actor_mode_control: bool
     show_demo_controls: bool
     show_wip_controls: bool
     show_debug_controls: bool
@@ -37,6 +38,7 @@ def resolve_hud_display_mode(
     if debug_enabled:
         return HUDDisplayMode(
             name="debug",
+            show_actor_mode_control=True,
             show_demo_controls=True,
             show_wip_controls=True,
             show_debug_controls=True,
@@ -44,12 +46,14 @@ def resolve_hud_display_mode(
     if demo_enabled:
         return HUDDisplayMode(
             name="demo",
+            show_actor_mode_control=True,
             show_demo_controls=True,
             show_wip_controls=False,
             show_debug_controls=False,
         )
     return HUDDisplayMode(
         name="normal",
+        show_actor_mode_control=False,
         show_demo_controls=False,
         show_wip_controls=False,
         show_debug_controls=False,
@@ -96,8 +100,10 @@ class DirectorHUD:
             demo_enabled=is_hud_demo_enabled(),
         )
         self._debug = self.display_mode.show_debug_controls
+        self.show_actor_mode_control = self.display_mode.show_actor_mode_control
         self.show_demo_controls = self.display_mode.show_demo_controls
         self.show_wip_controls = self.display_mode.show_wip_controls
+        self.show_debug_controls = self.display_mode.show_debug_controls
 
         self.root = tk.Tk()
         self.root.title(title)
@@ -175,7 +181,7 @@ class DirectorHUD:
             fg="#80FF80" if self._debug else "white",
             bg=frame["bg"],
         ).pack(side="left")
-        if self.show_demo_controls:
+        if self.show_actor_mode_control:
             self.actor_mode_combo = ttk.Combobox(
                 row_actor_mode,
                 textvariable=self.actor_mode_var,
@@ -196,8 +202,8 @@ class DirectorHUD:
                 bg=frame["bg"],
             ).pack(side="left", padx=4)
 
-        # --- Demo/debug: location controls ---
-        if self.show_demo_controls:
+        # --- Debug: location controls ---
+        if self.show_debug_controls:
             row_loc = tk.Frame(frame, bg=frame["bg"])
             row_loc.pack(fill="x", **pad)
             tk.Label(row_loc, text="\U0001f4cd", fg="white", bg=frame["bg"]).pack(side="left")
@@ -209,8 +215,8 @@ class DirectorHUD:
         else:
             self.location_combo = None
 
-        # --- Demo/debug: discovery injection ---
-        if self.show_demo_controls:
+        # --- Debug: discovery injection ---
+        if self.show_debug_controls:
             row_disc = tk.Frame(frame, bg=frame["bg"])
             row_disc.pack(fill="x", **pad)
             tk.Label(row_disc, text="\U0001f50d Disc:", fg="#80FF80", bg=frame["bg"]).pack(side="left")
@@ -394,7 +400,7 @@ class DirectorHUD:
         on_change: Optional[Callable[[str], None]],
     ) -> None:
         self.on_actor_mode_change = on_change
-        if not self.show_demo_controls or self.actor_mode_combo is None:
+        if not self.show_actor_mode_control or self.actor_mode_combo is None:
             return
         modes_list = list(modes or [])
 
@@ -457,7 +463,7 @@ class DirectorHUD:
         self._run_or_enqueue(apply)
 
     def set_location_options(self, options: list[str]) -> None:
-        if not self.show_demo_controls or self.location_combo is None:
+        if not self.show_debug_controls or self.location_combo is None:
             return
         def apply() -> None:
             self.location_combo["values"] = options
@@ -599,7 +605,7 @@ class DirectorHUD:
     # --- Debug: discovery injection ---
 
     def set_discovery_options(self, options: list[str]) -> None:
-        if not self.show_demo_controls or not hasattr(self, "_disc_combo"):
+        if not self.show_debug_controls or not hasattr(self, "_disc_combo"):
             return
         def apply() -> None:
             self._disc_combo["values"] = options
