@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-06-21（Session 49-B: 60秒デモ前のMicroGoal/Actions整合ポリッシュ）
+
+### 今日やったこと
+
+* RC別MicroGoalへ `action_id` を保存し、Session 49以前のsaveはtext / modeから補完するようにした。
+* discovery gating適用後のActions listboxに対応Actionがある場合だけ現在MicroGoalを表示し、選べない場合は `MicroGoal(<actor>): 未設定` にした。
+* switch_character、ActorMode変更、save/load後もactive actorの表示可能Actionsとの整合を取り、AI提案HUDのactor_idフィルタ/read-onlyを維持した。
+* 未解放のMicroGoal候補は削除せず、将来の「潜在目標 / 予兆 / ヒント」分離に残した。
+
+### 次回の最初の一手
+
+* TPOコンテンツ縦切り、RC別location/discovery、ROのRC別実装を後続タスクとして進める。
+
 ## 2026-06-20（Session 49: RC別MicroGoal）
 
 ### 今日やったこと

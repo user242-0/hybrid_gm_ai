@@ -66,16 +66,44 @@ class HUDCallbacks:
         if callable(get_for_actor):
             micro = get_for_actor(self.ctx.director_world, actor_id, reroll=reroll)
         else:
-            micro = self.ctx.director.get_micro_goal(
-                self.ctx.director_world,
-                reroll=reroll,
+            get_micro = getattr(self.ctx.director, "get_micro_goal", None)
+            micro = (
+                get_micro(self.ctx.director_world, reroll=reroll)
+                if callable(get_micro)
+                else self.ctx.game_state.get("director_micro_goal")
             )
         return actor_id, micro
 
-    def _show_active_micro_goal(self, *, reroll: bool = False) -> tuple[str | None, str]:
+    def _show_active_micro_goal(
+        self,
+        *,
+        reroll: bool = False,
+        available_action_ids: set[str] | None = None,
+    ) -> tuple[str | None, str]:
         actor_id, micro = self._active_actor_micro_goal(reroll=reroll)
-        self._ui_show_micro(micro, self.ctx.game_state, actor_id)
-        return actor_id, micro
+        if available_action_ids is None:
+            cached_actor_id = self.ctx.game_state.get("hud_cached_actor_id")
+            cached_mode = self.ctx.game_state.get("hud_cached_action_mode")
+            _current_actor_id, current_mode = self._active_actor_mode()
+            if cached_actor_id == actor_id and cached_mode == current_mode:
+                cached_actions = self.ctx.game_state.get("hud_cached_actions") or []
+                available_action_ids = {action_id for action_id, _, _ in cached_actions}
+            else:
+                available_action_ids = set()
+
+        get_action_id = getattr(
+            self.ctx.director,
+            "get_micro_goal_action_id_for_actor",
+            None,
+        )
+        if callable(get_action_id):
+            action_id = get_action_id(self.ctx.director_world, actor_id)
+            display_micro = micro if action_id in available_action_ids else "未設定"
+        else:
+            # Compatibility for lightweight/legacy Director implementations.
+            display_micro = micro
+        self._ui_show_micro(display_micro, self.ctx.game_state, actor_id)
+        return actor_id, display_micro
 
     def refresh_hud(self) -> None:
         """HUD の表示を更新する"""
@@ -89,6 +117,8 @@ class HUDCallbacks:
             ctx.director_hud.set_advisory_items([])
             ctx.game_state["hud_cached_progress"] = None
             ctx.game_state["hud_cached_actions"] = []
+            ctx.game_state["hud_cached_actor_id"] = None
+            ctx.game_state["hud_cached_action_mode"] = None
             ctx.game_state["hud_cached_recommended"] = {
                 "label": None,
                 "enabled": False,
@@ -226,6 +256,8 @@ class HUDCallbacks:
             if is_hud_debug_enabled():
                 print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
             ctx.game_state["hud_cached_actions"] = ctx.current_actions.copy()
+            ctx.game_state["hud_cached_actor_id"] = actor_id
+            ctx.game_state["hud_cached_action_mode"] = action_mode
             ctx.game_state["hud_last_rendered_rev"] = cache_rev
 
         ctx.director_hud.set_progress(ctx.game_state.get("hud_cached_progress"))
@@ -237,6 +269,9 @@ class HUDCallbacks:
         cached_actions = ctx.game_state.get("hud_cached_actions") or []
         ctx.current_actions[:] = list(cached_actions)
         ctx.director_hud.set_actions(list(cached_actions))
+        self._show_active_micro_goal(
+            available_action_ids={action_id for action_id, _, _ in cached_actions},
+        )
         self._refresh_advisory_items()
 
         # RO 助言表示

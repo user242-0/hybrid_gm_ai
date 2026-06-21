@@ -465,13 +465,46 @@ class Director:
                 baseline = {}
 
             state["text"] = choice
+            rule = self._lookup_rule(choice, mode)
+            state["action_id"] = rule.get("action") if isinstance(rule, dict) else None
             state["mode"] = mode
             state["baseline"] = baseline
             history.append(self._micro_id(choice))
             if len(history) > self._recent_k:
                 del history[0 : len(history) - self._recent_k]
+        elif "action_id" not in state:
+            # Backfill worlds saved before actor MicroGoals persisted action IDs.
+            rule = self._lookup_rule(current, mode)
+            state["action_id"] = rule.get("action") if isinstance(rule, dict) else None
 
         return state.get("text") or "(MicroGoal なし)"
+
+    def get_micro_goal_action_id_for_actor(
+        self,
+        world: Dict[str, Any],
+        actor_id: Optional[str],
+    ) -> Optional[str]:
+        """Return the action ID associated with the actor's current MicroGoal."""
+
+        if not actor_id or not isinstance(world, dict):
+            micro = self.get_micro_goal(world, reroll=False)
+            rule = self._lookup_rule(micro, self.mode)
+            action_id = rule.get("action") if isinstance(rule, dict) else None
+            return action_id if isinstance(action_id, str) and action_id else None
+
+        actor_goals = world.get("actor_micro_goals")
+        state = actor_goals.get(actor_id) if isinstance(actor_goals, dict) else None
+        if not isinstance(state, dict):
+            return None
+        action_id = state.get("action_id")
+        if not isinstance(action_id, str) or not action_id:
+            mode = state.get("mode")
+            if not isinstance(mode, str) or not mode:
+                mode = self.get_actor_mode(world, actor_id, fallback_mode=self.mode)
+            rule = self._lookup_rule(state.get("text"), mode)
+            action_id = rule.get("action") if isinstance(rule, dict) else None
+            state["action_id"] = action_id
+        return action_id if isinstance(action_id, str) and action_id else None
 
     def clear_micro_goal(self, mode: Optional[str] = None) -> None:
         target = mode or self.mode
@@ -499,6 +532,7 @@ class Director:
         if not isinstance(state, dict):
             return
         state["text"] = None
+        state["action_id"] = None
         state["baseline"] = {}
 
     def is_micro_goal_done(self, world: Dict[str, Any]) -> bool:

@@ -34,11 +34,39 @@ def test_actor_micro_goals_are_stored_independently_by_actor_id():
     assert trickster_micro in micro_texts(director, "FLEE")
     assert world["actor_micro_goals"]["刑事"]["text"] == cop_micro
     assert world["actor_micro_goals"]["愉快犯"]["text"] == trickster_micro
+    assert world["actor_micro_goals"]["刑事"]["action_id"]
+    assert world["actor_micro_goals"]["愉快犯"]["action_id"]
 
     director.clear_micro_goal_for_actor(world, "愉快犯")
 
     assert world["actor_micro_goals"]["刑事"]["text"] == cop_micro
     assert world["actor_micro_goals"]["愉快犯"]["text"] is None
+    assert world["actor_micro_goals"]["愉快犯"]["action_id"] is None
+
+
+def test_actor_micro_goal_action_id_is_backfilled_for_older_saved_state():
+    director = make_director()
+    world = apply_world_defaults(
+        director.synthesize_world(),
+        load_pack("cop_trickster"),
+    )
+    world["actor_micro_goals"] = {
+        "愉快犯": {
+            "text": "裏路地→高架下→駅裏へ移動",
+            "mode": "FLEE",
+            "baseline": {},
+            "recent_ids": {},
+        }
+    }
+
+    micro = director.get_micro_goal_for_actor(world, "愉快犯")
+
+    assert micro == "裏路地→高架下→駅裏へ移動"
+    assert world["actor_micro_goals"]["愉快犯"]["action_id"] == "move_low_profile"
+    assert (
+        director.get_micro_goal_action_id_for_actor(world, "愉快犯")
+        == "move_low_profile"
+    )
 
 
 def test_actor_micro_goal_uses_actor_mode_and_recomputes_when_mode_changes():

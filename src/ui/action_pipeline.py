@@ -463,7 +463,7 @@ class ActionPipeline:
                 refreshed = world.get("clock")
                 if isinstance(refreshed, str):
                     self.hud_set_clock(refreshed)
-        if self.hud_set_microgoal is not None:
+        if self.hud_set_microgoal is not None and self.ui_refresh is None:
             micro_text = self.game_state.get("director_micro_goal")
             micro_actor_id = self.game_state.get("director_micro_goal_actor_id")
             display = (

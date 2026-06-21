@@ -391,26 +391,112 @@ def test_hud_microgoal_switches_with_active_actor_and_restores_previous_goal(mon
         goals_dict=extract_goals_from_pack(pack),
     )
     world = apply_world_defaults(director.synthesize_world(), pack)
+    world["actor_micro_goals"] = {
+        "刑事": {
+            "text": "未読の通報を1件だけ確認",
+            "action_id": "check_tip",
+            "mode": "FREEZE",
+            "baseline": {},
+            "recent_ids": {},
+        },
+        "愉快犯": {
+            "text": "証拠を隠す",
+            "action_id": "hide_evidence",
+            "mode": "FLEE",
+            "baseline": {},
+            "recent_ids": {},
+        },
+    }
     callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
     monkeypatch.setattr(
         "src.ui.hud_callbacks.get_advisory_display_items",
         lambda *, actor_id, limit: [],
     )
 
-    callbacks.on_show_micro()
-    cop_micro = ctx.game_state["director_micro_goal"]
+    callbacks.refresh_hud()
+    cop_micro = world["actor_micro_goals"]["刑事"]["text"]
     assert hud.microgoal == f"MicroGoal(刑事): {cop_micro}"
 
     ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
-    callbacks.on_show_micro()
-    trickster_micro = ctx.game_state["director_micro_goal"]
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+    trickster_micro = world["actor_micro_goals"]["愉快犯"]["text"]
     assert hud.microgoal == f"MicroGoal(愉快犯): {trickster_micro}"
     assert world["actor_micro_goals"]["刑事"]["text"] == cop_micro
 
     ctx.game_state["active_char"] = SimpleNamespace(name="刑事")
-    callbacks.on_show_micro()
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
     assert ctx.game_state["director_micro_goal"] == cop_micro
     assert hud.microgoal == f"MicroGoal(刑事): {cop_micro}"
+
+
+def test_hud_hides_microgoal_when_action_is_not_in_visible_actions(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    world["actor_micro_goals"] = {
+        "愉快犯": {
+            "text": "裏路地→高架下→駅裏へ移動",
+            "action_id": "move_low_profile",
+            "mode": "FLEE",
+            "baseline": {},
+            "recent_ids": {},
+        }
+    }
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+
+    assert "move_low_profile" not in {
+        action_id for action_id, _label, _minutes in hud.actions
+    }
+    assert hud.microgoal == "MicroGoal(愉快犯): 未設定"
+    assert ctx.game_state["director_micro_goal"] == "未設定"
+    assert (
+        world["actor_micro_goals"]["愉快犯"]["text"]
+        == "裏路地→高架下→駅裏へ移動"
+    )
+
+
+def test_hud_shows_microgoal_after_its_action_becomes_visible(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    world["actor_micro_goals"] = {
+        "愉快犯": {
+            "text": "裏路地→高架下→駅裏へ移動",
+            "action_id": "move_low_profile",
+            "mode": "FLEE",
+            "baseline": {},
+            "recent_ids": {},
+        }
+    }
+    inject_discovery(world, "unsafe_route_identified")
+    callbacks, _ctx, hud = make_hud_callbacks(director, world, pack, "愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+
+    assert "move_low_profile" in {
+        action_id for action_id, _label, _minutes in hud.actions
+    }
+    assert hud.microgoal == "MicroGoal(愉快犯): 裏路地→高架下→駅裏へ移動"
 
 
 def test_actor_mode_dropdown_recomputes_active_actor_microgoal(monkeypatch):

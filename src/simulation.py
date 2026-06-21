@@ -274,7 +274,7 @@ def _init_hud_callbacks() -> None:
     ctx.director_hud.set_modes(_available_modes, on_change=_hud_cbs.on_mode_dropdown)
     ctx.director_hud.set_mode(ctx.director.mode)
     ctx.director_hud.set_auto_enabled(ctx.auto_enabled)
-    _hud_cbs.on_show_micro()
+    _hud_cbs.refresh_hud()
 
 
 # HUDCallbacks へのデリゲート関数（後方互換性のため）
@@ -488,10 +488,12 @@ def player_loop(gs):
                 micro_goal = get_for_actor(dw, actor_id, reroll=False)
             else:
                 micro_goal = ctx.director.get_micro_goal(dw, reroll=False)
-            ui_show_micro(micro_goal, gs, actor_id)
             if ctx.director_hud is not None:
+                refresh_hud()
                 ctx.director_hud.set_mode(ctx.director.mode)
                 ctx.director_hud.set_clock(_director_clock_string(dw))
+            else:
+                ui_show_micro(micro_goal, gs, actor_id)
         num_choice_map = {}
         command_ready = False
         # CLI で直接 input() する場合（GUI を使わないモード）
