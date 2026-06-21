@@ -1,4 +1,5 @@
 import pytest
+from src.utility.config_loader import is_hud_demo_enabled
 
 try:
     import tkinter as tk
@@ -6,15 +7,55 @@ except ImportError:  # pragma: no cover - tkinter optional
     tk = None  # type: ignore
 
 try:
-    from src.ui.director_hud import DirectorHUD, format_actor_mode_label
+    from src.ui.director_hud import (
+        DirectorHUD,
+        format_actor_mode_label,
+        resolve_hud_display_mode,
+    )
 except Exception:  # pragma: no cover - module depends on tkinter
     DirectorHUD = None  # type: ignore
     format_actor_mode_label = None  # type: ignore
+    resolve_hud_display_mode = None  # type: ignore
 
 
 def test_format_actor_mode_label():
     assert format_actor_mode_label("刑事") == "ActorMode(刑事):"
     assert format_actor_mode_label(None) == "ActorMode(?):"
+
+
+@pytest.mark.parametrize(
+    ("debug_enabled", "demo_enabled", "name", "demo_controls", "wip_controls"),
+    [
+        (False, False, "normal", False, False),
+        (False, True, "demo", True, False),
+        (True, False, "debug", True, True),
+        (True, True, "debug", True, True),
+    ],
+)
+def test_resolve_hud_display_mode(
+    debug_enabled,
+    demo_enabled,
+    name,
+    demo_controls,
+    wip_controls,
+):
+    mode = resolve_hud_display_mode(
+        debug_enabled=debug_enabled,
+        demo_enabled=demo_enabled,
+    )
+
+    assert mode.name == name
+    assert mode.show_demo_controls is demo_controls
+    assert mode.show_wip_controls is wip_controls
+    assert mode.show_debug_controls is debug_enabled
+
+
+def test_hud_demo_is_controlled_by_environment(monkeypatch):
+    monkeypatch.setenv("HUD_DEMO", "1")
+    assert is_hud_demo_enabled() is True
+
+    monkeypatch.setenv("HUD_DEMO", "0")
+    assert is_hud_demo_enabled() is False
 
 
 @pytest.mark.skipif(DirectorHUD is None or tk is None, reason="tkinter not available")
@@ -78,6 +119,7 @@ def test_director_hud_exposes_callbacks():
     hud.set_microgoal("Test objective")
     assert hud.clock_var.get() == "Day2 12:00"
     assert hud.micro_var.get() == "Test objective"
-    assert "A:Next(AI)" in hud.help_label.cget("text")
+    if hud.help_label is not None:
+        assert "A:Next(AI)" in hud.help_label.cget("text")
 
     hud.destroy()

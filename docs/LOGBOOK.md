@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-06-21（Session 49-C: Demo HUD cleanup）
+
+### 今日やったこと
+
+* 60秒デモ撮影用に `HUD_DEMO=1` を追加。RO / Recommended / ProgressはデモHUDから隠し、ActorMode / location / discovery操作は残した。
+* `HUD_DEBUG=1` を開発用フルHUDとして最優先し、`HUD_DEBUG=0` かつ `HUD_DEMO=0` は通常HUDとしてDirectorMode / ActorMode / MicroGoal / Actions / AI提案だけを表示するよう整理した。
+* HUDの初期geometry指定を生成時の専用処理に限定し、refresh経路では位置を再設定しない構造を明確化した。
+* AI提案HUDのactor_idフィルタ/read-only、save/load、switch_character、ActorMode変更、MicroGoal更新の既存経路は維持した。
+
+### 次回の最初の一手
+
+* RO / Recommended / ProgressのRC別対応は後続タスクとして進める。
+
 ## 2026-06-21（Session 49-B: 60秒デモ前のMicroGoal/Actions整合ポリッシュ）
 
 ### 今日やったこと

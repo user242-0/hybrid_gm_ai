@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable
 
 from src.action_proposal.advisory_provider import get_advisory_display_items
-from src.utility.config_loader import is_hud_debug_enabled
+from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
 if TYPE_CHECKING:
     from src.game_context import GameContext
@@ -604,8 +604,13 @@ class HUDCallbacks:
         hud.on_show_micro = self.on_show_micro
         hud.on_action_select = self.on_action_select
 
-        # Debug location dropdown + discovery injection
-        if is_hud_debug_enabled():
+        # Demo/debug location dropdown + discovery injection
+        interactive_hud = getattr(
+            hud,
+            "show_demo_controls",
+            is_hud_debug_enabled() or is_hud_demo_enabled(),
+        )
+        if interactive_hud:
             locs = self.ctx.game_state.get("available_locations", [])
             if locs:
                 hud.set_location_options(locs)

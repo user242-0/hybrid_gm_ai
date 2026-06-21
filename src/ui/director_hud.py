@@ -4,10 +4,11 @@ from __future__ import annotations
 import queue
 import threading
 import tkinter as tk
+from dataclasses import dataclass
 from tkinter import ttk
 from typing import Callable, Optional
 
-from src.utility.config_loader import is_hud_debug_enabled
+from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
 MODE_COLORS = {
     "FREEZE": "#3b3b3b",
@@ -17,6 +18,42 @@ MODE_COLORS = {
 }
 
 MAX_ADVISORY_DISPLAY_ITEMS = 3
+
+
+@dataclass(frozen=True)
+class HUDDisplayMode:
+    name: str
+    show_demo_controls: bool
+    show_wip_controls: bool
+    show_debug_controls: bool
+
+
+def resolve_hud_display_mode(
+    *,
+    debug_enabled: bool,
+    demo_enabled: bool,
+) -> HUDDisplayMode:
+    """Resolve HUD visibility, with HUD_DEBUG taking precedence over HUD_DEMO."""
+    if debug_enabled:
+        return HUDDisplayMode(
+            name="debug",
+            show_demo_controls=True,
+            show_wip_controls=True,
+            show_debug_controls=True,
+        )
+    if demo_enabled:
+        return HUDDisplayMode(
+            name="demo",
+            show_demo_controls=True,
+            show_wip_controls=False,
+            show_debug_controls=False,
+        )
+    return HUDDisplayMode(
+        name="normal",
+        show_demo_controls=False,
+        show_wip_controls=False,
+        show_debug_controls=False,
+    )
 
 
 def format_actor_mode_label(actor_id: object) -> str:
@@ -54,12 +91,18 @@ class DirectorHUD:
     """Small top-level window that exposes quick director controls."""
 
     def __init__(self, title: str = "Director HUD") -> None:
+        self.display_mode = resolve_hud_display_mode(
+            debug_enabled=is_hud_debug_enabled(),
+            demo_enabled=is_hud_demo_enabled(),
+        )
+        self._debug = self.display_mode.show_debug_controls
+        self.show_demo_controls = self.display_mode.show_demo_controls
+        self.show_wip_controls = self.display_mode.show_wip_controls
+
         self.root = tk.Tk()
         self.root.title(title)
-        # The HUD shows multiple stacked rows; ensure the window is tall enough so the
-        # Auto/Next controls and help text are visible without manual resizing.
-        self.root.geometry("520x520")
-        self.root.minsize(520, 470)
+        self._set_initial_geometry()
+        self.root.minsize(520, 360)
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -85,7 +128,6 @@ class DirectorHUD:
         self.auto_var = tk.BooleanVar(value=False)
         self.location_var = tk.StringVar(value="")
 
-        self._debug: bool = is_hud_debug_enabled()
         self._on_location_change_cb: Optional[Callable[[str], None]] = None
 
         self.actions_var: list[tuple[str, str, int]] = []
@@ -101,6 +143,11 @@ class DirectorHUD:
         self._build()
         self._bind_keys()
         self.set_mode("FREEZE")
+
+    def _set_initial_geometry(self) -> None:
+        """Set the initial size once; refresh paths must not reset user positioning."""
+        heights = {"normal": 380, "demo": 470, "debug": 520}
+        self.root.geometry(f"520x{heights[self.display_mode.name]}")
 
     def _build(self) -> None:
         pad = {"padx": 8, "pady": 4}
@@ -128,7 +175,7 @@ class DirectorHUD:
             fg="#80FF80" if self._debug else "white",
             bg=frame["bg"],
         ).pack(side="left")
-        if self._debug:
+        if self.show_demo_controls:
             self.actor_mode_combo = ttk.Combobox(
                 row_actor_mode,
                 textvariable=self.actor_mode_var,
@@ -149,10 +196,10 @@ class DirectorHUD:
                 bg=frame["bg"],
             ).pack(side="left", padx=4)
 
-        # --- Location row ---
-        row_loc = tk.Frame(frame, bg=frame["bg"])
-        row_loc.pack(fill="x", **pad)
-        if self._debug:
+        # --- Demo/debug: location controls ---
+        if self.show_demo_controls:
+            row_loc = tk.Frame(frame, bg=frame["bg"])
+            row_loc.pack(fill="x", **pad)
             tk.Label(row_loc, text="\U0001f4cd", fg="white", bg=frame["bg"]).pack(side="left")
             self.location_combo = ttk.Combobox(
                 row_loc, textvariable=self.location_var, state="readonly", width=24,
@@ -161,13 +208,9 @@ class DirectorHUD:
             self.location_combo.bind("<<ComboboxSelected>>", self._on_location_change)
         else:
             self.location_combo = None
-            tk.Label(
-                row_loc, textvariable=self.location_var, fg="white", bg=frame["bg"],
-                justify="left",
-            ).pack(side="left")
 
-        # --- Debug: discovery injection ---
-        if self._debug:
+        # --- Demo/debug: discovery injection ---
+        if self.show_demo_controls:
             row_disc = tk.Frame(frame, bg=frame["bg"])
             row_disc.pack(fill="x", **pad)
             tk.Label(row_disc, text="\U0001f50d Disc:", fg="#80FF80", bg=frame["bg"]).pack(side="left")
@@ -193,34 +236,42 @@ class DirectorHUD:
         )
         self.micro_lbl.pack(side="left", padx=6)
 
-        rowp = tk.Frame(frame, bg=frame["bg"])
-        rowp.pack(fill="x", **pad)
-        tk.Label(rowp, text="Progress:", fg="white", bg=frame["bg"]).pack(side="left")
-        tk.Label(
-            rowp,
-            textvariable=self.progress_var,
-            fg="white",
-            bg=frame["bg"],
-            wraplength=420,
-            justify="left",
-        ).pack(side="left", padx=6)
+        if self.show_wip_controls:
+            rowp = tk.Frame(frame, bg=frame["bg"])
+            rowp.pack(fill="x", **pad)
+            tk.Label(rowp, text="Progress:", fg="white", bg=frame["bg"]).pack(side="left")
+            tk.Label(
+                rowp,
+                textvariable=self.progress_var,
+                fg="white",
+                bg=frame["bg"],
+                wraplength=420,
+                justify="left",
+            ).pack(side="left", padx=6)
 
-        row_rec = tk.Frame(frame, bg=frame["bg"])
-        row_rec.pack(fill="x", **pad)
-        self.rec_btn = tk.Button(row_rec, text="(Recommended)", command=self._click_recommended)
-        self.rec_btn.pack(side="left")
+            row_rec = tk.Frame(frame, bg=frame["bg"])
+            row_rec.pack(fill="x", **pad)
+            self.rec_btn = tk.Button(
+                row_rec,
+                text="(Recommended)",
+                command=self._click_recommended,
+            )
+            self.rec_btn.pack(side="left")
 
-        row_ro = tk.Frame(frame, bg=frame["bg"])
-        row_ro.pack(fill="x", **pad)
-        tk.Label(
-            row_ro, text="RO:", fg="#FFD700", bg=frame["bg"],
-            font=("TkDefaultFont", 9, "bold"),
-        ).pack(side="left")
-        self.ro_label = tk.Label(
-            row_ro, textvariable=self.ro_var, fg="#FFD700", bg=frame["bg"],
-            wraplength=420, justify="left",
-        )
-        self.ro_label.pack(side="left", padx=6)
+            row_ro = tk.Frame(frame, bg=frame["bg"])
+            row_ro.pack(fill="x", **pad)
+            tk.Label(
+                row_ro, text="RO:", fg="#FFD700", bg=frame["bg"],
+                font=("TkDefaultFont", 9, "bold"),
+            ).pack(side="left")
+            self.ro_label = tk.Label(
+                row_ro, textvariable=self.ro_var, fg="#FFD700", bg=frame["bg"],
+                wraplength=420, justify="left",
+            )
+            self.ro_label.pack(side="left", padx=6)
+        else:
+            self.rec_btn = None
+            self.ro_label = None
 
         row_advisory = tk.Frame(frame, bg=frame["bg"])
         row_advisory.pack(fill="x", **pad)
@@ -243,37 +294,40 @@ class DirectorHUD:
         self.listbox.bind("<Double-Button-1>", self._on_list_activate)
         self.listbox.bind("<Return>", self._on_list_activate)
 
-        row_auto = tk.Frame(frame, bg=frame["bg"])
-        row_auto.pack(fill="x", **pad)
-        tk.Checkbutton(
-            row_auto,
-            text="Auto",
-            variable=self.auto_var,
-            command=lambda: self.on_toggle_auto
-            and self.on_toggle_auto(self.auto_var.get()),
-        ).pack(side="left")
-        tk.Button(
-            row_auto,
-            text="Next (AI)",
-            command=lambda: self.on_ai_step and self.on_ai_step(),
-        ).pack(side="left", padx=8)
-
-        row3 = tk.Frame(frame, bg=frame["bg"])
-        row3.pack(fill="x", **pad)
         help_text = (
             "[Keys] Use Mode dropdown | 1..9:Run Action | G:Show Micro | R:Reroll Micro | "
             "A:Next(AI) | S:Save L:Load"
         )
         self.help_text = help_text
-        self.help_label = tk.Label(
-            row3,
-            text=help_text,
-            fg="white",
-            bg=frame["bg"],
-            justify="left",
-            wraplength=460,
-        )
-        self.help_label.pack(side="left")
+        if self._debug:
+            row_auto = tk.Frame(frame, bg=frame["bg"])
+            row_auto.pack(fill="x", **pad)
+            tk.Checkbutton(
+                row_auto,
+                text="Auto",
+                variable=self.auto_var,
+                command=lambda: self.on_toggle_auto
+                and self.on_toggle_auto(self.auto_var.get()),
+            ).pack(side="left")
+            tk.Button(
+                row_auto,
+                text="Next (AI)",
+                command=lambda: self.on_ai_step and self.on_ai_step(),
+            ).pack(side="left", padx=8)
+
+            row3 = tk.Frame(frame, bg=frame["bg"])
+            row3.pack(fill="x", **pad)
+            self.help_label = tk.Label(
+                row3,
+                text=help_text,
+                fg="white",
+                bg=frame["bg"],
+                justify="left",
+                wraplength=460,
+            )
+            self.help_label.pack(side="left")
+        else:
+            self.help_label = None
 
     def _bind_keys(self) -> None:
         root = self.root
@@ -340,7 +394,7 @@ class DirectorHUD:
         on_change: Optional[Callable[[str], None]],
     ) -> None:
         self.on_actor_mode_change = on_change
-        if not self._debug or self.actor_mode_combo is None:
+        if not self.show_demo_controls or self.actor_mode_combo is None:
             return
         modes_list = list(modes or [])
 
@@ -399,12 +453,11 @@ class DirectorHUD:
 
     def set_location(self, text: str) -> None:
         def apply() -> None:
-            display = f"\U0001f4cd {text}" if not self._debug else text
-            self.location_var.set(display)
+            self.location_var.set(text)
         self._run_or_enqueue(apply)
 
     def set_location_options(self, options: list[str]) -> None:
-        if not self._debug or self.location_combo is None:
+        if not self.show_demo_controls or self.location_combo is None:
             return
         def apply() -> None:
             self.location_combo["values"] = options
@@ -419,6 +472,9 @@ class DirectorHUD:
             self._on_location_change_cb(value)
 
     def set_recommended(self, label: Optional[str], *, enabled: bool = True) -> None:
+        if self.rec_btn is None:
+            return
+
         def apply() -> None:
             state = tk.NORMAL if enabled else tk.DISABLED
             self.rec_btn.configure(text=label or "(Recommended)", state=state)
@@ -543,7 +599,7 @@ class DirectorHUD:
     # --- Debug: discovery injection ---
 
     def set_discovery_options(self, options: list[str]) -> None:
-        if not self._debug or not hasattr(self, "_disc_combo"):
+        if not self.show_demo_controls or not hasattr(self, "_disc_combo"):
             return
         def apply() -> None:
             self._disc_combo["values"] = options
