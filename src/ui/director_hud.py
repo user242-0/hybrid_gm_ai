@@ -19,6 +19,18 @@ MODE_COLORS = {
 
 MAX_ADVISORY_DISPLAY_ITEMS = 3
 
+HUD_FONT_SIZES = {
+    "normal": 9,
+    "demo": 14,
+    "debug": 9,
+}
+
+HUD_WINDOW_SIZES = {
+    "normal": (520, 380),
+    "demo": (700, 600),
+    "debug": (520, 520),
+}
+
 
 @dataclass(frozen=True)
 class HUDDisplayMode:
@@ -65,6 +77,10 @@ def format_actor_mode_label(actor_id: object) -> str:
     return f"ActorMode({actor_name}):"
 
 
+def advisory_heading_for_mode(display_mode_name: str) -> str:
+    return "提案候補:" if display_mode_name == "demo" else "AI提案:"
+
+
 def _display_text(value: object) -> str:
     return "" if value is None else str(value)
 
@@ -108,7 +124,8 @@ class DirectorHUD:
         self.root = tk.Tk()
         self.root.title(title)
         self._set_initial_geometry()
-        self.root.minsize(520, 360)
+        min_width, min_height = HUD_WINDOW_SIZES[self.display_mode.name]
+        self.root.minsize(min_width, min_height)
         self.root.attributes("-topmost", True)
 
         self.on_mode_change: Optional[Callable[[str], None]] = None
@@ -152,11 +169,19 @@ class DirectorHUD:
 
     def _set_initial_geometry(self) -> None:
         """Set the initial size once; refresh paths must not reset user positioning."""
-        heights = {"normal": 380, "demo": 470, "debug": 520}
-        self.root.geometry(f"520x{heights[self.display_mode.name]}")
+        width, height = HUD_WINDOW_SIZES[self.display_mode.name]
+        self.root.geometry(f"{width}x{height}")
 
     def _build(self) -> None:
-        pad = {"padx": 8, "pady": 4}
+        font_size = HUD_FONT_SIZES[self.display_mode.name]
+        normal_font = ("TkDefaultFont", font_size)
+        bold_font = ("TkDefaultFont", font_size, "bold")
+        wraplength = 560 if self.display_mode.name == "demo" else 420
+        pad = (
+            {"padx": 12, "pady": 6}
+            if self.display_mode.name == "demo"
+            else {"padx": 8, "pady": 4}
+        )
 
         frame = tk.Frame(self.root, bg=MODE_COLORS["FREEZE"])
         frame.pack(fill="both", expand=True)
@@ -164,14 +189,31 @@ class DirectorHUD:
 
         row1 = tk.Frame(frame, bg=frame["bg"])
         row1.pack(fill="x", **pad)
-        tk.Label(row1, text="DirectorMode:", fg="white", bg=frame["bg"]).pack(side="left")
+        tk.Label(
+            row1,
+            text="DirectorMode:",
+            fg="white",
+            bg=frame["bg"],
+            font=bold_font,
+        ).pack(side="left")
         self.mode_menu = tk.OptionMenu(row1, self.mode_var, "")
-        self.mode_menu.configure(highlightthickness=0)
+        self.mode_menu.configure(highlightthickness=0, font=normal_font)
+        self.mode_menu["menu"].configure(font=normal_font)
         self.mode_menu.pack(side="left")
-        tk.Label(row1, text="Clock:", fg="white", bg=frame["bg"]).pack(side="left", padx=12)
-        tk.Label(row1, textvariable=self.clock_var, fg="white", bg=frame["bg"]).pack(
-            side="left", padx=6
-        )
+        tk.Label(
+            row1,
+            text="Clock:",
+            fg="white",
+            bg=frame["bg"],
+            font=bold_font,
+        ).pack(side="left", padx=12)
+        tk.Label(
+            row1,
+            textvariable=self.clock_var,
+            fg="white",
+            bg=frame["bg"],
+            font=normal_font,
+        ).pack(side="left", padx=6)
 
         row_actor_mode = tk.Frame(frame, bg=frame["bg"])
         row_actor_mode.pack(fill="x", **pad)
@@ -180,6 +222,7 @@ class DirectorHUD:
             textvariable=self.actor_mode_label_var,
             fg="#80FF80" if self._debug else "white",
             bg=frame["bg"],
+            font=bold_font,
         ).pack(side="left")
         if self.show_actor_mode_control:
             self.actor_mode_combo = ttk.Combobox(
@@ -187,6 +230,7 @@ class DirectorHUD:
                 textvariable=self.actor_mode_var,
                 state="readonly",
                 width=14,
+                font=normal_font,
             )
             self.actor_mode_combo.pack(side="left", padx=4)
             self.actor_mode_combo.bind(
@@ -200,6 +244,7 @@ class DirectorHUD:
                 textvariable=self.actor_mode_var,
                 fg="white",
                 bg=frame["bg"],
+                font=normal_font,
             ).pack(side="left", padx=4)
 
         # --- Debug: location controls ---
@@ -231,28 +276,42 @@ class DirectorHUD:
 
         row2 = tk.Frame(frame, bg=frame["bg"])
         row2.pack(fill="x", **pad)
-        tk.Label(row2, text="MicroGoal:", fg="white", bg=frame["bg"]).pack(side="left")
+        tk.Label(
+            row2,
+            text="MicroGoal:",
+            fg="white",
+            bg=frame["bg"],
+            font=bold_font,
+        ).pack(side="left")
         self.micro_lbl = tk.Label(
             row2,
             textvariable=self.micro_var,
             fg="white",
             bg=frame["bg"],
-            wraplength=420,
+            wraplength=wraplength,
             justify="left",
+            font=normal_font,
         )
         self.micro_lbl.pack(side="left", padx=6)
 
         if self.show_wip_controls:
             rowp = tk.Frame(frame, bg=frame["bg"])
             rowp.pack(fill="x", **pad)
-            tk.Label(rowp, text="Progress:", fg="white", bg=frame["bg"]).pack(side="left")
+            tk.Label(
+                rowp,
+                text="Progress:",
+                fg="white",
+                bg=frame["bg"],
+                font=bold_font,
+            ).pack(side="left")
             tk.Label(
                 rowp,
                 textvariable=self.progress_var,
                 fg="white",
                 bg=frame["bg"],
-                wraplength=420,
+                wraplength=wraplength,
                 justify="left",
+                font=normal_font,
             ).pack(side="left", padx=6)
 
             row_rec = tk.Frame(frame, bg=frame["bg"])
@@ -268,11 +327,11 @@ class DirectorHUD:
             row_ro.pack(fill="x", **pad)
             tk.Label(
                 row_ro, text="RO:", fg="#FFD700", bg=frame["bg"],
-                font=("TkDefaultFont", 9, "bold"),
+                font=bold_font,
             ).pack(side="left")
             self.ro_label = tk.Label(
                 row_ro, textvariable=self.ro_var, fg="#FFD700", bg=frame["bg"],
-                wraplength=420, justify="left",
+                wraplength=wraplength, justify="left", font=normal_font,
             )
             self.ro_label.pack(side="left", padx=6)
         else:
@@ -282,19 +341,32 @@ class DirectorHUD:
         row_advisory = tk.Frame(frame, bg=frame["bg"])
         row_advisory.pack(fill="x", **pad)
         tk.Label(
-            row_advisory, text="AI提案:", fg="#9FE7FF", bg=frame["bg"],
-            font=("TkDefaultFont", 9, "bold"),
+            row_advisory,
+            text=advisory_heading_for_mode(self.display_mode.name),
+            fg="#9FE7FF",
+            bg=frame["bg"],
+            font=bold_font,
         ).pack(side="left")
         self.advisory_label = tk.Label(
             row_advisory, textvariable=self.advisory_var, fg="#9FE7FF", bg=frame["bg"],
-            wraplength=420, justify="left",
+            wraplength=wraplength, justify="left", font=normal_font,
         )
         self.advisory_label.pack(side="left", padx=6)
 
         row_actions = tk.Frame(frame, bg=frame["bg"])
         row_actions.pack(fill="both", expand=True, **pad)
-        tk.Label(row_actions, text="Actions:", fg="white", bg=frame["bg"]).pack(anchor="w")
-        self.listbox = tk.Listbox(row_actions, height=7)
+        tk.Label(
+            row_actions,
+            text="Actions:",
+            fg="white",
+            bg=frame["bg"],
+            font=bold_font,
+        ).pack(anchor="w")
+        self.listbox = tk.Listbox(
+            row_actions,
+            height=8 if self.display_mode.name == "demo" else 7,
+            font=normal_font,
+        )
         self.listbox.pack(fill="both", expand=True)
         self.listbox.bind("<<ListboxSelect>>", self._on_list_select)
         self.listbox.bind("<Double-Button-1>", self._on_list_activate)

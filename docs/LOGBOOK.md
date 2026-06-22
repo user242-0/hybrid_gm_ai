@@ -8,6 +8,18 @@
 
 ---
 
+## 2026-06-22（Session 49-D: HUD_DEMO legibility pass）
+
+### 今日やったこと
+
+* 60秒デモ撮影用にHUD_DEMOの文字サイズと表示ラベルを調整した。
+* HUD_DEMOではDirectorMode / ActorMode / MicroGoal / Actions / 提案候補を大きく表示し、ウィンドウ幅、余白、折り返し幅を撮影向けに広げた。
+* 「AI提案」は内部実装名として維持し、HUD_DEMO表示のみ「提案候補」とした。通常HUD / DEBUG HUDの表示、actor_idフィルタ、read-only動作は変更していない。
+
+### 次回の最初の一手
+
+* 60秒デモを試し撮りし、実際のYouTube表示サイズでDirector HUDの可読性を確認する。
+
 ## 2026-06-21（Session 49-C: Demo HUD cleanup）
 
 ### 今日やったこと

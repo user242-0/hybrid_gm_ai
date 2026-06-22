@@ -12,11 +12,15 @@ except ImportError:  # pragma: no cover - tkinter optional
 try:
     from src.ui.director_hud import (
         DirectorHUD,
+        HUD_FONT_SIZES,
+        advisory_heading_for_mode,
         format_actor_mode_label,
         resolve_hud_display_mode,
     )
 except Exception:  # pragma: no cover - module depends on tkinter
     DirectorHUD = None  # type: ignore
+    HUD_FONT_SIZES = None  # type: ignore
+    advisory_heading_for_mode = None  # type: ignore
     format_actor_mode_label = None  # type: ignore
     resolve_hud_display_mode = None  # type: ignore
 
@@ -63,6 +67,14 @@ def test_demo_hud_shows_actor_mode_control_without_debug_controls():
     assert mode.show_demo_controls is True
     assert mode.show_debug_controls is False
     assert mode.show_wip_controls is False
+
+
+def test_demo_hud_uses_larger_font_and_viewer_facing_advisory_heading():
+    assert HUD_FONT_SIZES["demo"] > HUD_FONT_SIZES["normal"]
+    assert HUD_FONT_SIZES["demo"] > HUD_FONT_SIZES["debug"]
+    assert advisory_heading_for_mode("demo") == "提案候補:"
+    assert advisory_heading_for_mode("normal") == "AI提案:"
+    assert advisory_heading_for_mode("debug") == "AI提案:"
 
 
 def test_hud_demo_uses_config_when_environment_is_unset(monkeypatch):
