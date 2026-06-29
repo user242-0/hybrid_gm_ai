@@ -1,11 +1,17 @@
 import copy
 from types import SimpleNamespace
+import yaml
 
 from director.director import Director, load_yaml
 from director.registry import load_pack, extract_goals_from_pack
 
 from src.action_definitions import get_action_spec, get_action_specs
-from src.affordance_bridge import inject_discovery
+from src.actor_view_state import (
+    get_actor_discoveries,
+    get_actor_location,
+    inject_actor_discovery,
+    set_actor_location,
+)
 from src.ui.action_pipeline import ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
 from src.world_defaults import apply_world_defaults
@@ -16,6 +22,7 @@ class RecordingHUD:
         self.actions = []
         self.actor_mode = None
         self.microgoal = None
+        self.location = None
 
     def set_progress(self, _value):
         pass
@@ -32,8 +39,8 @@ class RecordingHUD:
     def set_ro_recommendation(self, _text):
         pass
 
-    def set_location(self, _text):
-        pass
+    def set_location(self, text):
+        self.location = text
 
     def set_actor_mode(self, actor_id, mode):
         self.actor_mode = (actor_id, mode)
@@ -267,9 +274,9 @@ def test_refresh_hud_shows_camera_clock_affordance_for_cop_pursue_mode(monkeypat
     director.mode = "FREEZE"
     world = apply_world_defaults(director.synthesize_world(), pack)
     director.set_actor_mode(world, "刑事", "PURSUE")
-    inject_discovery(world, "camera_skew_noticed")
+    inject_actor_discovery(world, "刑事", "camera_skew_noticed")
     callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
-    ctx.game_state["current_location"] = "事件現場_路地裏"
+    set_actor_location(world, "刑事", "事件現場_路地裏")
     monkeypatch.setattr(
         "src.ui.hud_callbacks.get_advisory_display_items",
         lambda *, actor_id, limit: [],
@@ -293,9 +300,9 @@ def test_refresh_hud_hides_camera_clock_affordance_for_cop_freeze_mode(monkeypat
     )
     world = apply_world_defaults(director.synthesize_world(), pack)
     director.set_actor_mode(world, "刑事", "FREEZE")
-    inject_discovery(world, "camera_skew_noticed")
+    inject_actor_discovery(world, "刑事", "camera_skew_noticed")
     callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
-    ctx.game_state["current_location"] = "事件現場_路地裏"
+    set_actor_location(world, "刑事", "事件現場_路地裏")
     monkeypatch.setattr(
         "src.ui.hud_callbacks.get_advisory_display_items",
         lambda *, actor_id, limit: [],
@@ -484,7 +491,7 @@ def test_hud_shows_microgoal_after_its_action_becomes_visible(monkeypatch):
             "recent_ids": {},
         }
     }
-    inject_discovery(world, "unsafe_route_identified")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
     callbacks, _ctx, hud = make_hud_callbacks(director, world, pack, "愉快犯")
     monkeypatch.setattr(
         "src.ui.hud_callbacks.get_advisory_display_items",
@@ -548,7 +555,7 @@ def test_refresh_hud_keeps_location_dependent_label_with_actor_mode(monkeypatch)
     world = apply_world_defaults(director.synthesize_world(), pack)
     director.set_actor_mode(world, "刑事", "FREEZE")
     callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
-    ctx.game_state["current_location"] = "情報源_夜の酒場"
+    set_actor_location(world, "刑事", "情報源_夜の酒場")
     monkeypatch.setattr(
         "src.ui.hud_callbacks.get_advisory_display_items",
         lambda *, actor_id, limit: [],
@@ -659,6 +666,147 @@ def test_hud_executes_trickster_action_after_core_specs_are_enumerated(
     assert world["clock"] != clock_before
     assert world["witnesses_avoided"] == witnesses_before + 1
     assert world["suspicion"]["value"] == max(0, suspicion_before - 1)
+
+
+def test_actor_locations_are_saved_and_fallback_to_current_location():
+    world = {}
+    game_state = {"current_location": "事件現場_路地裏"}
+
+    assert set_actor_location(world, "刑事", "警察署_控室")
+    assert set_actor_location(world, "愉快犯", "事件現場_路地裏")
+
+    assert get_actor_location(world, game_state, "刑事") == "警察署_控室"
+    assert get_actor_location(world, game_state, "愉快犯") == "事件現場_路地裏"
+    assert get_actor_location(world, game_state, "第三者") == "事件現場_路地裏"
+
+
+def test_refresh_hud_switches_location_and_discoveries_by_active_actor(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    director.mode = "FREEZE"
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    director.set_actor_mode(world, "愉快犯", "FLEE")
+    set_actor_location(world, "刑事", "事件現場_路地裏")
+    set_actor_location(world, "愉快犯", "警察署_控室")
+    inject_actor_discovery(world, "刑事", "camera_skew_noticed")
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+    cop_action_ids = {action_id for action_id, _label, _minutes in hud.actions}
+    assert hud.location == "事件現場_路地裏"
+    assert "fix_cam_clock" in cop_action_ids
+    assert get_actor_discoveries(world, "愉快犯") == []
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+    trickster_action_ids = {action_id for action_id, _label, _minutes in hud.actions}
+    assert hud.location == "警察署_控室"
+    assert "fix_cam_clock" not in trickster_action_ids
+    assert "camera_skew_noticed" not in world["affordances"]["discoveries"]
+
+
+def test_trickster_discovery_actions_are_actor_scoped(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    director.set_actor_mode(world, "愉快犯", "FLEE")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+    callbacks, _ctx, hud = make_hud_callbacks(director, world, pack, "愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+
+    action_ids = {action_id for action_id, _label, _minutes in hud.actions}
+    assert {"move_low_profile", "mark_avoid_shop"} <= action_ids
+
+
+def test_debug_location_dropdown_updates_only_active_actor(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, _hud = make_hud_callbacks(director, world, pack, "刑事")
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    other_location = world["actor_locations"]["愉快犯"]
+
+    callbacks._on_debug_location_change("情報源_夜の酒場")
+
+    assert world["actor_locations"]["刑事"] == "情報源_夜の酒場"
+    assert world["actor_locations"]["愉快犯"] == other_location
+    assert ctx.game_state["current_location"] == "情報源_夜の酒場"
+
+
+def test_debug_discovery_injection_updates_only_active_actor(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, _hud = make_hud_callbacks(director, world, pack, "刑事")
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks._on_debug_inject_discovery("camera_skew_noticed")
+
+    assert world["actor_discoveries"]["刑事"] == ["camera_skew_noticed"]
+    assert world["actor_discoveries"]["愉快犯"] == []
+    assert world["affordances"]["discoveries"] == ["camera_skew_noticed"]
+
+
+def test_actor_view_state_survives_yaml_roundtrip():
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    set_actor_location(world, "刑事", "事件現場_路地裏")
+    inject_actor_discovery(world, "刑事", "camera_skew_noticed")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+
+    dumped = yaml.safe_dump(world, allow_unicode=True, sort_keys=False)
+    loaded = yaml.safe_load(dumped)
+    loaded_with_defaults = apply_world_defaults(loaded, pack)
+
+    assert loaded_with_defaults["actor_locations"]["刑事"] == "事件現場_路地裏"
+    assert loaded_with_defaults["actor_discoveries"]["刑事"] == ["camera_skew_noticed"]
+    assert loaded_with_defaults["actor_discoveries"]["愉快犯"] == ["unsafe_route_identified"]
 
 
 def test_unknown_actor_falls_back_to_current_mode_actions():

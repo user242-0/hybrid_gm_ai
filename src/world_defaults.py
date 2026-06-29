@@ -5,6 +5,14 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
+_PRESERVE_BASE_DICT_KEYS = {
+    "actor_discoveries",
+    "actor_locations",
+    "actor_micro_goals",
+    "actor_modes",
+}
+
+
 def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(base, dict):
         base = {}
@@ -12,6 +20,13 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
         return dict(base)
     merged: Dict[str, Any] = dict(base)
     for key, value in override.items():
+        if (
+            key in _PRESERVE_BASE_DICT_KEYS
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            merged[key] = deep_merge(value, merged[key])
+            continue
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = deep_merge(merged[key], value)
         else:

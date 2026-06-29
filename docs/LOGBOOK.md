@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-06-29（Session50: RC別location / discovery）
+
+### 今日やったこと
+
+* active actorごとに location / discovery を保持する `actor_view_state` 層を追加した。
+* HUD refresh時に active actor の location / discovery を、既存互換の `game_state["current_location"]` / `director_world["affordances"]["discoveries"]` へ同期するようにした。
+* HUD_DEBUGのlocation変更・discovery injectionをactive actor対象に変更した。
+* `cop_trickster` packに `actor_locations` / `actor_discoveries` の初期値を追加した。
+* pytest all greenを確認した。
+* 手動HUD_DEBUGで、刑事側のdiscoveryが愉快犯側に混ざらず、愉快犯側でdiscovery注入した時だけ追加アクションが出ることを確認した。
+
+### 気づき
+
+* `current_location` / `affordances.discoveries` を即削除せず、active actor視点のlegacy互換ビューとして扱う方針が安全だった。
+* RCごとに場所と発見が分かれたことで、switch_characterの価値が一段強くなった。
+* 一方で、別locationにいるRC同士が `current_target` になり、talk / combat系GUIアクションが出る問題が見えた。これはGUIアクション / target解決 / same-location requirementの後続課題。
+
+### 次回の最初の一手
+
+* Session51-Aとして、TPO縦切り前にGUIアクション / HUDアクション / current_target / location / discovery の責務を整理する。
+
 ## 2026-06-22（Session 49-D: HUD_DEMO legibility pass）
 
 ### 今日やったこと

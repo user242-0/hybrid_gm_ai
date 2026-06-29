@@ -255,6 +255,12 @@ tone:
   - neo-noir
   - slow_burn
 world_defaults:
+  actor_locations:
+    刑事: "警察署_控室"
+    愉快犯: "事件現場_路地裏"
+  actor_discoveries:
+    刑事: []
+    愉快犯: []
   actor_micro_goals: {}
   actor_modes:
     刑事: FREEZE

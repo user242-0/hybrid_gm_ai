@@ -6,6 +6,11 @@ import time
 from typing import TYPE_CHECKING, Any, Callable
 
 from src.action_proposal.advisory_provider import get_advisory_display_items
+from src.actor_view_state import (
+    inject_actor_discovery,
+    set_actor_location,
+    sync_actor_view_to_legacy,
+)
 from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
 if TYPE_CHECKING:
@@ -129,6 +134,7 @@ class HUDCallbacks:
             return
 
         actor_id, action_mode = self._active_actor_mode()
+        sync_actor_view_to_legacy(ctx.director_world, ctx.game_state, actor_id)
         set_actor_mode = getattr(ctx.director_hud, "set_actor_mode", None)
         if callable(set_actor_mode):
             set_actor_mode(actor_id, action_mode)
@@ -521,10 +527,15 @@ class HUDCallbacks:
     def _on_debug_location_change(self, new_location: str) -> None:
         """Debug dropdown で location が変更されたとき"""
         ctx = self.ctx
+        actor_id, _action_mode = self._active_actor_mode()
+        sync_actor_view_to_legacy(ctx.director_world, ctx.game_state, actor_id)
         old = ctx.game_state.get("current_location", "")
         if new_location == old:
             return
+        if actor_id:
+            set_actor_location(ctx.director_world, actor_id, new_location)
         ctx.game_state["current_location"] = new_location
+        sync_actor_view_to_legacy(ctx.director_world, ctx.game_state, actor_id)
         if is_hud_debug_enabled():
             print(f"[HUD_DEBUG] location: {old!r} -> {new_location!r}")
         ctx.bump_hud_cache_rev(reason="location_change")
@@ -571,8 +582,10 @@ class HUDCallbacks:
         ctx = self.ctx
         if ctx.director_world is None:
             return
-        from src.affordance_bridge import inject_discovery, evaluate_opportunities
-        ok = inject_discovery(ctx.director_world, discovery_id)
+        from src.affordance_bridge import evaluate_opportunities
+        actor_id, action_mode = self._active_actor_mode()
+        ok = inject_actor_discovery(ctx.director_world, actor_id, discovery_id)
+        sync_actor_view_to_legacy(ctx.director_world, ctx.game_state, actor_id)
         print(f"[HUD_DEBUG] inject_discovery({discovery_id!r}) -> {'NEW' if ok else 'already exists'}")
         if ok:
             aff_state = ctx.director_world.get("affordances", {})
@@ -580,7 +593,6 @@ class HUDCallbacks:
             print(f"[HUD_DEBUG]   spent_opp={aff_state.get('spent_opportunities', set())}")
             opp_rules = ctx.director.affordance_rules().get("opportunity_rules", [])
             if opp_rules:
-                _, action_mode = self._active_actor_mode()
                 opps = evaluate_opportunities(
                     ctx.director_world, ctx.game_state,
                     opp_rules, mode=action_mode,
