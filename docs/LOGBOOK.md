@@ -13,6 +13,10 @@
 Session45〜Session50は、Prototype Demo #1前後の中核開発ログとして当面LOGBOOK.mdに残す。
 将来的に肥大化した場合は、`general_documents/diary/` に「Demo #1開発アーカイブ」として退避する。
 
+
+## 2026-06-30(Session51-A前 TPOコンテンツ縦切りの整理)
+- Session51-A前の設計整理として、TPO / Operation / MicroGoal補足メモを future_goals に追加した。
+
 ## 2026-06-29（Session50: RC別location / discovery）
 
 ### 今日やったこと
