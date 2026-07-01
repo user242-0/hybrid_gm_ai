@@ -332,6 +332,41 @@ def test_trickster_provoke_tpo_hud_candidates_require_taunt_window(monkeypatch):
     assert "犯行声明めいたメモを残す" not in hud_labels
 
 
+def test_debug_injected_taunt_window_shows_provoke_actions_without_actor_target(
+    monkeypatch,
+):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "愉快犯")
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    ctx.game_state["current_target"] = "愉快犯"
+    ctx.game_state.pop("actor_targets", None)
+    world.pop("actor_targets", None)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.on_actor_mode_dropdown("PROVOKE")
+    callbacks._on_debug_inject_discovery("taunt_window_open")
+
+    hud_labels = [label for _action_id, label, _minutes in hud.actions]
+
+    assert world["actor_modes"]["愉快犯"] == "PROVOKE"
+    assert world["actor_discoveries"]["愉快犯"] == ["taunt_window_open"]
+    assert world["affordances"]["discoveries"] == ["taunt_window_open"]
+    assert "あえて痕跡を見せる" in hud_labels
+    assert "犯行声明めいたメモを残す" in hud_labels
+
+
 def test_trickster_escalate_tpo_hud_candidates(monkeypatch):
     _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
     monkeypatch.setattr(
