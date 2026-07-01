@@ -109,3 +109,142 @@ def test_action_pipeline_blocks_direct_action_for_remote_explicit_target():
     )
 
     assert result is None
+
+
+def test_same_location_requirement_rejects_self_target_even_when_colocated():
+    actor = _actor("trickster", location="alley")
+    game_state = {
+        "current_location": "alley",
+        "current_target": "trickster",
+        "party": {"trickster": actor},
+        "director_world": {"actor_locations": {"trickster": "alley"}},
+    }
+
+    checker = RequirementsChecker(game_state, actor)
+
+    assert checker.check_all({"same_location": True}) is False
+
+
+def test_direct_gui_actions_are_hidden_when_active_actor_is_legacy_current_target():
+    actor = _actor(
+        "trickster",
+        location="alley",
+        equipped_weapon={"name": "knife", "weapon_type": "sword"},
+    )
+    cop = _actor("cop", location="station")
+    game_state = {
+        "current_location": "alley",
+        "current_target": "trickster",
+        "has_enemy": True,
+        "enemy": actor,
+        "party": {"trickster": actor, "cop": cop},
+        "director_world": {
+            "actor_locations": {
+                "trickster": "alley",
+                "cop": "station",
+            }
+        },
+    }
+
+    action_ids = _choice_ids(actor, game_state)
+
+    assert DIRECT_ACTIONS.isdisjoint(action_ids)
+
+
+def test_combat_actions_are_hidden_for_actor_target_in_remote_location():
+    actor = _actor(
+        "trickster",
+        location="alley",
+        equipped_weapon={"name": "knife", "weapon_type": "sword"},
+    )
+    cop = _actor("cop", location="station")
+    game_state = {
+        "current_location": "alley",
+        "current_target": "trickster",
+        "actor_targets": {"trickster": "cop"},
+        "has_enemy": True,
+        "party": {"trickster": actor, "cop": cop},
+        "director_world": {
+            "actor_locations": {
+                "trickster": "alley",
+                "cop": "station",
+            }
+        },
+    }
+
+    action_ids = _choice_ids(actor, game_state)
+
+    assert DIRECT_ACTIONS.isdisjoint(action_ids)
+
+
+def test_combat_actions_are_available_for_actor_target_in_same_location():
+    actor = _actor(
+        "trickster",
+        location="alley",
+        equipped_weapon={"name": "knife", "weapon_type": "sword"},
+    )
+    cop = _actor("cop", location="alley")
+    game_state = {
+        "current_location": "alley",
+        "current_target": "trickster",
+        "actor_targets": {"trickster": "cop"},
+        "has_enemy": True,
+        "party": {"trickster": actor, "cop": cop},
+        "director_world": {
+            "actor_locations": {
+                "trickster": "alley",
+                "cop": "alley",
+            }
+        },
+    }
+
+    action_ids = _choice_ids(actor, game_state)
+
+    assert DIRECT_ACTIONS <= action_ids
+
+
+def test_action_pipeline_blocks_self_target_engage_combat():
+    actor = _actor("trickster", location="alley")
+    game_state = {
+        "current_location": "alley",
+        "current_target": "trickster",
+        "has_enemy": True,
+        "enemy": actor,
+        "party": {"trickster": actor},
+        "director_world": {"actor_locations": {"trickster": "alley"}},
+        "world": {"actor_locations": {"trickster": "alley"}},
+    }
+    pipeline = ActionPipeline(game_state=game_state)
+
+    result = pipeline.request_action("engage_combat", actor_obj=actor, args=[], source="GUI")
+
+    assert result is None
+
+
+def test_action_pipeline_blocks_remote_actor_target_engage_combat():
+    actor = _actor("trickster", location="alley")
+    cop = _actor("cop", location="station")
+    game_state = {
+        "current_location": "alley",
+        "current_target": "trickster",
+        "actor_targets": {"trickster": "cop"},
+        "has_enemy": True,
+        "party": {"trickster": actor, "cop": cop},
+        "director_world": {
+            "actor_locations": {
+                "trickster": "alley",
+                "cop": "station",
+            }
+        },
+        "world": {
+            "actor_locations": {
+                "trickster": "alley",
+                "cop": "station",
+            }
+        },
+    }
+    pipeline = ActionPipeline(game_state=game_state)
+
+    result = pipeline.request_action("engage_combat", actor_obj=actor, args=[], source="GUI")
+
+    assert result is None

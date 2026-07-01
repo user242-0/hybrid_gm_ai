@@ -13,6 +13,29 @@
 Session45〜Session50は、Prototype Demo #1前後の中核開発ログとして当面LOGBOOK.mdに残す。
 将来的に肥大化した場合は、`general_documents/diary/` に「Demo #1開発アーカイブ」として退避する。
 
+## 2026-06-30（Session51-B: GUI target gating / same-location requirement）
+
+### 今日やったこと
+
+- GUI直接行動の `same_location` requirement を最小実装した。
+- `talk` / `attack` / `swing_sword` / `engage_combat` / `avoid_combat` / `accept_attack` を、同じlocationの有効targetがいる場合だけ成立するようにした。
+- `RequirementsChecker` のtarget解決を整理し、explicit args target / actor_targets / director_world actor_targets / current_target / enemy の順で参照するようにした。
+- self-targetは常に不許可にした。
+- `has_enemy` だけでcombat系が出る状態を防ぎ、有効target + same-location を必要条件にした。
+- `action_layer` / `interaction_scope` の最小メタデータを追加した。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- `current_target` は「目の前にいる相手」ではなく「そのRCが意識している相手」として扱う必要がある。
+- GUI直接行動は「今この場でできる基礎動詞」に限定する方針が実装上も重要になった。
+- 愉快犯側で刑事と同じlocationにいても、actor別targetが未設定ならtalk/combatが出ないのは安全側の挙動。
+- Session51-Cでは、別locationだからこそ出るHUD/TPO候補を増やすと、今回消えた直接行動の空白を物語行動で埋められる。
+
+### 次回の最初の一手
+
+- Session51-Cとして、packベースTPO HUD候補を少し増やす。刑事は追跡・証言照合・包囲、愉快犯は撹乱・逃走経路変更・偽痕跡を中心にする。
+
 
 ## 2026-06-30(Session51-A前 TPOコンテンツ縦切りの整理)
 - Session51-A前の設計整理として、TPO / Operation / MicroGoal補足メモを future_goals に追加した。

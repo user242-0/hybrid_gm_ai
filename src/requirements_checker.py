@@ -108,6 +108,7 @@ class RequirementsChecker:
         return {}
 
     def _target_id(self):
+        actor_id = self._actor_id()
         if self._current_args:
             target = self._current_args[0]
             if isinstance(target, str):
@@ -116,14 +117,27 @@ class RequirementsChecker:
             if name:
                 return name
 
-        target = self.game_state.get("current_target")
-        if target:
-            return target
-
-        actor_id = self._actor_id()
         actor_targets = self.game_state.get("actor_targets")
         if actor_id and isinstance(actor_targets, dict):
-            return actor_targets.get(actor_id)
+            target = actor_targets.get(actor_id)
+            if target:
+                return target
+
+        world = self._director_world()
+        world_actor_targets = world.get("actor_targets")
+        if actor_id and isinstance(world_actor_targets, dict):
+            target = world_actor_targets.get(actor_id)
+            if target:
+                return target
+
+        target = self.game_state.get("current_target")
+        if target and target != actor_id:
+            return target
+
+        enemy = self.game_state.get("enemy")
+        enemy_id = enemy.get("name") if isinstance(enemy, dict) else getattr(enemy, "name", None)
+        if enemy_id and enemy_id != actor_id:
+            return enemy_id
         return None
 
     def _actor_location(self, actor_id):
@@ -166,11 +180,22 @@ class RequirementsChecker:
             if isinstance(location, str) and location:
                 return location
 
+        enemy = self.game_state.get("enemy")
+        enemy_id = enemy.get("name") if isinstance(enemy, dict) else getattr(enemy, "name", None)
+        if enemy_id == target_id:
+            location = enemy.get("location") if isinstance(enemy, dict) else getattr(enemy, "location", None)
+            if isinstance(location, str) and location:
+                return location
+
         return None
 
     def _same_location_required(self) -> bool:
-        actor_location = self._actor_location(self._actor_id())
-        target_location = self._target_location(self._target_id())
+        actor_id = self._actor_id()
+        target_id = self._target_id()
+        if not target_id or target_id == actor_id:
+            return False
+        actor_location = self._actor_location(actor_id)
+        target_location = self._target_location(target_id)
         if not actor_location or not target_location:
             return False
         return actor_location == target_location

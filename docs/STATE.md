@@ -80,6 +80,17 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session51-B: GUI action target gating / same-location requirement
+
+* GUI直接行動に `same_location` requirement を導入した。
+* `talk` / combat系GUIアクションは、有効targetが存在し、かつactorとtargetが同じlocationにいる時だけ候補に出る。
+* `current_target` は「目の前にいる相手」ではなく「そのRCが意識している対象」として扱う。
+* active actor自身をtargetにするself-targetは常に不許可。
+* `has_enemy` はcombat系の十分条件ではなくなり、有効target + same-location が必要。
+* `action_layer` / `interaction_scope` の最小メタデータを導入し、将来のHUD Action Synthesis / GUI Action Compile / Operation設計の足場にした。
+* `arrest` / `逮捕する` はまだGUIコマンドとして実装していない。
+* HUD Action / Operation本実装、TPO HUD候補追加はまだ行っていない。Session51-C以降に回す。
+
 ### Session51-A前: TPOコンテンツ縦切りの前整理
 * TPO縦切りでは、まずGUI/HUD/Operationの境界を壊さないことを優先する。
 
@@ -204,24 +215,24 @@ current_target と narrative_targetの違い：
   * 次は、HUDに見えているAI提案を、どうやって自然に生成するか、またはプレイヤーがどう採用するかを段階的に設計する
 
 ## 3. 直近の変更（最新3つだけ）
+* 2026-06-30: Session51-B: GUI直接行動のsame-location gatingを実装。talk/combat系は有効target + same-locationが必要になり、self-targetや別location targetでは表示・実行されない。`action_layer` / `interaction_scope` の最小メタデータも追加。
 * 2026-06-29: Session50: RC別location/discoveryを実装。active actorごとに現在地と発見を保持し、HUD refresh時にlegacy互換の `current_location` / `affordances.discoveries` へ同期する。HUD_DEBUGで刑事/愉快犯の発見が混ざらないことを確認。
 * 2026-06-21: Session 49-C: 60秒デモ撮影用に `HUD_DEMO=1` を追加。RO / Recommended / ProgressはデモHUDから隠し、ActorMode / location / discovery操作は残す。`HUD_DEBUG=1` は開発用フルHUD、両方無効なら通常HUD。
-* 2026-06-21: Session 49-B: 60秒デモ前のMicroGoal/Actions整合ポリッシュ。現在HUD Actionsに対応ActionがあるRC別MicroGoalだけを表示し、未解放時は `未設定` にする。
 
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. `pytest -q` all greenを維持し、Session50差分をstaging/integrationブランチへcommitする。
+1. Session51-C: packベースTPO HUD候補を少し増やす。刑事は追跡・証言照合・包囲、愉快犯は撹乱・逃走経路変更・偽痕跡を中心にする。
 
-2. Session51-A: TPO縦切り前の設計整理を行う。特にGUIアクション / HUDアクション / location / discovery / current_targetの責務を整理する。
+2. actor別targetの最小設計を検討する。`actor_targets["刑事"] = "愉快犯"` / `actor_targets["愉快犯"] = "刑事"` のような明示target設定をどう導入するか整理する。
 
-3. 別地点にいるRC同士が `current_target` になり、talk / combat系GUIアクションが出てしまう問題をfuture issueとして整理する。same-location requirement / target gating の設計課題として扱う。
+3. Session52に向けて active_operation の最小スケルトン案を準備する。ただしOperation本実装はまだ急がない。
 
 
 ## 5. ブロッカー（止まってる理由があれば）
 （現状）大きなブロッカーなし。
 
-* 既知課題: 別locationにいる刑事と愉快犯が互いを `current_target` として認識し、talk / combat系GUIアクションが出る場合がある。これはSession50の範囲外で、GUIアクションtarget gating / same-location requirementとして後続で扱う。
+* 既知課題: 愉快犯側で刑事と同じlocationにいても、有効な `actor_targets["愉快犯"] = "刑事"` が未設定ならtalk/combat系は出ない。これは安全側の挙動であり、actor別target導入時に整理する。
 
 ## 6. 参考（読む順番）
 1. `CLAUDE.md`（前提とルール）
