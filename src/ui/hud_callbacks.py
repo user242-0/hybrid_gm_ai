@@ -308,6 +308,10 @@ class HUDCallbacks:
         # Location 表示
         loc = ctx.game_state.get("current_location", "")
         ctx.director_hud.set_location(loc)
+        if getattr(ctx.director_hud, "show_debug_controls", is_hud_debug_enabled()):
+            set_discovery_options = getattr(ctx.director_hud, "set_discovery_options", None)
+            if callable(set_discovery_options):
+                set_discovery_options(self._get_injectable_discoveries(actor_id))
 
     def _refresh_advisory_items(self) -> None:
         hud = self.ctx.director_hud
@@ -584,13 +588,31 @@ class HUDCallbacks:
         print(f"[Director] actor_mode[{actor_id}] -> {new_mode}")
         self.refresh_hud()
 
-    def _get_injectable_discoveries(self) -> list[str]:
-        """Pack YAML の discovery_rules から discovery ID を列挙する。"""
+    def _get_injectable_discoveries(self, actor_id: str | None = None) -> list[str]:
+        """Return HUD_DEBUG discovery IDs for the active actor."""
         ctx = self.ctx
         if ctx.director is None:
             return []
+        if actor_id is None:
+            actor_id, _mode = self._active_actor_mode()
+
+        catalog_for_actor = getattr(ctx.director, "actor_discovery_catalog", None)
+        if callable(catalog_for_actor):
+            discovered = catalog_for_actor(actor_id)
+            if isinstance(discovered, list) and discovered:
+                return list(discovered)
+
         rules = ctx.director.affordance_rules().get("discovery_rules", [])
-        return [r.get("creates_discovery", "") for r in rules if r.get("creates_discovery")]
+        seen: set[str] = set()
+        disc_ids: list[str] = []
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+            disc_id = rule.get("creates_discovery")
+            if isinstance(disc_id, str) and disc_id and disc_id not in seen:
+                seen.add(disc_id)
+                disc_ids.append(disc_id)
+        return disc_ids
 
     def _on_debug_inject_discovery(self, discovery_id: str) -> None:
         """Debug: discovery を直接注入して HUD を更新する。"""
@@ -661,7 +683,8 @@ class HUDCallbacks:
                 hud.set_location_options(locs)
             hud.set_location_change_callback(self._on_debug_location_change)
 
-            disc_ids = self._get_injectable_discoveries()
+            actor_id, _mode = self._active_actor_mode()
+            disc_ids = self._get_injectable_discoveries(actor_id)
             if disc_ids:
                 hud.set_discovery_options(disc_ids)
             else:

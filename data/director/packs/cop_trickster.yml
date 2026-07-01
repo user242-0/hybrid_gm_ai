@@ -409,6 +409,22 @@ actions:
     heart:
       axis: red
       value: 150
+actor_discovery_catalog:
+  刑事:
+    - camera_skew_noticed
+    - blue_fiber_spotted
+    - need_partner_help_realized
+    - suspect_route_inferred
+    - testimony_timeline_checked
+    - escape_destination_narrowed
+  愉快犯:
+    - unsafe_route_identified
+    - face_seen_risk
+    - witness_attention_rising
+    - taunt_window_open
+    - escalation_impulse
+    - false_trace_material_ready
+    - detective_pressure_felt
 hud_actions:
   actors:
     刑事:
@@ -472,7 +488,7 @@ hud_actions:
       required_actor_mode:
         - MISLEAD
       required_discoveries:
-        - unsafe_route_identified
+        - false_trace_material_ready
       effects:
         - add_discovery: false_trace_planted
         - investigation_confusion: 1
@@ -514,7 +530,7 @@ hud_actions:
       required_actor_mode:
         - MISLEAD
       required_discoveries:
-        - unsafe_route_identified
+        - witness_attention_rising
       effects:
         - add_discovery: witness_confusion_seeded
         - investigation_confusion: 1
@@ -528,7 +544,7 @@ hud_actions:
       required_actor_mode:
         - MISLEAD
       required_discoveries:
-        - unsafe_route_identified
+        - face_seen_risk
       effects:
         - add_discovery: cop_inference_delayed
         - investigation_confusion: 1
@@ -542,7 +558,7 @@ hud_actions:
       required_actor_mode:
         - PROVOKE
       required_discoveries:
-        - unsafe_route_identified
+        - taunt_window_open
       effects:
         - add_discovery: deliberate_trace_seen
         - trickster_heat: 1
@@ -556,7 +572,7 @@ hud_actions:
       required_actor_mode:
         - PROVOKE
       required_discoveries:
-        - unsafe_route_identified
+        - taunt_window_open
       effects:
         - add_discovery: manifesto_note_left
         - trickster_heat: 1
@@ -570,7 +586,7 @@ hud_actions:
       required_actor_mode:
         - PROVOKE
       required_discoveries:
-        - unsafe_route_identified
+        - detective_pressure_felt
       effects:
         - add_discovery: cop_lured
         - trickster_heat: 1
@@ -584,7 +600,7 @@ hud_actions:
       required_actor_mode:
         - ESCALATE
       required_discoveries:
-        - unsafe_route_identified
+        - escalation_impulse
       effects:
         - add_discovery: next_move_hastened
         - escape_progress: 1
@@ -598,7 +614,7 @@ hud_actions:
       required_actor_mode:
         - ESCALATE
       required_discoveries:
-        - unsafe_route_identified
+        - detective_pressure_felt
       effects:
         - add_discovery: dangerous_route_taken
         - pursuit_pressure: 1
@@ -612,7 +628,7 @@ hud_actions:
       required_actor_mode:
         - ESCALATE
       required_discoveries:
-        - unsafe_route_identified
+        - escalation_impulse
       effects:
         - add_discovery: case_tension_raised
         - case_tension: 1

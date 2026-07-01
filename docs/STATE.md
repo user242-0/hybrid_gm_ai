@@ -80,6 +80,18 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session51-E: RC別discovery語彙 / HUD_DEBUG注入整理
+
+* Session51-E: RC別discovery語彙 / HUD_DEBUG注入候補を整理。
+* actor別discovery catalogを導入し、刑事 / 愉快犯ごとにHUD_DEBUG注入候補を切り替えるようにした。
+* 愉快犯向けdiscoveryとして `face_seen_risk` / `taunt_window_open` / `false_trace_material_ready` / `escalation_impulse` 等を追加。
+* PROVOKEで `taunt_window_open` から挑発系HUD候補が出るようにした。
+* MISLEAD / ESCALATE の `unsafe_route_identified` 依存を減らし、FLEE側の逃走系では維持した。
+* discovery inventory: 既存のHUD_DEBUG dropdownは `discovery_rules` 由来のみで、TPO HUD候補の `required_discoveries` にあるIDが出ていなかった。
+* 「知ったことを知る」系のメタ認識は今回は実装せず、将来課題として残した。
+* future examples: `trickster_knows_fiber_collected` / `detective_notices_false_trace` / `trickster_realizes_witness_saw_face`。
+* active_operation / Operation manager / GUI Action Compile はまだ未実装。
+
 ### Session51-D: Trickster ActorMode taxonomy / HUD候補整理
 
 * Session51-D: 愉快犯ActorMode taxonomy / HUD候補整理を実施。
@@ -243,7 +255,7 @@ current_target と narrative_targetの違い：
 
 2. actor別targetの最小設計を検討する。
 
-3. HUD候補からOperation開始へ進む前に、TPO候補のeffectsとdiscovery連鎖を確認する。
+3. discovery連鎖からOperation.MiniGoalにどう接続するか整理する。
 
 
 ## 5. ブロッカー（止まってる理由があれば）

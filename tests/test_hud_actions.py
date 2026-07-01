@@ -33,6 +33,7 @@ class RecordingHUD:
         self.actor_mode = None
         self.microgoal = None
         self.location = None
+        self.discovery_options = []
 
     def set_progress(self, _value):
         pass
@@ -60,6 +61,9 @@ class RecordingHUD:
 
     def set_microgoal(self, text):
         self.microgoal = text
+
+    def set_discovery_options(self, options):
+        self.discovery_options = list(options)
 
 
 def make_hud_callbacks(director, world, pack, actor_id):
@@ -213,6 +217,43 @@ def test_cop_tpo_hud_candidates_require_discovery(monkeypatch):
     assert "compare_testimony_time" not in hud_action_ids
 
 
+def test_actor_discovery_catalog_is_readable():
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    cop_id = pack["roles"]["protagonist"]["name"]
+    trickster_id = pack["roles"]["antagonist"]["name"]
+
+    assert "camera_skew_noticed" in director.actor_discovery_catalog(cop_id)
+    assert "face_seen_risk" in director.actor_discovery_catalog(trickster_id)
+    assert "taunt_window_open" in director.actor_discovery_catalog(trickster_id)
+
+
+def test_debug_discovery_options_switch_by_active_actor(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    hud.show_debug_controls = True
+
+    callbacks.refresh_hud()
+    cop_options = list(hud.discovery_options)
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+    trickster_options = list(hud.discovery_options)
+
+    assert "camera_skew_noticed" in cop_options
+    assert "taunt_window_open" not in cop_options
+    assert "taunt_window_open" in trickster_options
+    assert "face_seen_risk" in trickster_options
+    assert "camera_skew_noticed" not in trickster_options
+
+
 def test_trickster_flee_tpo_hud_candidates_are_escape_only(monkeypatch):
     _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
     monkeypatch.setattr(
@@ -243,13 +284,13 @@ def test_trickster_mislead_tpo_hud_candidates(monkeypatch):
     director.set_actor_mode(world, "愉快犯", "MISLEAD")
     set_actor_location(world, "愉快犯", "事件現場_路地裏")
     set_actor_location(world, "刑事", "警察署_控室")
-    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+    inject_actor_discovery(world, "愉快犯", "false_trace_material_ready")
 
     hud_labels = _refresh_action_labels(callbacks, ctx, hud)
 
     assert "偽の痕跡を残す" in hud_labels
-    assert "目撃証言を撹乱する" in hud_labels
-    assert "刑事の推理を遅らせる" in hud_labels
+    assert "目撃証言を撹乱する" not in hud_labels
+    assert "刑事の推理を遅らせる" not in hud_labels
     assert "偽の痕跡を残す" not in [
         label
         for index, label in enumerate(hud_labels)
@@ -266,13 +307,29 @@ def test_trickster_provoke_tpo_hud_candidates(monkeypatch):
     director.set_actor_mode(world, "愉快犯", "PROVOKE")
     set_actor_location(world, "愉快犯", "事件現場_路地裏")
     set_actor_location(world, "刑事", "警察署_控室")
-    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+    inject_actor_discovery(world, "愉快犯", "taunt_window_open")
 
     hud_labels = _refresh_action_labels(callbacks, ctx, hud)
 
     assert "あえて痕跡を見せる" in hud_labels
     assert "犯行声明めいたメモを残す" in hud_labels
-    assert "刑事を誘導する" in hud_labels
+    assert "刑事を誘導する" not in hud_labels
+
+
+def test_trickster_provoke_tpo_hud_candidates_require_taunt_window(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "愉快犯", "PROVOKE")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    set_actor_location(world, "刑事", "警察署_控室")
+
+    hud_labels = _refresh_action_labels(callbacks, ctx, hud)
+
+    assert "あえて痕跡を見せる" not in hud_labels
+    assert "犯行声明めいたメモを残す" not in hud_labels
 
 
 def test_trickster_escalate_tpo_hud_candidates(monkeypatch):
@@ -284,12 +341,12 @@ def test_trickster_escalate_tpo_hud_candidates(monkeypatch):
     director.set_actor_mode(world, "愉快犯", "ESCALATE")
     set_actor_location(world, "愉快犯", "事件現場_路地裏")
     set_actor_location(world, "刑事", "警察署_控室")
-    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+    inject_actor_discovery(world, "愉快犯", "escalation_impulse")
 
     hud_labels = _refresh_action_labels(callbacks, ctx, hud)
 
     assert "次の行動を早める" in hud_labels
-    assert "危険なルートを取る" in hud_labels
+    assert "危険なルートを取る" not in hud_labels
     assert "事件の圧を上げる" in hud_labels
 
 

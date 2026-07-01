@@ -172,6 +172,31 @@ class Director:
             return [mode for mode in actor_modes if isinstance(mode, str) and mode]
         return self.available_modes()
 
+    def actor_discovery_catalog(self, actor_id: Optional[str] = None) -> Dict[str, List[str]] | List[str]:
+        """Return pack-defined discovery IDs, optionally scoped to one actor."""
+
+        catalog = (self.goals_dict or {}).get("actor_discovery_catalog", {})
+        normalized: Dict[str, List[str]] = {}
+        if isinstance(catalog, dict):
+            for key, values in catalog.items():
+                if not isinstance(key, str):
+                    continue
+                if isinstance(values, str):
+                    values = [values]
+                if not isinstance(values, list):
+                    continue
+                seen: set[str] = set()
+                items: List[str] = []
+                for value in values:
+                    if isinstance(value, str) and value and value not in seen:
+                        seen.add(value)
+                        items.append(value)
+                normalized[key] = items
+
+        if actor_id is not None:
+            return normalized.get(actor_id, [])
+        return normalized
+
     def set_mode(self, mode: str) -> bool:
         if mode in self._available_modes or not self._available_modes:
             self.mode = mode

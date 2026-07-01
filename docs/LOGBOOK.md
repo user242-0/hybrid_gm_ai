@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-06-30（Session51-E: RC別discovery語彙 / HUD_DEBUG注入整理）
+
+### 今日やったこと
+
+- Session51-DでActorModeが整理された結果、discovery語彙の粗さが見えたため、RC別discovery語彙を整理した。
+- actor別discovery catalogを導入した。
+- 愉快犯用discoveryとして、挑発・撹乱・エスカレート系を起動する語彙を追加した。
+- HUD_DEBUGのdiscovery注入候補をactive actorに応じて切り替えるようにした。
+- PROVOKEで挑発系HUD候補が出るようにした。
+- unsafe_route_identifiedへの依存を少し減らした。
+- discovery inventoryでは、HUD_DEBUG dropdownが `discovery_rules` 由来のみを見ており、TPO HUD候補の `required_discoveries` が注入候補に出ていないことを確認した。
+- 「Aが知ったことをBが知る」メタ認識は今回は実装せず、将来課題として残した。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- ActorModeを整理すると、次に必要になるのはdiscovery語彙の整理だった。
+- 愉快犯は、逃走だけでなく、顔を見られた危険・挑発の隙・偽装材料・エスカレート衝動などの内的/状況的discoveryを持つと、一気に別キャラクターらしくなる。
+- メタ認識は面白いが、まずは明示discoveryで十分。
+
+### 次回の最初の一手
+
+- Session52に向けて、active_operationの最小スケルトンを検討する。
+
 ### 整理メモ
 
 Session45〜Session50は、Prototype Demo #1前後の中核開発ログとして当面LOGBOOK.mdに残す。
