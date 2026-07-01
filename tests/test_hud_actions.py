@@ -12,9 +12,19 @@ from src.actor_view_state import (
     inject_actor_discovery,
     set_actor_location,
 )
+from src.choice_definitions import get_available_choices
 from src.ui.action_pipeline import ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
 from src.world_defaults import apply_world_defaults
+
+DIRECT_GUI_ACTIONS = {
+    "talk",
+    "attack",
+    "swing_sword",
+    "engage_combat",
+    "avoid_combat",
+    "accept_attack",
+}
 
 
 class RecordingHUD:
@@ -93,6 +103,52 @@ def make_hud_callbacks(director, world, pack, actor_id):
     return callbacks, ctx, hud
 
 
+def _active_actor(name, *, location):
+    return SimpleNamespace(
+        name=name,
+        location=location,
+        is_npc=False,
+        is_rc=True,
+        is_active=True,
+        faction="player",
+        is_tired=False,
+        hp=100,
+        max_hp=100,
+        stamina=100,
+        max_stamina=100,
+        inventory=[],
+        equipped_weapon={"name": "test sword", "weapon_type": "sword"},
+        emotion_color=(127, 127, 255),
+        attack_power=10,
+    )
+
+
+def _setup_cop_trickster_hud(active_actor_id):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, active_actor_id)
+    ctx.game_state["party"] = {
+        "刑事": _active_actor("刑事", location=world["actor_locations"]["刑事"]),
+        "愉快犯": _active_actor("愉快犯", location=world["actor_locations"]["愉快犯"]),
+    }
+    ctx.game_state["current_target"] = "愉快犯" if active_actor_id == "刑事" else "刑事"
+    ctx.game_state["actor_targets"] = {"刑事": "愉快犯", "愉快犯": "刑事"}
+    world["actor_targets"] = dict(ctx.game_state["actor_targets"])
+    ctx.game_state["has_enemy"] = True
+    return pack, director, world, callbacks, ctx, hud
+
+
+def _refresh_action_ids(callbacks, ctx, hud):
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+    return {action_id for action_id, _label, _minutes in hud.actions}
+
+
 def test_actions_list_populates():
     premise = load_yaml("data/director/premise.yml").get("premise", {})
     goals = extract_goals_from_pack(load_pack("cop_trickster"))
@@ -110,6 +166,118 @@ def test_actions_list_populates():
     progress = director.progress_text(world)
     assert isinstance(progress, str)
     assert progress.startswith("Micro:")
+
+
+def test_remote_target_hides_direct_gui_but_shows_cop_tpo_hud_candidates(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    set_actor_location(world, "刑事", "警察署_控室")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    ctx.game_state["party"]["刑事"].location = "警察署_控室"
+    ctx.game_state["party"]["愉快犯"].location = "事件現場_路地裏"
+    inject_actor_discovery(world, "刑事", "camera_skew_noticed")
+
+    gui_action_ids = {
+        choice.action_key
+        for choice in get_available_choices(ctx.game_state["party"]["刑事"], ctx.game_state)
+    }
+    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert DIRECT_GUI_ACTIONS.isdisjoint(gui_action_ids)
+    assert {"infer_escape_route", "compare_testimony_time"} <= hud_action_ids
+
+
+def test_cop_tpo_hud_candidates_require_discovery(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    set_actor_location(world, "刑事", "警察署_控室")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+
+    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert "infer_escape_route" not in hud_action_ids
+    assert "compare_testimony_time" not in hud_action_ids
+
+
+def test_trickster_flee_tpo_hud_candidates_require_unsafe_route(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "愉快犯", "FLEE")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    set_actor_location(world, "刑事", "警察署_控室")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+
+    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert {
+        "leave_false_trace",
+        "change_escape_route",
+        "mislead_witness_testimony",
+    } <= hud_action_ids
+
+
+def test_cop_discovery_does_not_enable_trickster_tpo_hud_candidates(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "愉快犯", "FLEE")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    set_actor_location(world, "刑事", "警察署_控室")
+    inject_actor_discovery(world, "刑事", "camera_skew_noticed")
+
+    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert "leave_false_trace" not in hud_action_ids
+    assert "change_escape_route" not in hud_action_ids
+    assert "mislead_witness_testimony" not in hud_action_ids
+
+
+def test_switch_character_switches_tpo_hud_candidates_by_actor_mode_and_discovery(
+    monkeypatch,
+):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    director.set_actor_mode(world, "愉快犯", "FLEE")
+    set_actor_location(world, "刑事", "警察署_控室")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    inject_actor_discovery(world, "刑事", "camera_skew_noticed")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+
+    cop_first = _refresh_action_ids(callbacks, ctx, hud)
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    ctx.game_state["current_target"] = "刑事"
+    trickster = _refresh_action_ids(callbacks, ctx, hud)
+    ctx.game_state["active_char"] = SimpleNamespace(name="刑事")
+    ctx.game_state["current_target"] = "愉快犯"
+    cop_second = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert {"infer_escape_route", "compare_testimony_time"} <= cop_first
+    assert {"infer_escape_route", "compare_testimony_time"} <= cop_second
+    assert "leave_false_trace" not in cop_first
+    assert "leave_false_trace" not in cop_second
+    assert {
+        "leave_false_trace",
+        "change_escape_route",
+        "mislead_witness_testimony",
+    } <= trickster
+    assert "infer_escape_route" not in trickster
 
 
 def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():

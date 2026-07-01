@@ -174,7 +174,15 @@ class HUDCallbacks:
 
             list_for_actor = getattr(ctx.director, "list_actions_for_actor", None)
             if callable(list_for_actor):
-                action_records = list_for_actor(actor_id, action_mode)
+                try:
+                    action_records = list_for_actor(
+                        actor_id,
+                        action_mode,
+                        world=ctx.director_world,
+                        game_state=ctx.game_state,
+                    )
+                except TypeError:
+                    action_records = list_for_actor(actor_id, action_mode)
             else:
                 action_records = ctx.director.list_actions_for_mode(action_mode)
             mode_action_ids = {

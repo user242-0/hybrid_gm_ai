@@ -80,6 +80,13 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session51-C: packベースTPO HUD候補
+
+* Session51-C: packベースTPO HUD候補を追加。
+* 51-Bで消えた別location direct actionの空白に、追跡・推理・撹乱・逃走経路変更・偽痕跡系のHUD候補を追加した。
+* GUI直接行動のsame-location gatingは維持。
+* Operation本実装 / active_operation / GUI Action Compile はまだ未実装。
+
 ### Session51-B: GUI action target gating / same-location requirement
 
 * GUI直接行動に `same_location` requirement を導入した。
@@ -222,11 +229,11 @@ current_target と narrative_targetの違い：
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. Session51-C: packベースTPO HUD候補を少し増やす。刑事は追跡・証言照合・包囲、愉快犯は撹乱・逃走経路変更・偽痕跡を中心にする。
+1. actor別targetの最小設計を進める。
 
-2. actor別targetの最小設計を検討する。`actor_targets["刑事"] = "愉快犯"` / `actor_targets["愉快犯"] = "刑事"` のような明示target設定をどう導入するか整理する。
+2. Session52: active_operation の最小スケルトンを検討する。
 
-3. Session52に向けて active_operation の最小スケルトン案を準備する。ただしOperation本実装はまだ急がない。
+3. HUD候補からOperation開始へ進む前に、TPO候補の効果とdiscovery連鎖を確認する。
 
 
 ## 5. ブロッカー（止まってる理由があれば）

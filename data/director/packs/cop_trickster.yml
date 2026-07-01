@@ -103,6 +103,151 @@ actions:
     heart:
       axis: blue
       value: 80
+  infer_escape_route:
+    label: "逃走経路を推理する"
+    description: "現場と監視情報のずれから、相手が選んだ逃走経路を読む。"
+    time_min: 6
+    action_layer: HUD
+    interaction_scope: inferred_location
+    effects:
+      - op: add_to_set
+        path: actor_discoveries.刑事
+        value: suspect_route_inferred
+      - op: add
+        path: pursuit_pressure
+        value: 1
+    tags:
+      - tpo
+      - pursue
+      - inference
+      - remote_narrative
+    ui_visible: false
+    starts_operation: null
+    operation_type: null
+    heart:
+      axis: blue
+      value: 130
+  compare_testimony_time:
+    label: "証言時刻を照合する"
+    description: "証言の時刻とカメラ時刻のずれを照合し、逃走の流れを詰める。"
+    time_min: 5
+    action_layer: HUD
+    interaction_scope: inferred_location
+    effects:
+      - op: add_to_set
+        path: actor_discoveries.刑事
+        value: testimony_timeline_checked
+      - op: add
+        path: investigation_progress
+        value: 1
+    tags:
+      - tpo
+      - pursue
+      - witness
+      - remote_narrative
+    ui_visible: false
+    starts_operation: null
+    operation_type: null
+    heart:
+      axis: blue
+      value: 120
+  narrow_escape_destination:
+    label: "逃走先を絞り込む"
+    description: "推理した逃走経路から、次に向かう場所を絞り込む。"
+    time_min: 6
+    action_layer: HUD
+    interaction_scope: inferred_location
+    effects:
+      - op: add_to_set
+        path: actor_discoveries.刑事
+        value: escape_destination_narrowed
+      - op: add
+        path: perimeter_pressure
+        value: 1
+    tags:
+      - tpo
+      - pursue
+      - perimeter
+      - remote_narrative
+    ui_visible: false
+    starts_operation: null
+    operation_type: null
+    heart:
+      axis: blue
+      value: 135
+  leave_false_trace:
+    label: "偽の痕跡を残す"
+    description: "追跡の焦点をずらすため、偽の痕跡を残す。"
+    time_min: 5
+    action_layer: HUD
+    interaction_scope: any_location
+    effects:
+      - op: add_to_set
+        path: actor_discoveries.愉快犯
+        value: false_trace_planted
+      - op: add
+        path: investigation_confusion
+        value: 1
+    tags:
+      - tpo
+      - flee
+      - deception
+      - remote_narrative
+    ui_visible: false
+    starts_operation: null
+    operation_type: null
+    heart:
+      axis: green
+      value: 135
+  change_escape_route:
+    label: "逃走経路を変更する"
+    description: "危険な経路を避け、追跡圧を下げる逃走経路へ切り替える。"
+    time_min: 6
+    action_layer: HUD
+    interaction_scope: known_location
+    effects:
+      - op: add_to_set
+        path: actor_discoveries.愉快犯
+        value: escape_route_changed
+      - op: add
+        path: pursuit_pressure
+        value: -1
+    tags:
+      - tpo
+      - flee
+      - route_change
+      - remote_narrative
+    ui_visible: false
+    starts_operation: null
+    operation_type: null
+    heart:
+      axis: green
+      value: 140
+  mislead_witness_testimony:
+    label: "目撃証言を撹乱する"
+    description: "目撃情報の解釈をずらし、追跡側の判断を乱す。"
+    time_min: 6
+    action_layer: HUD
+    interaction_scope: inferred_location
+    effects:
+      - op: add_to_set
+        path: actor_discoveries.愉快犯
+        value: witness_confusion_seeded
+      - op: add
+        path: investigation_confusion
+        value: 1
+    tags:
+      - tpo
+      - flee
+      - witness
+      - disruption
+      - remote_narrative
+    ui_visible: false
+    starts_operation: null
+    operation_type: null
+    heart:
+      axis: green
+      value: 130
 hud_actions:
   actors:
     刑事:
@@ -111,6 +256,92 @@ hud_actions:
       - WITNESS
     愉快犯:
       - FLEE
+  tpo_candidates:
+    - id: infer_escape_route
+      label: "逃走経路を推理する"
+      actor_id: 刑事
+      action_layer: HUD
+      interaction_scope: inferred_location
+      required_actor_mode:
+        - PURSUE
+      required_discoveries:
+        - camera_skew_noticed
+      effects:
+        - add_discovery: suspect_route_inferred
+        - pursuit_pressure: 1
+      starts_operation: null
+      operation_type: null
+    - id: compare_testimony_time
+      label: "証言時刻を照合する"
+      actor_id: 刑事
+      action_layer: HUD
+      interaction_scope: inferred_location
+      required_actor_mode:
+        - PURSUE
+        - WITNESS
+      required_discoveries:
+        - camera_skew_noticed
+      effects:
+        - add_discovery: testimony_timeline_checked
+        - investigation_progress: 1
+      starts_operation: null
+      operation_type: null
+    - id: narrow_escape_destination
+      label: "逃走先を絞り込む"
+      actor_id: 刑事
+      action_layer: HUD
+      interaction_scope: inferred_location
+      required_actor_mode:
+        - PURSUE
+      required_discoveries:
+        - suspect_route_inferred
+      effects:
+        - add_discovery: escape_destination_narrowed
+        - perimeter_pressure: 1
+      starts_operation: null
+      operation_type: null
+    - id: leave_false_trace
+      label: "偽の痕跡を残す"
+      actor_id: 愉快犯
+      action_layer: HUD
+      interaction_scope: any_location
+      required_actor_mode:
+        - FLEE
+      required_discoveries:
+        - unsafe_route_identified
+      effects:
+        - add_discovery: false_trace_planted
+        - investigation_confusion: 1
+      starts_operation: null
+      operation_type: null
+    - id: change_escape_route
+      label: "逃走経路を変更する"
+      actor_id: 愉快犯
+      action_layer: HUD
+      interaction_scope: known_location
+      required_actor_mode:
+        - FLEE
+      required_discoveries:
+        - unsafe_route_identified
+      effects:
+        - add_discovery: escape_route_changed
+        - pursuit_pressure: -1
+      starts_operation: null
+      operation_type: null
+    - id: mislead_witness_testimony
+      label: "目撃証言を撹乱する"
+      actor_id: 愉快犯
+      action_layer: HUD
+      interaction_scope: inferred_location
+      required_actor_mode:
+        - FLEE
+      required_discoveries:
+        - unsafe_route_identified
+      effects:
+        - add_discovery: witness_confusion_seeded
+        - investigation_confusion: 1
+      starts_operation: null
+      operation_type: null
 modes:
   FLEE:
     goals:

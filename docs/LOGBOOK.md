@@ -13,6 +13,25 @@
 Session45〜Session50は、Prototype Demo #1前後の中核開発ログとして当面LOGBOOK.mdに残す。
 将来的に肥大化した場合は、`general_documents/diary/` に「Demo #1開発アーカイブ」として退避する。
 
+## 2026-06-30（Session51-C: TPO HUD候補の小さな縦切り）
+
+### 今日やったこと
+
+- Session51-Bで直接行動が消えた空白に、packベースのTPO HUD候補を追加した。
+- 刑事側に追跡・推理・証言照合・包囲寄りの候補を追加した。
+- 愉快犯側に撹乱・逃走経路変更・偽痕跡寄りの候補を追加した。
+- actor_id / ActorMode / location / discovery による出し分けを確認した。
+- GUI直接行動のsame-location gatingは維持した。
+
+### 気づき
+
+- 別locationの相手とは直接戦えないが、物語的には追跡・推理・撹乱で戦える。
+- 51-CはOperation前の前段階であり、HUD候補が作戦文脈へ育つための素材を増やす回になった。
+
+### 次回の最初の一手
+
+- Session52に向けて、active_operationの最小スケルトンを検討する。
+
 ## 2026-06-30（Session51-B: GUI target gating / same-location requirement）
 
 ### 今日やったこと

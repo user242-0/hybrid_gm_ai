@@ -663,6 +663,8 @@ class Director:
         self,
         actor_id: Optional[str],
         mode: Optional[str] = None,
+        world: Optional[Dict[str, Any]] = None,
+        game_state: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Return HUD actions for one mode when that mode is allowed for the actor."""
 
@@ -675,9 +677,140 @@ class Director:
             return self.list_actions_for_mode(current_mode)
 
         if current_mode in actor_modes:
-            return self.list_actions_for_mode(current_mode)
+            actions = self.list_actions_for_mode(current_mode)
+            actions.extend(
+                self._list_tpo_hud_actions_for_actor(
+                    actor_id,
+                    current_mode,
+                    world=world,
+                    game_state=game_state,
+                )
+            )
+            return actions
 
         return []
+
+    def _list_tpo_hud_actions_for_actor(
+        self,
+        actor_id: Optional[str],
+        mode: str,
+        *,
+        world: Optional[Dict[str, Any]] = None,
+        game_state: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return pack-defined TPO HUD candidates gated by actor/mode/discovery/location."""
+
+        if not actor_id or not isinstance(world, dict):
+            return []
+        candidates = (self.goals_dict or {}).get("hud_actions", {}).get("tpo_candidates", [])
+        if not isinstance(candidates, list):
+            return []
+
+        discoveries = set(self._actor_discoveries(world, actor_id))
+        actions: List[Dict[str, Any]] = []
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            action_id = candidate.get("id") or candidate.get("action") or candidate.get("action_id")
+            if not isinstance(action_id, str) or not action_id:
+                continue
+            if candidate.get("actor_id") != actor_id:
+                continue
+            required_modes = candidate.get("required_actor_mode") or []
+            if isinstance(required_modes, str):
+                required_modes = [required_modes]
+            if required_modes and mode not in required_modes:
+                continue
+            required_discoveries = candidate.get("required_discoveries") or []
+            if isinstance(required_discoveries, str):
+                required_discoveries = [required_discoveries]
+            if not all(discovery in discoveries for discovery in required_discoveries):
+                continue
+            scope = candidate.get("interaction_scope")
+            if not self._passes_tpo_location_scope(actor_id, scope, world, game_state):
+                continue
+            actions.append(
+                {
+                    "action": action_id,
+                    "label": candidate.get("label") or action_id,
+                    "time_min": candidate.get("time_min", 0),
+                }
+            )
+        return actions
+
+    def _actor_discoveries(self, world: Dict[str, Any], actor_id: str) -> List[str]:
+        actor_discoveries = world.get("actor_discoveries")
+        if isinstance(actor_discoveries, dict) and actor_id in actor_discoveries:
+            discoveries = actor_discoveries.get(actor_id)
+            return [item for item in discoveries if isinstance(item, str)] if isinstance(discoveries, list) else []
+        aff = world.get("affordances")
+        discoveries = aff.get("discoveries") if isinstance(aff, dict) else None
+        return [item for item in discoveries if isinstance(item, str)] if isinstance(discoveries, list) else []
+
+    def _passes_tpo_location_scope(
+        self,
+        actor_id: str,
+        scope: Any,
+        world: Dict[str, Any],
+        game_state: Optional[Dict[str, Any]],
+    ) -> bool:
+        if scope in (None, "", "any_location"):
+            return True
+
+        actor_location = self._actor_location(world, game_state, actor_id)
+        if not actor_location:
+            return False
+
+        target_id = self._actor_target(world, game_state, actor_id)
+        if not target_id or target_id == actor_id:
+            return scope == "known_location"
+        target_location = self._actor_location(world, game_state, target_id)
+
+        if scope == "same_location":
+            return bool(target_location and target_location == actor_location)
+        if scope in {"known_location", "inferred_location"}:
+            return bool(target_location and target_location != actor_location)
+        return True
+
+    def _actor_location(
+        self,
+        world: Dict[str, Any],
+        game_state: Optional[Dict[str, Any]],
+        actor_id: str,
+    ) -> Optional[str]:
+        actor_locations = world.get("actor_locations")
+        if isinstance(actor_locations, dict):
+            location = actor_locations.get(actor_id)
+            if isinstance(location, str) and location:
+                return location
+        party = game_state.get("party") if isinstance(game_state, dict) else None
+        actor_obj = party.get(actor_id) if isinstance(party, dict) else None
+        location = getattr(actor_obj, "location", None)
+        if isinstance(location, str) and location:
+            return location
+        if isinstance(game_state, dict):
+            current = game_state.get("current_location")
+            if isinstance(current, str) and current:
+                return current
+        return None
+
+    def _actor_target(
+        self,
+        world: Dict[str, Any],
+        game_state: Optional[Dict[str, Any]],
+        actor_id: str,
+    ) -> Optional[str]:
+        for source in (game_state, world):
+            actor_targets = source.get("actor_targets") if isinstance(source, dict) else None
+            if isinstance(actor_targets, dict):
+                target = actor_targets.get(actor_id)
+                if isinstance(target, str) and target:
+                    return target
+        if isinstance(game_state, dict):
+            target = game_state.get("current_target")
+            if isinstance(target, str) and target:
+                return target
+        return None
 
     def affordance_rules(self) -> Dict[str, Any]:
         """Return the affordances section from the pack YAML (goals_dict)."""
