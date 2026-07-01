@@ -135,6 +135,13 @@ class HUDCallbacks:
 
         actor_id, action_mode = self._active_actor_mode()
         sync_actor_view_to_legacy(ctx.director_world, ctx.game_state, actor_id)
+        set_actor_modes = getattr(ctx.director_hud, "set_actor_modes", None)
+        available_actor_modes = getattr(ctx.director, "available_actor_modes", None)
+        if callable(set_actor_modes) and callable(available_actor_modes):
+            set_actor_modes(
+                available_actor_modes(actor_id),
+                on_change=self.on_actor_mode_dropdown,
+            )
         set_actor_mode = getattr(ctx.director_hud, "set_actor_mode", None)
         if callable(set_actor_mode):
             set_actor_mode(actor_id, action_mode)
@@ -630,8 +637,15 @@ class HUDCallbacks:
             is_hud_debug_enabled() or is_hud_demo_enabled(),
         )
         if actor_mode_hud:
+            actor_id, _mode = self._active_actor_mode()
+            available_actor_modes = getattr(self.ctx.director, "available_actor_modes", None)
+            modes = (
+                available_actor_modes(actor_id)
+                if callable(available_actor_modes)
+                else self.ctx.director.available_modes()
+            )
             hud.set_actor_modes(
-                self.ctx.director.available_modes(),
+                modes,
                 on_change=self.on_actor_mode_dropdown,
             )
 

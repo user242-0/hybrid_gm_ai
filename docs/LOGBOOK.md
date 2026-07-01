@@ -13,6 +13,28 @@
 Session45〜Session50は、Prototype Demo #1前後の中核開発ログとして当面LOGBOOK.mdに残す。
 将来的に肥大化した場合は、`general_documents/diary/` に「Demo #1開発アーカイブ」として退避する。
 
+## 2026-06-30（Session51-D: Trickster mode taxonomy / HUD候補整理）
+
+### 今日やったこと
+
+- 愉快犯側のActorModeを FLEE / MISLEAD / PROVOKE / ESCALATE の4系統に整理した。
+- FLEEに集中していたHUD候補を、逃走・撹乱・挑発・エスカレート系に分配した。
+- 「偽の痕跡を残す」などの重複候補を整理した。
+- 「目撃証言を撹乱する」をMISLEAD系候補として扱うようにした。
+- DirectorModeは従来通り FREEZE / PURSUE / WITNESS / FLEE を維持した。
+- GUI直接行動のsame-location gatingは維持した。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- 愉快犯はFLEE一本では表現が狭く、逃走・撹乱・挑発・エスカレートに分けることでHUD候補の意味が見えやすくなった。
+- Operation実装前にActorMode語彙を整理することで、後続のactive_operation設計が作りやすくなる。
+- DirectorModeとActorModeは同じ語彙である必要はなく、当面はDirectorModeを主人公側・世界側の大きな空気として維持する。
+
+### 次回の最初の一手
+
+- Session52に向けて、active_operationの最小スケルトンを検討する。
+
 ## 2026-06-30（Session51-C: TPO HUD候補の小さな縦切り）
 
 ### 今日やったこと

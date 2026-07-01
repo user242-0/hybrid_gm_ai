@@ -80,6 +80,16 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session51-D: Trickster ActorMode taxonomy / HUD候補整理
+
+* Session51-D: 愉快犯ActorMode taxonomy / HUD候補整理を実施。
+* DirectorModeは従来通り FREEZE / PURSUE / WITNESS / FLEE を維持。
+* 愉快犯ActorModeを FLEE / MISLEAD / PROVOKE / ESCALATE に整理。
+* FLEEに集中していた愉快犯HUD候補を、逃走・撹乱・挑発・エスカレート系へ分配。
+* 「偽の痕跡を残す」など重複候補を整理。
+* 「目撃証言を撹乱する」はMISLEAD系候補として扱う。
+* Operation本実装 / active_operation / GUI Action Compile はまだ未実装。
+
 ### Session51-C: packベースTPO HUD候補
 
 * Session51-C: packベースTPO HUD候補を追加。
@@ -229,11 +239,11 @@ current_target と narrative_targetの違い：
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. actor別targetの最小設計を進める。
+1. Session52: active_operation の最小スケルトンを検討する。
 
-2. Session52: active_operation の最小スケルトンを検討する。
+2. actor別targetの最小設計を検討する。
 
-3. HUD候補からOperation開始へ進む前に、TPO候補の効果とdiscovery連鎖を確認する。
+3. HUD候補からOperation開始へ進む前に、TPO候補のeffectsとdiscovery連鎖を確認する。
 
 
 ## 5. ブロッカー（止まってる理由があれば）

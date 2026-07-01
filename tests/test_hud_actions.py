@@ -149,6 +149,12 @@ def _refresh_action_ids(callbacks, ctx, hud):
     return {action_id for action_id, _label, _minutes in hud.actions}
 
 
+def _refresh_action_labels(callbacks, ctx, hud):
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+    return [label for _action_id, label, _minutes in hud.actions]
+
+
 def test_actions_list_populates():
     premise = load_yaml("data/director/premise.yml").get("premise", {})
     goals = extract_goals_from_pack(load_pack("cop_trickster"))
@@ -207,7 +213,7 @@ def test_cop_tpo_hud_candidates_require_discovery(monkeypatch):
     assert "compare_testimony_time" not in hud_action_ids
 
 
-def test_trickster_flee_tpo_hud_candidates_require_unsafe_route(monkeypatch):
+def test_trickster_flee_tpo_hud_candidates_are_escape_only(monkeypatch):
     _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
     monkeypatch.setattr(
         "src.ui.hud_callbacks.get_advisory_display_items",
@@ -218,13 +224,73 @@ def test_trickster_flee_tpo_hud_candidates_require_unsafe_route(monkeypatch):
     set_actor_location(world, "刑事", "警察署_控室")
     inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
 
-    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+    hud_labels = _refresh_action_labels(callbacks, ctx, hud)
 
-    assert {
-        "leave_false_trace",
-        "change_escape_route",
-        "mislead_witness_testimony",
-    } <= hud_action_ids
+    assert "逃走経路を変更する" in hud_labels
+    assert "顔を見られた店を避ける" in hud_labels
+    assert "潜伏先を変える" in hud_labels
+    assert "目撃証言を撹乱する" not in hud_labels
+    assert "事件の圧を上げる" not in hud_labels
+    assert "犯行声明めいたメモを残す" not in hud_labels
+
+
+def test_trickster_mislead_tpo_hud_candidates(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "愉快犯", "MISLEAD")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    set_actor_location(world, "刑事", "警察署_控室")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+
+    hud_labels = _refresh_action_labels(callbacks, ctx, hud)
+
+    assert "偽の痕跡を残す" in hud_labels
+    assert "目撃証言を撹乱する" in hud_labels
+    assert "刑事の推理を遅らせる" in hud_labels
+    assert "偽の痕跡を残す" not in [
+        label
+        for index, label in enumerate(hud_labels)
+        if label in hud_labels[:index]
+    ]
+
+
+def test_trickster_provoke_tpo_hud_candidates(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "愉快犯", "PROVOKE")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    set_actor_location(world, "刑事", "警察署_控室")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+
+    hud_labels = _refresh_action_labels(callbacks, ctx, hud)
+
+    assert "あえて痕跡を見せる" in hud_labels
+    assert "犯行声明めいたメモを残す" in hud_labels
+    assert "刑事を誘導する" in hud_labels
+
+
+def test_trickster_escalate_tpo_hud_candidates(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("愉快犯")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "愉快犯", "ESCALATE")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+    set_actor_location(world, "刑事", "警察署_控室")
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+
+    hud_labels = _refresh_action_labels(callbacks, ctx, hud)
+
+    assert "次の行動を早める" in hud_labels
+    assert "危険なルートを取る" in hud_labels
+    assert "事件の圧を上げる" in hud_labels
 
 
 def test_cop_discovery_does_not_enable_trickster_tpo_hud_candidates(monkeypatch):
@@ -243,6 +309,8 @@ def test_cop_discovery_does_not_enable_trickster_tpo_hud_candidates(monkeypatch)
     assert "leave_false_trace" not in hud_action_ids
     assert "change_escape_route" not in hud_action_ids
     assert "mislead_witness_testimony" not in hud_action_ids
+    assert "show_trace_deliberately" not in hud_action_ids
+    assert "raise_case_tension" not in hud_action_ids
 
 
 def test_switch_character_switches_tpo_hud_candidates_by_actor_mode_and_discovery(
@@ -273,11 +341,11 @@ def test_switch_character_switches_tpo_hud_candidates_by_actor_mode_and_discover
     assert "leave_false_trace" not in cop_first
     assert "leave_false_trace" not in cop_second
     assert {
-        "leave_false_trace",
         "change_escape_route",
-        "mislead_witness_testimony",
+        "mark_avoid_shop",
     } <= trickster
     assert "infer_escape_route" not in trickster
+    assert "mislead_witness_testimony" not in trickster
 
 
 def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():
@@ -296,13 +364,8 @@ def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():
 
     assert {"collect_fiber", "fix_cam_clock", "call_partner"} <= cop_actions
     assert {
-        "hide_evidence",
-        "plant_false_trace",
-        "avoid_witness",
         "change_hideout",
-        "observe_next_target",
         "move_low_profile",
-        "mark_avoid_shop",
     } <= trickster_actions
     assert cop_actions.isdisjoint(trickster_actions)
 
@@ -324,13 +387,8 @@ def test_actor_hud_actions_are_limited_to_the_effective_mode():
         record["action"]
         for record in director.list_actions_for_actor("愉快犯", "FLEE")
     } == {
-        "hide_evidence",
-        "plant_false_trace",
-        "avoid_witness",
         "change_hideout",
-        "observe_next_target",
         "move_low_profile",
-        "mark_avoid_shop",
     }
 
 
@@ -341,6 +399,21 @@ def test_actor_hud_actions_are_empty_when_effective_mode_is_not_allowed():
 
     assert director.list_actions_for_actor("刑事", "FLEE") == []
     assert director.list_actions_for_actor("愉快犯", "PURSUE") == []
+
+
+def test_director_modes_stay_global_while_trickster_actor_modes_expand():
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    goals = extract_goals_from_pack(load_pack("cop_trickster"))
+    director = Director(premise=premise, goals_dict=goals)
+
+    assert director.available_modes() == ["FREEZE", "FLEE", "PURSUE", "WITNESS"]
+    assert director.available_actor_modes("刑事") == ["FREEZE", "PURSUE", "WITNESS"]
+    assert director.available_actor_modes("愉快犯") == [
+        "FLEE",
+        "MISLEAD",
+        "PROVOKE",
+        "ESCALATE",
+    ]
 
 
 def test_actor_modes_are_stored_by_actor_and_fall_back_to_director_mode():
@@ -400,11 +473,8 @@ def test_refresh_hud_uses_active_actor_mode_independently_of_director_mode(monke
 
     assert cop_action_ids == {"collect_fiber", "fix_cam_clock", "call_partner"}
     assert {
-        "hide_evidence",
-        "plant_false_trace",
-        "avoid_witness",
         "change_hideout",
-        "observe_next_target",
+        "move_low_profile",
     } <= trickster_action_ids
     assert cop_action_ids.isdisjoint(trickster_action_ids)
 
@@ -507,21 +577,16 @@ def test_actor_mode_dropdown_updates_world_cache_and_actions(monkeypatch):
     assert {
         action_id for action_id, _label, _minutes in hud.actions
     } == {
-        "hide_evidence",
-        "plant_false_trace",
-        "avoid_witness",
         "change_hideout",
-        "observe_next_target",
         "move_low_profile",
-        "mark_avoid_shop",
     }
     rev_before = ctx.game_state["hud_cache_rev"]
 
-    callbacks.on_actor_mode_dropdown("PURSUE")
+    callbacks.on_actor_mode_dropdown("MISLEAD")
 
-    assert world["actor_modes"]["愉快犯"] == "PURSUE"
+    assert world["actor_modes"]["愉快犯"] == "MISLEAD"
     assert ctx.game_state["hud_cache_rev"] == rev_before + 1
-    assert hud.actor_mode == ("愉快犯", "PURSUE")
+    assert hud.actor_mode == ("愉快犯", "MISLEAD")
     assert hud.actions == []
 
 
@@ -575,8 +640,8 @@ def test_hud_microgoal_switches_with_active_actor_and_restores_previous_goal(mon
             "recent_ids": {},
         },
         "愉快犯": {
-            "text": "証拠を隠す",
-            "action_id": "hide_evidence",
+            "text": "潜伏先を変える",
+            "action_id": "change_hideout",
             "mode": "FLEE",
             "baseline": {},
             "recent_ids": {},
@@ -749,11 +814,7 @@ def test_trickster_flee_actions_are_available_without_affordance_discoveries():
     }
 
     assert {
-        "hide_evidence",
-        "plant_false_trace",
-        "avoid_witness",
         "change_hideout",
-        "observe_next_target",
     } <= action_ids
 
 
@@ -778,11 +839,7 @@ def test_refresh_hud_shows_basic_trickster_actions_when_governed_actions_are_hid
 
     visible_ids = {action_id for action_id, _label, _minutes in hud.actions}
     assert visible_ids == {
-        "hide_evidence",
-        "plant_false_trace",
-        "avoid_witness",
         "change_hideout",
-        "observe_next_target",
     }
     assert ctx.current_actions == hud.actions
 
@@ -799,7 +856,7 @@ def test_hud_executes_trickster_action_after_core_specs_are_enumerated(
     )
     director.mode = "FLEE"
     world = apply_world_defaults(director.synthesize_world(), pack)
-    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "諢牙ｿｫ迥ｯ")
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, "愉快犯")
     monkeypatch.setattr(
         "src.ui.hud_callbacks.get_advisory_display_items",
         lambda *, actor_id, limit: [],
@@ -821,10 +878,9 @@ def test_hud_executes_trickster_action_after_core_specs_are_enumerated(
 
     callbacks.refresh_hud()
     action_ids = [action_id for action_id, _label, _minutes in hud.actions]
-    action_index = action_ids.index("avoid_witness")
+    action_index = action_ids.index("change_hideout")
     clock_before = world["clock"]
-    witnesses_before = world["witnesses_avoided"]
-    suspicion_before = world["suspicion"]["value"]
+    hideouts_before = world["hideout_changes"]
 
     callbacks.on_action_select(action_index)
 
@@ -832,8 +888,7 @@ def test_hud_executes_trickster_action_after_core_specs_are_enumerated(
     assert "spec=OK" in output
     assert "invalid action_id" not in output
     assert world["clock"] != clock_before
-    assert world["witnesses_avoided"] == witnesses_before + 1
-    assert world["suspicion"]["value"] == max(0, suspicion_before - 1)
+    assert world["hideout_changes"] == hideouts_before + 1
 
 
 def test_actor_locations_are_saved_and_fallback_to_current_location():

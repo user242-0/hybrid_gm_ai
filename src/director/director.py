@@ -161,6 +161,17 @@ class Director:
 
         return list(self._available_modes)
 
+    def available_actor_modes(self, actor_id: Optional[str]) -> List[str]:
+        """Return actor-specific HUD modes when the pack defines them."""
+
+        actors = (self.goals_dict or {}).get("hud_actions", {}).get("actors", {})
+        actor_modes = actors.get(actor_id) if actor_id else None
+        if isinstance(actor_modes, str):
+            actor_modes = [actor_modes]
+        if isinstance(actor_modes, list) and actor_modes:
+            return [mode for mode in actor_modes if isinstance(mode, str) and mode]
+        return self.available_modes()
+
     def set_mode(self, mode: str) -> bool:
         if mode in self._available_modes or not self._available_modes:
             self.mode = mode
@@ -193,7 +204,8 @@ class Director:
 
         if not isinstance(world, dict) or not actor_id or not isinstance(mode, str) or not mode:
             return False
-        if self._available_modes and mode not in self._available_modes:
+        allowed_modes = self.available_actor_modes(actor_id)
+        if allowed_modes and mode not in allowed_modes:
             return False
         actor_modes = world.setdefault("actor_modes", {})
         if not isinstance(actor_modes, dict):
@@ -729,10 +741,16 @@ class Director:
             scope = candidate.get("interaction_scope")
             if not self._passes_tpo_location_scope(actor_id, scope, world, game_state):
                 continue
+            label = candidate.get("label") or action_id
+            if any(
+                existing.get("action") == action_id or existing.get("label") == label
+                for existing in actions
+            ):
+                continue
             actions.append(
                 {
                     "action": action_id,
-                    "label": candidate.get("label") or action_id,
+                    "label": label,
                     "time_min": candidate.get("time_min", 0),
                 }
             )
