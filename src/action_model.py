@@ -22,6 +22,8 @@ class ActionSpec:
     id_aliases: List[str] = field(default_factory=list)
     ui_visible: bool = True  # UI選択肢に表示するか
     heart: Optional[Dict[str, Any]] = None  # {axis: "red"|"green"|"blue", value: 0-255}
+    action_layer: Optional[str] = None
+    interaction_scope: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         data = {
@@ -39,5 +41,7 @@ class ActionSpec:
             "id_aliases": self.id_aliases or None,
             "ui_visible": self.ui_visible,
             "heart": self.heart,
+            "action_layer": self.action_layer,
+            "interaction_scope": self.interaction_scope,
         }
         return {key: value for key, value in data.items() if value is not None}

@@ -2,6 +2,7 @@ class RequirementsChecker:
     def __init__(self, game_state, player_status):
         self.game_state = game_state
         self.player_status = player_status
+        self._current_args = []
 
         # 内部ヘルパ：現在装備の weapon_type を安全に取得
         # - dict でもオブジェクトでも OK
@@ -35,6 +36,7 @@ class RequirementsChecker:
             #"has_weapon": lambda: self.player_status.has_weapon,
             "has_enemy": lambda: self.game_state.get("has_enemy"),   # この行を追加
             "has_target": lambda: bool(self.game_state.get("current_target")),
+            "same_location": lambda: self._same_location_required(),
             "location": lambda loc: self.game_state.get("current_location") == loc,
             "has_item": lambda item_name: any(
                 item["name"] == item_name for item in self.player_status.inventory
@@ -93,8 +95,87 @@ class RequirementsChecker:
         labels = target.relationship_tags_from.get(self.player_status.name, set())
         return str(label) in labels
 
+    def _actor_id(self):
+        return getattr(self.player_status, "name", None)
 
-    def check_all(self, requirements):
+    def _director_world(self):
+        world = self.game_state.get("director_world")
+        if isinstance(world, dict):
+            return world
+        world = self.game_state.get("world")
+        if isinstance(world, dict):
+            return world
+        return {}
+
+    def _target_id(self):
+        if self._current_args:
+            target = self._current_args[0]
+            if isinstance(target, str):
+                return target
+            name = getattr(target, "name", None)
+            if name:
+                return name
+
+        target = self.game_state.get("current_target")
+        if target:
+            return target
+
+        actor_id = self._actor_id()
+        actor_targets = self.game_state.get("actor_targets")
+        if actor_id and isinstance(actor_targets, dict):
+            return actor_targets.get(actor_id)
+        return None
+
+    def _actor_location(self, actor_id):
+        world = self._director_world()
+        actor_locations = world.get("actor_locations")
+        if isinstance(actor_locations, dict):
+            location = actor_locations.get(actor_id)
+            if isinstance(location, str) and location:
+                return location
+
+        location = self.game_state.get("current_location")
+        if isinstance(location, str) and location:
+            return location
+
+        location = getattr(self.player_status, "location", None)
+        if isinstance(location, str) and location:
+            return location
+        return None
+
+    def _target_location(self, target_id):
+        if not target_id:
+            return None
+
+        world = self._director_world()
+        actor_locations = world.get("actor_locations")
+        if isinstance(actor_locations, dict):
+            location = actor_locations.get(target_id)
+            if isinstance(location, str) and location:
+                return location
+
+        party = self.game_state.get("party")
+        if isinstance(party, dict):
+            target = party.get(target_id)
+            if target is None:
+                for candidate in party.values():
+                    if getattr(candidate, "name", None) == target_id:
+                        target = candidate
+                        break
+            location = getattr(target, "location", None)
+            if isinstance(location, str) and location:
+                return location
+
+        return None
+
+    def _same_location_required(self) -> bool:
+        actor_location = self._actor_location(self._actor_id())
+        target_location = self._target_location(self._target_id())
+        if not actor_location or not target_location:
+            return False
+        return actor_location == target_location
+
+    def check_all(self, requirements, args=None):
         """
         requirements が
         ① None           → 制約なし
@@ -103,6 +184,14 @@ class RequirementsChecker:
         """
 
         # requirementsがNoneまたは空の場合、常にTrue
+        if args:
+            previous_args = self._current_args
+            self._current_args = list(args)
+            try:
+                return self.check_all(requirements)
+            finally:
+                self._current_args = previous_args
+
         if not requirements:
             return True
         

@@ -266,7 +266,7 @@ class ActionPipeline:
         if action_id in legacy_actions and actor_obj is not None:
             if spec and spec.requirements:
                 checker = RequirementsChecker(self.game_state, actor_obj)
-                if not checker.check_all(spec.requirements):
+                if not checker.check_all(spec.requirements, args=arg_list):
                     return None
             if spec and spec.function:
                 result = spec.function(actor_obj, self.game_state, *arg_list)
