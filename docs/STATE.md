@@ -80,6 +80,15 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session52-0: Operation前提修理
+
+- Fable5外部レビューで指摘された重大リスク2件を、Operation実装前に修理した。
+- discovery書き込みの正本を actor_discoveries[actor_id] に寄せ、legacy affordances.discoveries はactive actor viewの互換キャッシュとして扱う方針を強化した。
+- affordance_bridge / ActionPipeline 経由のdiscovery獲得がHUD refreshで消えないようにした。
+- TPO HUD / pack actionの実行時ゲートを追加し、actor_id / ActorMode / discovery / interaction_scope を実行時にも再チェックするようにした。
+- 他actor用HUDアクションを直接requestしても実行されず、effectsが適用されないようにした。
+- active_operation / Operation manager / GUI Action Compile はまだ未実装。
+
 ### Session51-E: RC別discovery語彙 / HUD_DEBUG注入整理
 
 * Session51-E: RC別discovery語彙 / HUD_DEBUG注入候補を整理。
@@ -251,11 +260,11 @@ current_target と narrative_targetの違い：
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. Session52: active_operation の最小スケルトンを検討する。
+1. Session52: active_operation の最小スケルトンを実装する。
 
-2. actor別targetの最小設計を検討する。
+2. actor_operations の保存・YAML roundtrip・HUD save/loadをテストする。
 
-3. discovery連鎖からOperation.MiniGoalにどう接続するか整理する。
+3. OperationはGUI gatingを変えないことを回帰テストで固定する。
 
 
 ## 5. ブロッカー（止まってる理由があれば）

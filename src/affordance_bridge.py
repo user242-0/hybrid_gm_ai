@@ -15,6 +15,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.actor_view_state import (
+    get_actor_discoveries,
+    inject_actor_discovery,
+    sync_actor_view_to_legacy,
+)
+
 
 # ------------------------------------------------------------------
 # Internal helpers
@@ -29,6 +35,23 @@ def _check_facts(world: dict, required_facts: list[str]) -> bool:
     return True
 
 
+def _resolve_actor_id(
+    game_state: dict | None = None,
+    actor_obj: Any | None = None,
+    actor_id: str | None = None,
+) -> str | None:
+    if isinstance(actor_id, str) and actor_id:
+        return actor_id
+    name = getattr(actor_obj, "name", None)
+    if isinstance(name, str) and name:
+        return name
+    active = game_state.get("active_char") if isinstance(game_state, dict) else None
+    name = getattr(active, "name", None)
+    if isinstance(name, str) and name:
+        return name
+    return None
+
+
 # ------------------------------------------------------------------
 # Discovery layer
 # ------------------------------------------------------------------
@@ -39,6 +62,8 @@ def evaluate_discoveries(
     action_id: str,
     rules: list[dict],
     mode: str | None = None,
+    actor_id: str | None = None,
+    actor_obj: Any | None = None,
 ) -> list[str]:
     """action 実行後に呼ぶ。discovery_rules を評価し、新規 discovery を記録。
 
@@ -49,10 +74,15 @@ def evaluate_discoveries(
 
     Returns: 新たに追加された discovery ID のリスト。
     """
+    resolved_actor_id = _resolve_actor_id(game_state, actor_obj, actor_id)
     aff = world.setdefault("affordances", {"discoveries": [], "spent_opportunities": set()})
     discoveries: list[str] = aff.setdefault("discoveries", [])
     aff.setdefault("spent_opportunities", set())
-    existing = set(discoveries)
+    existing = (
+        set(get_actor_discoveries(world, resolved_actor_id))
+        if resolved_actor_id
+        else set(discoveries)
+    )
     added: list[str] = []
 
     for rule in rules:
@@ -85,18 +115,39 @@ def evaluate_discoveries(
         else:
             continue
 
-        discoveries.append(disc_id)
-        existing.add(disc_id)
-        added.append(disc_id)
+        if resolved_actor_id:
+            if inject_actor_discovery(world, resolved_actor_id, disc_id):
+                added.append(disc_id)
+            existing.add(disc_id)
+        else:
+            discoveries.append(disc_id)
+            existing.add(disc_id)
+            added.append(disc_id)
+
+    if added and resolved_actor_id:
+        sync_actor_view_to_legacy(world, game_state, resolved_actor_id)
 
     return added
 
 
-def inject_discovery(world: dict, discovery_id: str) -> bool:
+def inject_discovery(
+    world: dict,
+    discovery_id: str,
+    game_state: dict | None = None,
+    actor_id: str | None = None,
+    actor_obj: Any | None = None,
+) -> bool:
     """Director が外部から discovery を注入する（director_inject 用）。
 
     Returns: 新規追加された場合 True。
     """
+    resolved_actor_id = _resolve_actor_id(game_state, actor_obj, actor_id)
+    if resolved_actor_id:
+        added = inject_actor_discovery(world, resolved_actor_id, discovery_id)
+        if added and isinstance(game_state, dict):
+            sync_actor_view_to_legacy(world, game_state, resolved_actor_id)
+        return added
+
     aff = world.setdefault("affordances", {"discoveries": [], "spent_opportunities": set()})
     discoveries: list[str] = aff.setdefault("discoveries", [])
     if discovery_id in discoveries:

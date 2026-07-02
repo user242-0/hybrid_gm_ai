@@ -37,6 +37,16 @@ class ActionPipeline:
             return world
         return None
 
+    def _resolve_actor_id(self, actor_obj: Any | None) -> str | None:
+        actor_name = getattr(actor_obj, "name", None)
+        if isinstance(actor_name, str) and actor_name:
+            return actor_name
+        active = self.game_state.get("active_char")
+        active_name = getattr(active, "name", None)
+        if isinstance(active_name, str) and active_name:
+            return active_name
+        return None
+
     def _advance_time(self, world: dict | None, minutes: int) -> None:
         if minutes <= 0:
             return
@@ -274,6 +284,16 @@ class ActionPipeline:
             action_executed = True
         else:
             if world is not None:
+                if self.director is not None:
+                    can_execute_tpo = getattr(self.director, "can_execute_tpo_hud_action", None)
+                    if callable(can_execute_tpo):
+                        actor_id = self._resolve_actor_id(actor_obj)
+                        if not can_execute_tpo(world, self.game_state, actor_id, action_id):
+                            print(
+                                "[ActionPipeline] TPO HUD action rejected at execution gate: "
+                                f"actor={actor_id} action={action_id}"
+                            )
+                            return None
                 if hasattr(action_registry, "execute_action_core"):
                     action_registry.execute_action_core(world, action_id)
                     action_executed = True
@@ -383,6 +403,7 @@ class ActionPipeline:
                 new_discoveries = evaluate_discoveries(
                     world, self.game_state, action_id, disc_rules,
                     mode=self.director.mode,
+                    actor_id=self._resolve_actor_id(actor_obj),
                 )
                 if new_discoveries:
                     self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1

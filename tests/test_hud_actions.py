@@ -11,7 +11,9 @@ from src.actor_view_state import (
     get_actor_location,
     inject_actor_discovery,
     set_actor_location,
+    sync_actor_view_to_legacy,
 )
+from src.affordance_bridge import inject_discovery
 from src.choice_definitions import get_available_choices
 from src.ui.action_pipeline import ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
@@ -1101,6 +1103,71 @@ def test_debug_discovery_injection_updates_only_active_actor(monkeypatch):
     assert world["actor_discoveries"]["刑事"] == ["camera_skew_noticed"]
     assert world["actor_discoveries"]["愉快犯"] == []
     assert world["affordances"]["discoveries"] == ["camera_skew_noticed"]
+
+
+def test_discovery_earned_via_bridge_survives_hud_refresh():
+    pack, _director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    discovery_id = "need_partner_help_realized"
+
+    added = inject_discovery(
+        world,
+        discovery_id,
+        game_state=ctx.game_state,
+        actor_id=pack["roles"]["protagonist"]["name"],
+    )
+    world["affordances"]["discoveries"] = []
+    sync_actor_view_to_legacy(
+        world,
+        ctx.game_state,
+        pack["roles"]["protagonist"]["name"],
+    )
+
+    assert added is True
+    assert discovery_id in get_actor_discoveries(world, "刑事")
+    assert world["affordances"]["discoveries"] == [discovery_id]
+
+
+def test_tpo_hud_action_execution_rechecks_gating():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("愉快犯")
+    trickster_id = pack["roles"]["antagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, trickster_id, "FLEE")
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    result = pipeline.request_action(
+        "show_trace_deliberately",
+        actor_obj=ctx.game_state["party"][trickster_id],
+        args=[],
+        source="HUD",
+    )
+
+    assert result is None
+    assert "deliberate_trace_seen" not in get_actor_discoveries(world, trickster_id)
+    assert world.get("trickster_heat") in (None, 0)
+
+
+def test_hud_action_of_other_actor_is_blocked():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    trickster_id = pack["roles"]["antagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    result = pipeline.request_action(
+        "leave_manifesto_note",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+    )
+
+    assert result is None
+    assert "manifesto_note_left" not in get_actor_discoveries(world, trickster_id)
+    assert world.get("trickster_heat") in (None, 0)
 
 
 def test_actor_view_state_survives_yaml_roundtrip():

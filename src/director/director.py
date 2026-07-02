@@ -781,6 +781,56 @@ class Director:
             )
         return actions
 
+    def can_execute_tpo_hud_action(
+        self,
+        world: Dict[str, Any],
+        game_state: Optional[Dict[str, Any]],
+        actor_id: Optional[str],
+        action_id: str,
+    ) -> bool:
+        """Recheck pack-defined TPO HUD gates before executing a HUD action.
+
+        Non-TPO actions are allowed through; TPO candidates must match the same
+        actor/mode/discovery/location gates used when they are listed.
+        """
+
+        candidates = (self.goals_dict or {}).get("hud_actions", {}).get("tpo_candidates", [])
+        if not isinstance(candidates, list):
+            return True
+
+        matched_candidate: Optional[Dict[str, Any]] = None
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            candidate_id = candidate.get("id") or candidate.get("action") or candidate.get("action_id")
+            if candidate_id == action_id:
+                matched_candidate = candidate
+                break
+
+        if matched_candidate is None:
+            return True
+        if not actor_id:
+            return False
+        if matched_candidate.get("actor_id") != actor_id:
+            return False
+
+        mode = self.get_actor_mode(world, actor_id, fallback_mode=self.mode)
+        required_modes = matched_candidate.get("required_actor_mode") or []
+        if isinstance(required_modes, str):
+            required_modes = [required_modes]
+        if required_modes and mode not in required_modes:
+            return False
+
+        discoveries = set(self._actor_discoveries(world, actor_id))
+        required_discoveries = matched_candidate.get("required_discoveries") or []
+        if isinstance(required_discoveries, str):
+            required_discoveries = [required_discoveries]
+        if not all(discovery in discoveries for discovery in required_discoveries):
+            return False
+
+        scope = matched_candidate.get("interaction_scope")
+        return self._passes_tpo_location_scope(actor_id, scope, world, game_state)
+
     def _actor_discoveries(self, world: Dict[str, Any], actor_id: str) -> List[str]:
         actor_discoveries = world.get("actor_discoveries")
         if isinstance(actor_discoveries, dict) and actor_id in actor_discoveries:

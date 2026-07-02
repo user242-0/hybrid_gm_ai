@@ -8,6 +8,29 @@
 
 ---
 
+## 2026-07-02（Session52-0: Operation前提修理）
+
+### 今日やったこと
+
+- Fable5外部アーキテクチャレビューで指摘された重大リスク2件を、Operation実装前に修理した。
+- discovery書き込み経路を actor bucket = `actor_discoveries[actor_id]` に寄せた。
+- legacy `affordances.discoveries` はactive actor viewの互換キャッシュとして扱い、正本にしない方針を強めた。
+- affordance_bridge / ActionPipeline 経由で獲得したdiscoveryがHUD refreshで消えないようにした。
+- TPO HUD / pack actionの実行時ゲートを追加した。
+- 表示時だけでなく実行時にも actor_id / ActorMode / discovery / interaction_scope を再チェックするようにした。
+- 他actor用HUD actionを直接requestしても実行されず、effectsが適用されないことをテストした。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- Operationを載せる前に、read側だけでなくwrite側もactor別化する必要があった。
+- HUDに表示されているかどうかだけに頼らず、実行時にも必ずgateを通す必要がある。
+- Operationは「誰の文脈か」が本質なので、actor_idの実行時検証はOperation前の必須条件だった。
+
+### 次回の最初の一手
+
+- Session52として、actorごとの `active_operation` 最小スケルトンを実装する。
+
 ## 2026-06-30（Session51-E: RC別discovery語彙 / HUD_DEBUG注入整理）
 
 ### 今日やったこと
