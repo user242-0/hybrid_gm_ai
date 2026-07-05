@@ -297,13 +297,6 @@ class DirectorHUD:
 
         row_operation = tk.Frame(frame, bg=frame["bg"])
         row_operation.pack(fill="x", **pad)
-        tk.Label(
-            row_operation,
-            text="Operation:",
-            fg="white",
-            bg=frame["bg"],
-            font=bold_font,
-        ).pack(side="left")
         self.operation_lbl = tk.Label(
             row_operation,
             textvariable=self.operation_var,

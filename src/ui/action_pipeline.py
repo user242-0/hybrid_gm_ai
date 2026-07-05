@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src import action_registry
 from src.action_definitions import actions as legacy_actions, get_action_spec
+from src.actor_operations import start_operation_once
 from src.requirements_checker import RequirementsChecker
 from src.simulation_utils import add_minutes, ensure_clock
 from src.world import world_tick
@@ -46,6 +47,58 @@ class ActionPipeline:
         if isinstance(active_name, str) and active_name:
             return active_name
         return None
+
+    def _resolve_parent_microgoal_id(self, world: dict | None, actor_id: str | None) -> str | None:
+        if not isinstance(world, dict) or not actor_id:
+            return None
+        actor_goals = world.get("actor_micro_goals")
+        state = actor_goals.get(actor_id) if isinstance(actor_goals, dict) else None
+        if not isinstance(state, dict):
+            return None
+        micro_id = state.get("id")
+        return micro_id if isinstance(micro_id, str) and micro_id else None
+
+    def _start_operation_from_spec(
+        self,
+        world: dict | None,
+        spec: Any | None,
+        actor_id: str | None,
+        *,
+        source: str,
+    ) -> None:
+        if source != "HUD" or not isinstance(world, dict) or spec is None:
+            return
+        if not getattr(spec, "starts_operation", False):
+            return
+        operation_type = getattr(spec, "operation_type", None)
+        if not isinstance(operation_type, str) or not operation_type:
+            return
+        label = getattr(spec, "operation_label", None) or getattr(spec, "label", None) or operation_type
+        target_id = self.game_state.get("current_target")
+        if not isinstance(target_id, str) or not target_id:
+            actor_targets = world.get("actor_targets")
+            target_id = (
+                actor_targets.get(actor_id)
+                if isinstance(actor_targets, dict) and actor_id
+                else None
+            )
+        if not isinstance(target_id, str) or not target_id:
+            target_id = None
+        operation = start_operation_once(
+            world,
+            actor_id or "",
+            operation_type=operation_type,
+            label=str(label),
+            phase=getattr(spec, "operation_phase", None),
+            target_id=target_id,
+            parent_microgoal_id=self._resolve_parent_microgoal_id(world, actor_id),
+            created_from="HUD",
+            mini_goal=getattr(spec, "operation_mini_goal", None),
+        )
+        if operation is None:
+            print(f"[Operation] active operation already exists for actor={actor_id}")
+        elif operation.get("type") == operation_type:
+            print(f"[Operation] active actor={actor_id} operation={operation.get('id')}")
 
     def _advance_time(self, world: dict | None, minutes: int) -> None:
         if minutes <= 0:
@@ -299,6 +352,14 @@ class ActionPipeline:
                     action_executed = True
                 else:  # TODO: implement execute_action_core in src.action_registry
                     return None
+
+        if action_executed:
+            self._start_operation_from_spec(
+                world,
+                spec,
+                self._resolve_actor_id(actor_obj),
+                source=source,
+            )
 
         dt = time_min_override if time_min_override is not None else (spec.time_min if spec else 0)
         try:

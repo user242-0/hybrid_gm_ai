@@ -41,6 +41,47 @@ def clear_active_operation(world: dict, actor_id: str) -> None:
     set_active_operation(world, actor_id, None)
 
 
+def start_operation_once(
+    world: dict,
+    actor_id: str,
+    *,
+    operation_type: str,
+    label: str,
+    phase: str | None = None,
+    target_id: str | None = None,
+    parent_microgoal_id: str | None = None,
+    created_from: str = "HUD",
+    mini_goal: dict | None = None,
+) -> dict | None:
+    """Create one active operation for an actor without overwriting another one."""
+
+    if not actor_id or not operation_type or not isinstance(world, dict):
+        return None
+
+    operation_id = f"op_{operation_type}_{actor_id}"
+    current = get_active_operation(world, actor_id)
+    if isinstance(current, dict):
+        if current.get("id") == operation_id:
+            return current
+        return None
+
+    operation = {
+        "id": operation_id,
+        "type": operation_type,
+        "label": label,
+        "status": "active",
+        "phase": phase,
+        "actor_id": actor_id,
+        "target_id": target_id,
+        "parent_microgoal_id": parent_microgoal_id,
+        "created_from": created_from,
+        "mini_goal": deepcopy(mini_goal) if isinstance(mini_goal, dict) else None,
+        "notes": [],
+    }
+    set_active_operation(world, actor_id, operation)
+    return get_active_operation(world, actor_id)
+
+
 def format_operation_summary(operation: dict | None, actor_id: str | None = None) -> str:
     actor_name = actor_id or "?"
     if not isinstance(operation, dict):

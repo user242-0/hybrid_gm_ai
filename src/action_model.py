@@ -24,6 +24,11 @@ class ActionSpec:
     heart: Optional[Dict[str, Any]] = None  # {axis: "red"|"green"|"blue", value: 0-255}
     action_layer: Optional[str] = None
     interaction_scope: Optional[str] = None
+    starts_operation: bool = False
+    operation_type: Optional[str] = None
+    operation_label: Optional[str] = None
+    operation_phase: Optional[str] = None
+    operation_mini_goal: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         data = {
@@ -43,5 +48,10 @@ class ActionSpec:
             "heart": self.heart,
             "action_layer": self.action_layer,
             "interaction_scope": self.interaction_scope,
+            "starts_operation": self.starts_operation,
+            "operation_type": self.operation_type,
+            "operation_label": self.operation_label,
+            "operation_phase": self.operation_phase,
+            "operation_mini_goal": self.operation_mini_goal,
         }
         return {key: value for key, value in data.items() if value is not None}

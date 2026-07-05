@@ -451,6 +451,11 @@ def _spec_from_new(action_id: str, data: Dict[str, Any]) -> ActionSpec:
         heart=heart,
         action_layer=data.get("action_layer"),
         interaction_scope=data.get("interaction_scope"),
+        starts_operation=bool(data.get("starts_operation")),
+        operation_type=data.get("operation_type"),
+        operation_label=data.get("operation_label"),
+        operation_phase=data.get("operation_phase"),
+        operation_mini_goal=data.get("operation_mini_goal"),
     )
 
 
@@ -477,6 +482,11 @@ def _spec_from_legacy(action_id: str, data: Dict[str, Any]) -> ActionSpec:
         heart=heart,
         action_layer=data.get("action_layer"),
         interaction_scope=data.get("interaction_scope"),
+        starts_operation=bool(data.get("starts_operation")),
+        operation_type=data.get("operation_type"),
+        operation_label=data.get("operation_label"),
+        operation_phase=data.get("operation_phase"),
+        operation_mini_goal=data.get("operation_mini_goal"),
     )
 
 

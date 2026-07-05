@@ -8,6 +8,29 @@
 
 ---
 
+## 2026-07-05（Session52-B: HUD actionからOperationを1本だけ開始）
+
+### 今日やったこと
+
+- 刑事HUD action「聞き込みを始める」から inquiry Operation を開始できるようにした。
+- active_operationは actorごとに0..1で維持し、director_world["actor_operations"] に保存した。
+- Operation.MiniGoalとして「最初の証言を取る」を表示できるようにした。
+- 同じHUD actionを2回実行してもOperationが重複しないようにした。
+- required_discovery未達や他actorからの直接requestではOperationが開始しないことを確認した。
+- Operation開始後もGUI gatingに影響しないことをテストで固定した。
+- OperationによるHUD候補変化、自動phase進行、自動実行はまだ行っていない。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- Operationは、まずHUD actionから立つ文脈として扱えるようになった。
+- まだGUIアクションへコンパイルせず、Operation表示と保存だけに留めたことで、安全に縦切りできた。
+- GUI基礎動詞の補強は今後必要だが、Session52-Bではまだ扱わない方が安全。
+
+### 次回の最初の一手
+
+- Session52-Cとして、required_operation_typeでHUD候補に1条件だけ影響させる。
+
 ## 2026-07-05（Session52-A: active_operation保存・表示スケルトン）
 
 ### 今日やったこと

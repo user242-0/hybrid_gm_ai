@@ -6,7 +6,7 @@ from director.director import Director, load_yaml
 from director.registry import load_pack, extract_goals_from_pack
 
 from src.action_definitions import get_action_spec, get_action_specs
-from src.actor_operations import set_active_operation
+from src.actor_operations import get_active_operation, set_active_operation
 from src.actor_view_state import (
     get_actor_discoveries,
     get_actor_location,
@@ -164,6 +164,19 @@ def _refresh_action_labels(callbacks, ctx, hud):
     ctx.game_state["hud_cache_rev"] += 1
     callbacks.refresh_hud()
     return [label for _action_id, label, _minutes in hud.actions]
+
+
+def _request_start_inquiry_operation(director, world, ctx, actor_id):
+    get_action_specs(load_pack("cop_trickster"))
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    return pipeline.request_action(
+        "start_inquiry_operation",
+        actor_obj=ctx.game_state["party"][actor_id],
+        args=[],
+        source="HUD",
+    )
 
 
 def test_actions_list_populates():
@@ -1324,6 +1337,117 @@ def test_hud_action_of_other_actor_is_blocked():
     assert result is None
     assert "manifesto_note_left" not in get_actor_discoveries(world, trickster_id)
     assert world.get("trickster_heat") in (None, 0)
+
+
+def test_hud_action_starts_operation_once():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    inject_actor_discovery(world, cop_id, "camera_skew_noticed")
+
+    _request_start_inquiry_operation(director, world, ctx, cop_id)
+
+    operation = get_active_operation(world, cop_id)
+    assert operation is not None
+    assert operation["id"] == "op_inquiry_刑事"
+    assert operation["type"] == "inquiry"
+    assert operation["label"] == "聞き込みを始める"
+    assert operation["status"] == "active"
+    assert operation["phase"] == "start"
+    assert operation["actor_id"] == cop_id
+    assert operation["created_from"] == "HUD"
+    assert operation["mini_goal"]["label"] == "最初の証言を取る"
+    assert operation["notes"] == []
+
+
+def test_hud_action_starts_operation_idempotently():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    inject_actor_discovery(world, cop_id, "camera_skew_noticed")
+
+    _request_start_inquiry_operation(director, world, ctx, cop_id)
+    first_operation = copy.deepcopy(get_active_operation(world, cop_id))
+    _request_start_inquiry_operation(director, world, ctx, cop_id)
+
+    assert get_active_operation(world, cop_id) == first_operation
+    assert isinstance(world["actor_operations"][cop_id], dict)
+    assert "operations" not in world["actor_operations"][cop_id]
+    assert "suspended_operations" not in world["actor_operations"][cop_id]
+
+
+def test_hud_action_does_not_start_operation_without_required_discovery():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    director.set_actor_mode(world, cop_id, "WITNESS")
+
+    result = _request_start_inquiry_operation(director, world, ctx, cop_id)
+
+    assert result is None
+    assert get_active_operation(world, cop_id) is None
+    assert "camera_skew_noticed" not in get_actor_discoveries(world, cop_id)
+
+
+def test_other_actor_cannot_start_detective_operation():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("愉快犯")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    trickster_id = pack["roles"]["antagonist"]["name"]
+    director.set_actor_mode(world, trickster_id, "FLEE")
+    inject_actor_discovery(world, trickster_id, "camera_skew_noticed")
+
+    result = _request_start_inquiry_operation(director, world, ctx, trickster_id)
+
+    assert result is None
+    assert get_active_operation(world, trickster_id) is None
+    assert get_active_operation(world, cop_id) is None
+
+
+def test_started_operation_does_not_change_gui_gating():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    inject_actor_discovery(world, cop_id, "camera_skew_noticed")
+
+    before = {
+        choice.action_key
+        for choice in get_available_choices(ctx.game_state["party"][cop_id], ctx.game_state)
+    }
+    _request_start_inquiry_operation(director, world, ctx, cop_id)
+    after = {
+        choice.action_key
+        for choice in get_available_choices(ctx.game_state["party"][cop_id], ctx.game_state)
+    }
+
+    assert get_active_operation(world, cop_id)["type"] == "inquiry"
+    assert after == before
+
+
+def test_save_load_preserves_hud_started_operation(monkeypatch):
+    pack, director, world, callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    saved = {}
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    callbacks._save_director_world = lambda value: saved.update(copy.deepcopy(value))
+    callbacks._load_director_world = lambda _fallback: copy.deepcopy(saved)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    inject_actor_discovery(world, cop_id, "camera_skew_noticed")
+    _request_start_inquiry_operation(director, world, ctx, cop_id)
+
+    callbacks.on_save()
+    world["actor_operations"][cop_id]["active_operation"] = None
+    callbacks.on_load()
+
+    operation = get_active_operation(ctx.director_world, cop_id)
+    assert operation["type"] == "inquiry"
+    assert operation["label"] == "聞き込みを始める"
+    assert operation["mini_goal"]["label"] == "最初の証言を取る"
 
 
 def test_actor_view_state_survives_yaml_roundtrip():

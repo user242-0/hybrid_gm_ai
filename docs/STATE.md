@@ -79,6 +79,16 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session52-B: HUD actionからOperationを1本だけ開始
+
+- 刑事HUD action「聞き込みを始める」から inquiry Operation を開始できるようにした。
+- Operationは director_world["actor_operations"][actor_id]["active_operation"] に保存される。
+- Operation.MiniGoalとして「最初の証言を取る」を持つ。
+- 同じHUD actionを2回実行してもOperationが重複しない。
+- required_discovery未達や他actorからの直接requestではOperationが開始しない。
+- Operation開始後もGUI gatingには影響しないことをテストで固定した。
+- OperationによるHUD候補変化、required_operation_type、MicroGoal上書き、自動phase進行、自動実行はまだ未実装。
+
 ### Session52-A: active_operation保存・表示スケルトン
 
 - actorごとにactive_operationを0..1で持てるようにした。
@@ -270,11 +280,11 @@ current_target と narrative_targetの違い：
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. Session52-B: HUD actionからOperationを1本だけ開始する。
+1. Session52-C: required_operation_typeでHUD候補に1条件だけ影響させる。
 
-2. starts_operation / operation_type をActionSpecまたはpack action経路に最小接続する。
+2. inquiry Operation中だけ出るHUD候補を1件追加する。
 
-3. 同じHUD actionを2回実行してもactive_operationが重複しないことをテストする。
+3. GUI基礎動詞補強はSession53以降に回す。
 
 
 ## 5. ブロッカー（止まってる理由があれば）
