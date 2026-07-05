@@ -6,6 +6,7 @@ from director.director import Director, load_yaml
 from director.registry import load_pack, extract_goals_from_pack
 
 from src.action_definitions import get_action_spec, get_action_specs
+from src.actor_operations import set_active_operation
 from src.actor_view_state import (
     get_actor_discoveries,
     get_actor_location,
@@ -34,6 +35,7 @@ class RecordingHUD:
         self.actions = []
         self.actor_mode = None
         self.microgoal = None
+        self.operation_summary = None
         self.location = None
         self.discovery_options = []
 
@@ -63,6 +65,9 @@ class RecordingHUD:
 
     def set_microgoal(self, text):
         self.microgoal = text
+
+    def set_operation_summary(self, text):
+        self.operation_summary = text
 
     def set_discovery_options(self, options):
         self.discovery_options = list(options)
@@ -715,6 +720,157 @@ def test_actor_modes_survive_hud_save_load_roundtrip(monkeypatch):
     assert ctx.director_world["actor_modes"]["刑事"] == "PURSUE"
     assert ctx.director_world["actor_micro_goals"]["刑事"]["text"] == cop_micro
     assert hud.actor_mode == ("刑事", "PURSUE")
+
+
+def test_save_load_preserves_active_operation(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    cop_id = pack["roles"]["protagonist"]["name"]
+    trickster_id = pack["roles"]["antagonist"]["name"]
+    operation = {
+        "id": "op_debug_detective_inquiry",
+        "type": "inquiry",
+        "label": "聞き込みを始める",
+        "status": "active",
+        "phase": "start",
+        "actor_id": cop_id,
+        "target_id": trickster_id,
+        "mini_goal": {
+            "id": "mini_goal_first_lead",
+            "label": "最初の手がかりを確認する",
+            "status": "active",
+        },
+        "notes": [],
+    }
+    set_active_operation(world, cop_id, operation)
+    saved = {}
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, cop_id)
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    callbacks._save_director_world = lambda value: saved.update(copy.deepcopy(value))
+    callbacks._load_director_world = lambda _fallback: copy.deepcopy(saved)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.on_save()
+    world["actor_operations"][cop_id]["active_operation"] = None
+    callbacks.on_load()
+
+    loaded_operation = ctx.director_world["actor_operations"][cop_id]["active_operation"]
+    assert loaded_operation["id"] == "op_debug_detective_inquiry"
+    assert loaded_operation["phase"] == "start"
+    assert loaded_operation["mini_goal"]["id"] == "mini_goal_first_lead"
+    assert "聞き込みを始める / start" in hud.operation_summary
+    assert "最初の手がかりを確認する" in hud.operation_summary
+
+
+def test_switch_character_switches_operation_display(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    cop_id = pack["roles"]["protagonist"]["name"]
+    trickster_id = pack["roles"]["antagonist"]["name"]
+    set_active_operation(
+        world,
+        cop_id,
+        {
+            "id": "op_cop",
+            "type": "inquiry",
+            "label": "聞き込みを始める",
+            "status": "active",
+            "phase": "start",
+            "actor_id": cop_id,
+            "target_id": trickster_id,
+            "mini_goal": {"id": "mini_cop", "label": "最初の手がかりを確認する"},
+            "notes": [],
+        },
+    )
+    set_active_operation(
+        world,
+        trickster_id,
+        {
+            "id": "op_trickster",
+            "type": "mislead",
+            "label": "痕跡をずらす",
+            "status": "active",
+            "phase": "seed",
+            "actor_id": trickster_id,
+            "target_id": cop_id,
+            "mini_goal": {"id": "mini_trickster", "label": "偽の手がかりを置く"},
+            "notes": [],
+        },
+    )
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, cop_id)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+    assert f"Operation({cop_id}): 聞き込みを始める / start" in hud.operation_summary
+    assert "MiniGoal: 最初の手がかりを確認する" in hud.operation_summary
+
+    ctx.game_state["active_char"] = SimpleNamespace(name=trickster_id)
+    callbacks.refresh_hud()
+
+    assert f"Operation({trickster_id}): 痕跡をずらす / seed" in hud.operation_summary
+    assert "MiniGoal: 偽の手がかりを置く" in hud.operation_summary
+
+
+def test_hud_operation_display_is_actor_scoped(monkeypatch):
+    pack = load_pack("cop_trickster")
+    premise = load_yaml("data/director/premise.yml").get("premise", {})
+    director = Director(
+        premise=premise,
+        goals_dict=extract_goals_from_pack(pack),
+    )
+    world = apply_world_defaults(director.synthesize_world(), pack)
+    cop_id = pack["roles"]["protagonist"]["name"]
+    trickster_id = pack["roles"]["antagonist"]["name"]
+    set_active_operation(
+        world,
+        cop_id,
+        {
+            "id": "op_cop",
+            "type": "inquiry",
+            "label": "聞き込みを始める",
+            "status": "active",
+            "phase": "start",
+            "actor_id": cop_id,
+            "target_id": trickster_id,
+            "mini_goal": {"id": "mini_cop", "label": "最初の手がかりを確認する"},
+            "notes": [],
+        },
+    )
+    callbacks, ctx, hud = make_hud_callbacks(director, world, pack, cop_id)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+    assert "聞き込みを始める" in hud.operation_summary
+    assert "最初の手がかりを確認する" in hud.operation_summary
+
+    ctx.game_state["active_char"] = SimpleNamespace(name=trickster_id)
+    callbacks.refresh_hud()
+
+    assert hud.operation_summary == f"Operation({trickster_id}): なし"
+    assert trickster_id not in world["actor_operations"]
+    assert "聞き込みを始める" not in (hud.microgoal or "")
 
 
 def test_hud_microgoal_switches_with_active_actor_and_restores_previous_goal(monkeypatch):

@@ -14,6 +14,34 @@ def test_pack_world_defaults_merge():
     assert merged["harm"]["threshold_warn"] == defaults["harm"]["threshold_warn"]
 
 
+def test_world_defaults_preserve_actor_operations():
+    pack = {
+        "world_defaults": {
+            "actor_operations": {
+                "detective": {"active_operation": None},
+                "trickster": {"active_operation": None},
+            }
+        }
+    }
+    operation = {
+        "id": "op_debug_detective_inquiry",
+        "type": "inquiry",
+        "label": "聞き込みを始める",
+        "status": "active",
+        "phase": "start",
+        "mini_goal": {
+            "id": "mini_goal_first_lead",
+            "label": "最初の手がかりを確認する",
+        },
+    }
+    world = {"actor_operations": {"detective": {"active_operation": operation}}}
+
+    merged = apply_world_defaults(world, pack)
+
+    assert merged["actor_operations"]["detective"]["active_operation"] == operation
+    assert merged["actor_operations"]["trickster"]["active_operation"] is None
+
+
 def test_execute_action_applies_effects():
     world = {"sobriety_days": 0, "evidence_score": 0, "entropy": {"value": 0}}
     execute_action(world, "limit_drink")

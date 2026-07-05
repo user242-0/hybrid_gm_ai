@@ -79,6 +79,16 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session52-A: active_operation保存・表示スケルトン
+
+- actorごとにactive_operationを0..1で持てるようにした。
+- 保存先は director_world["actor_operations"]。
+- OperationはYAML safe_dump / safe_load、HUD save/loadで残る。
+- world_defaults適用時に actor_operations が上書きされないよう preserve対象に追加した。
+- HUDにactive actorのOperation / MiniGoalをread-only表示するようにした。
+- switch_characterでOperation表示がactive actorに追従する。
+- OperationはGUI gatingに一切影響しないことをテストで固定した。
+- HUD actionからOperation開始、starts_operation、required_operation_type、Operationによる候補変化、自動phase進行、自動実行はまだ未実装。
 
 ### Session52-0: Operation前提修理
 
@@ -260,11 +270,11 @@ current_target と narrative_targetの違い：
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. Session52: active_operation の最小スケルトンを実装する。
+1. Session52-B: HUD actionからOperationを1本だけ開始する。
 
-2. actor_operations の保存・YAML roundtrip・HUD save/loadをテストする。
+2. starts_operation / operation_type をActionSpecまたはpack action経路に最小接続する。
 
-3. OperationはGUI gatingを変えないことを回帰テストで固定する。
+3. 同じHUD actionを2回実行してもactive_operationが重複しないことをテストする。
 
 
 ## 5. ブロッカー（止まってる理由があれば）

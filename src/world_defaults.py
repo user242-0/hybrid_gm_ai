@@ -10,6 +10,7 @@ _PRESERVE_BASE_DICT_KEYS = {
     "actor_locations",
     "actor_micro_goals",
     "actor_modes",
+    "actor_operations",
 }
 
 

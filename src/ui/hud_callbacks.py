@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable
 
 from src.action_proposal.advisory_provider import get_advisory_display_items
+from src.actor_operations import format_operation_summary, get_active_operation
 from src.actor_view_state import (
     inject_actor_discovery,
     set_actor_location,
@@ -117,6 +118,9 @@ class HUDCallbacks:
             return
         if ctx.director_world is None:
             ctx.director_hud.set_progress(None)
+            set_operation_summary = getattr(ctx.director_hud, "set_operation_summary", None)
+            if callable(set_operation_summary):
+                set_operation_summary(None)
             ctx.director_hud.set_recommended(None, enabled=False)
             ctx.director_hud.set_actions([])
             ctx.director_hud.set_advisory_items([])
@@ -135,6 +139,10 @@ class HUDCallbacks:
 
         actor_id, action_mode = self._active_actor_mode()
         sync_actor_view_to_legacy(ctx.director_world, ctx.game_state, actor_id)
+        set_operation_summary = getattr(ctx.director_hud, "set_operation_summary", None)
+        if callable(set_operation_summary):
+            operation = get_active_operation(ctx.director_world, actor_id)
+            set_operation_summary(format_operation_summary(operation, actor_id))
         set_actor_modes = getattr(ctx.director_hud, "set_actor_modes", None)
         available_actor_modes = getattr(ctx.director, "available_actor_modes", None)
         if callable(set_actor_modes) and callable(available_actor_modes):

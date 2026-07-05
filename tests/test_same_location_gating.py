@@ -97,6 +97,35 @@ def test_direct_gui_actions_are_available_for_colocated_current_target():
     assert DIRECT_ACTIONS <= action_ids
 
 
+def test_operation_does_not_change_gui_gating():
+    actor, _target, game_state = _state("station", "alley")
+    without_operation = _choice_ids(actor, game_state)
+
+    world = game_state["director_world"]
+    world["actor_operations"] = {
+        actor.name: {
+            "active_operation": {
+                "id": "op_debug_detective_inquiry",
+                "type": "inquiry",
+                "label": "聞き込みを始める",
+                "status": "active",
+                "phase": "start",
+                "actor_id": actor.name,
+                "target_id": "諢牙ｿｫ迥ｯ",
+                "mini_goal": {
+                    "id": "mini_goal_first_lead",
+                    "label": "最初の手がかりを確認する",
+                    "status": "active",
+                },
+                "notes": [],
+            }
+        }
+    }
+    with_operation = _choice_ids(actor, game_state)
+
+    assert with_operation == without_operation
+
+
 def test_action_pipeline_blocks_direct_action_for_remote_explicit_target():
     actor, _target, game_state = _state("警察署_控室", "事件現場_路地裏")
     pipeline = ActionPipeline(game_state=game_state)

@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-07-05（Session52-A: active_operation保存・表示スケルトン）
+
+### 今日やったこと
+
+- actorごとにactive_operationを0..1で持てる最小スケルトンを実装した。
+- `director_world["actor_operations"]` にOperationを保存する方針にした。
+- OperationはYAML roundtrip / HUD save-loadで残るようにした。
+- `world_defaults` 適用時に `actor_operations` が潰れないようにした。
+- Director HUDにactive actorのOperation / MiniGoalをread-only表示した。
+- switch_characterでOperation表示がactive actorに追従するようにした。
+- OperationがGUI gatingに影響しないことをテストで固定した。
+- HUD actionからOperation開始、自動phase進行、自動実行はまだ行っていない。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- Operationは最初から実行単位にせず、保存される文脈として置くだけでも大きな一歩。
+- GUIアクションの厳格判定を守ったまま、Operation表示だけを足すことで安全に足場を作れた。
+- 次はHUD actionからOperationを1本だけ開始する縦切りに進める。
+
+### 次回の最初の一手
+
+- Session52-Bとして、HUD actionからOperationを1本だけ開始する。
+
 ## 2026-07-02（Session52-0: Operation前提修理）
 
 ### 今日やったこと
