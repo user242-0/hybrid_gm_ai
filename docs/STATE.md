@@ -79,6 +79,15 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session52-C: required_operation_type によるHUD候補の最小接続
+
+- `required_operation_type: inquiry` を導入し、inquiry Operation中だけ「聞き込み先を一件選ぶ」が出るようにした。
+- 「聞き込みを始める」は既存挙動として、刑事 + PURSUE/WITNESS + camera_skew_noticed でHUD候補に出て、実行すると inquiry Operation を開始する。
+- Operationが無い時、他actorのOperationしか無い時、statusがactive以外の時はOperation依存候補が出ない。
+- Operation依存候補も実行時gateで再チェックされる。
+- OperationはHUD候補に1条件だけ影響するが、GUI候補には影響しない。
+- phase自動進行 / 自動実行 / MicroGoal上書き / GUI Action Compile / RO接続はまだ未実装。
+
 ### Session52-B: HUD actionからOperationを1本だけ開始
 
 - 刑事HUD action「聞き込みを始める」から inquiry Operation を開始できるようにした。
@@ -280,11 +289,9 @@ current_target と narrative_targetの違い：
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. Session52-C: required_operation_typeでHUD候補に1条件だけ影響させる。
-
-2. inquiry Operation中だけ出るHUD候補を1件追加する。
-
-3. GUI基礎動詞補強はSession53以降に回す。
+1. Session53: Operationを支えるGUI基礎動詞補強を検討する。
+2. actor_location runtime移動経路を整理し、移動系GUI/HUD actionが actor_locations を正しく更新するようにする。
+3. Operation.MiniGoalをphase進行に接続するのは、GUI基礎動詞補強後に検討する。
 
 
 ## 5. ブロッカー（止まってる理由があれば）

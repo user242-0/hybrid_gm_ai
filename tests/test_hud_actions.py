@@ -179,6 +179,26 @@ def _request_start_inquiry_operation(director, world, ctx, actor_id):
     )
 
 
+def _active_inquiry_operation(actor_id, *, status="active"):
+    return {
+        "id": f"op_inquiry_{actor_id}",
+        "type": "inquiry",
+        "label": "聞き込みを始める",
+        "status": status,
+        "phase": "start",
+        "actor_id": actor_id,
+        "target_id": None,
+        "parent_microgoal_id": None,
+        "created_from": "test",
+        "mini_goal": {
+            "id": "mini_goal_first_testimony",
+            "label": "最初の証言を取る",
+            "status": "active",
+        },
+        "notes": [],
+    }
+
+
 def test_actions_list_populates():
     premise = load_yaml("data/director/premise.yml").get("premise", {})
     goals = extract_goals_from_pack(load_pack("cop_trickster"))
@@ -1337,6 +1357,129 @@ def test_hud_action_of_other_actor_is_blocked():
     assert result is None
     assert "manifesto_note_left" not in get_actor_discoveries(world, trickster_id)
     assert world.get("trickster_heat") in (None, 0)
+
+
+def test_start_inquiry_operation_still_appears_and_starts_operation(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    inject_actor_discovery(world, cop_id, "camera_skew_noticed")
+
+    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+    _request_start_inquiry_operation(director, world, ctx, cop_id)
+
+    assert "start_inquiry_operation" in hud_action_ids
+    assert get_active_operation(world, cop_id)["type"] == "inquiry"
+
+
+def test_operation_required_candidate_hidden_without_operation(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    inject_actor_discovery(world, cop_id, "camera_skew_noticed")
+
+    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert "choose_first_inquiry_target" not in hud_action_ids
+
+
+def test_operation_required_candidate_shown_during_inquiry(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+
+    hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert "choose_first_inquiry_target" in hud_action_ids
+
+
+def test_operation_required_candidate_uses_active_actor_operation_only(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    trickster_id = pack["roles"]["antagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    director.set_actor_mode(world, trickster_id, "FLEE")
+    set_active_operation(world, trickster_id, _active_inquiry_operation(trickster_id))
+
+    cop_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    ctx.game_state["active_char"] = SimpleNamespace(name=trickster_id)
+    ctx.game_state["current_target"] = cop_id
+    trickster_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert "choose_first_inquiry_target" not in cop_action_ids
+    assert "choose_first_inquiry_target" not in trickster_action_ids
+
+
+def test_operation_required_candidate_hidden_when_operation_not_active(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, cop_id, "PURSUE")
+
+    for status in ("completed", "suspended"):
+        set_active_operation(world, cop_id, _active_inquiry_operation(cop_id, status=status))
+        hud_action_ids = _refresh_action_ids(callbacks, ctx, hud)
+        assert "choose_first_inquiry_target" not in hud_action_ids
+
+
+def test_required_operation_type_does_not_change_gui_gating():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    director.set_actor_mode(world, cop_id, "PURSUE")
+
+    without_operation = {
+        choice.action_key
+        for choice in get_available_choices(ctx.game_state["party"][cop_id], ctx.game_state)
+    }
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    with_operation = {
+        choice.action_key
+        for choice in get_available_choices(ctx.game_state["party"][cop_id], ctx.game_state)
+    }
+
+    assert with_operation == without_operation
+
+
+def test_operation_required_hud_action_execution_rechecks_operation_type():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    result = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+    )
+
+    assert result is None
+    assert "inquiry_target_chosen" not in get_actor_discoveries(world, cop_id)
+    assert world.get("investigation_progress") in (None, 0)
 
 
 def test_hud_action_starts_operation_once():

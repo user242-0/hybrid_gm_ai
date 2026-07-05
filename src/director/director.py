@@ -8,6 +8,7 @@ import pathlib
 
 from logic.cond_eval import eval_cond, parse_cond, _get_path as get_path
 from logic.emotion_traits import derived_traits
+from src.actor_operations import get_active_operation
 
 
 LEGACY_MICRO_RULES: Dict[str, Dict[str, Any]] = {
@@ -763,6 +764,8 @@ class Director:
                 required_discoveries = [required_discoveries]
             if not all(discovery in discoveries for discovery in required_discoveries):
                 continue
+            if not self._passes_required_operation_type(candidate, world, actor_id):
+                continue
             scope = candidate.get("interaction_scope")
             if not self._passes_tpo_location_scope(actor_id, scope, world, game_state):
                 continue
@@ -827,9 +830,28 @@ class Director:
             required_discoveries = [required_discoveries]
         if not all(discovery in discoveries for discovery in required_discoveries):
             return False
+        if not self._passes_required_operation_type(matched_candidate, world, actor_id):
+            return False
 
         scope = matched_candidate.get("interaction_scope")
         return self._passes_tpo_location_scope(actor_id, scope, world, game_state)
+
+    def _passes_required_operation_type(
+        self,
+        candidate: Dict[str, Any],
+        world: Dict[str, Any],
+        actor_id: str,
+    ) -> bool:
+        required_type = candidate.get("required_operation_type")
+        if not required_type:
+            return True
+        operation = get_active_operation(world, actor_id)
+        if not isinstance(operation, dict):
+            return False
+        return (
+            operation.get("type") == required_type
+            and operation.get("status") == "active"
+        )
 
     def _actor_discoveries(self, world: Dict[str, Any], actor_id: str) -> List[str]:
         actor_discoveries = world.get("actor_discoveries")

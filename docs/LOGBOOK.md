@@ -8,6 +8,28 @@
 
 ---
 
+## 2026-07-05（Session52-C: required_operation_type によるHUD候補の最小接続）
+
+### 今日やったこと
+
+- `required_operation_type: inquiry` を導入し、inquiry Operation中だけ「聞き込み先を一件選ぶ」が出るようにした。
+- 「聞き込みを始める」は既存挙動として維持し、刑事 + PURSUE/WITNESS + camera_skew_noticed で inquiry Operation を開始できることを確認した。
+- Operationが無い時、他actorのOperationしか無い時、statusがactive以外の時はOperation依存候補が出ないことをテストした。
+- Operation依存候補も実行時gateを通るようにした。
+- OperationはHUD候補に1条件だけ影響するが、GUI候補には影響しないことを確認した。
+- phase自動進行、自動実行、MicroGoal上書き、GUI Action Compile、RO接続はまだ行っていない。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- Operationが初めてHUD候補の出方に影響した。
+- ただし影響は `required_operation_type` という1条件だけに絞ったため、GUIやMicroGoalを壊さずに縦切りできた。
+- 次に必要なのは、Operationを支えるGUI基礎動詞やactor_location更新経路の整理。
+
+### 次回の最初の一手
+
+- Session53として、Operationを支えるGUI基礎動詞補強とactor_location runtime移動経路を検討する。
+
 ## 2026-07-05（Session52-B: HUD actionからOperationを1本だけ開始）
 
 ### 今日やったこと
