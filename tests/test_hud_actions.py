@@ -1740,6 +1740,74 @@ def test_switch_character_reflects_actor_location_after_move(monkeypatch):
     assert hud.location == "酒場"
 
 
+
+def test_gui_switch_character_choice_passes_target_name():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    ctx.game_state["active_char"] = ctx.game_state["party"]["刑事"]
+    ctx.game_state["party"]["刑事"].is_active = True
+    ctx.game_state["party"]["愉快犯"].is_active = False
+    ctx.game_state["_switch_cooldown_disabled"] = True
+    pipeline = _move_pipeline(director, world, ctx)
+
+    switch_choice = next(
+        choice
+        for choice in _gui_choices(ctx, world, "刑事")
+        if choice.action_key == "switch_character"
+    )
+    args = choice_dispatch_args(switch_choice)
+    result = pipeline.request_action(
+        switch_choice.action_key,
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=args,
+        source="GUI",
+    )
+
+    assert switch_choice.params["target_name"] == "愉快犯"
+    assert args == ["愉快犯"]
+    assert result is ctx.game_state["party"]["刑事"]
+    assert ctx.game_state["active_char"].name == "愉快犯"
+    assert ctx.game_state["director_micro_goal_actor_id"] == "愉快犯"
+
+
+def test_gui_switch_character_after_move_still_works():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    set_actor_location(world, "刑事", "警察署_控室")
+    set_actor_location(world, "愉快犯", "駅裏")
+    ctx.game_state["active_char"] = ctx.game_state["party"]["刑事"]
+    ctx.game_state["party"]["刑事"].is_active = True
+    ctx.game_state["party"]["愉快犯"].is_active = False
+    ctx.game_state["_switch_cooldown_disabled"] = True
+    pipeline = _move_pipeline(director, world, ctx)
+
+    move_choice = next(
+        choice
+        for choice in _gui_choices(ctx, world, "刑事")
+        if choice.action_key == "move_to_location"
+        and choice.params.get("destination") == "酒場"
+    )
+    pipeline.request_action(
+        move_choice.action_key,
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=choice_dispatch_args(move_choice),
+        source="GUI",
+    )
+    switch_choice = next(
+        choice
+        for choice in _gui_choices(ctx, world, "刑事")
+        if choice.action_key == "switch_character"
+    )
+    pipeline.request_action(
+        switch_choice.action_key,
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=choice_dispatch_args(switch_choice),
+        source="GUI",
+    )
+
+    assert choice_dispatch_args(switch_choice) == ["愉快犯"]
+    assert ctx.game_state["active_char"].name == "愉快犯"
+    assert world["actor_locations"]["刑事"] == "酒場"
+    assert world["actor_locations"]["愉快犯"] == "駅裏"
+
 def test_invalid_gui_move_destination_is_rejected():
     _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
     set_actor_location(world, "刑事", "警察署_控室")

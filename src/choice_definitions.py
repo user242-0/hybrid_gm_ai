@@ -64,6 +64,16 @@ def get_available_choices(actor, game_state):
         # Choice インスタンスを生成（labelとaction_keyを分離）
         # actor_idをスナップショットして、実行時に使う
         actor_id = getattr(actor, "name", None)
+        params = {}
+        if action_id == "switch_character":
+            party = game_state.get("party", {})
+            if isinstance(party, dict):
+                for candidate_name, candidate in party.items():
+                    if candidate is actor or candidate_name == actor_id:
+                        continue
+                    params["target_name"] = candidate_name
+                    break
+
         choice = Choice(
             label=spec.label,
             action_key=action_id,  # 英語の内部ID
@@ -71,6 +81,7 @@ def get_available_choices(actor, game_state):
             emotion_value=emotion_value,
             requirement_keys=spec.requirements,
             actor_id=actor_id,
+            params=params,
         )
 
         # 実行条件を満たすか
@@ -106,6 +117,10 @@ def choice_dispatch_args(choice: Choice) -> list[str]:
         destination = params.get("destination")
         if isinstance(destination, str) and destination:
             return [destination]
+    if choice.action_key == "switch_character" and isinstance(params, dict):
+        target_name = params.get("target_name")
+        if isinstance(target_name, str) and target_name:
+            return [target_name]
     return []
 
 
