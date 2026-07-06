@@ -68,6 +68,7 @@ current_target と narrative_targetの違い：
 - hud.narrative_target = HUD候補生成上の物語対象
 - world.current_focus = 演出焦点
 
+- RC別 perceived_world / RC行動認知ループの将来設計は `general_documents/future_goals/gm_ai_rc_perception_loop_memo_260706.md` を参照。
 
 ## 1. すぐ動かす（入口コマンド）
 - Run:
