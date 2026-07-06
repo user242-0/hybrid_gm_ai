@@ -818,7 +818,6 @@ locations:
   available:
     - "拠点_安アパート"
     - "事件現場_路地裏"
-    - "情報源_夜の酒場"
     - "警察署_控室"
     - "酒場"
 location_graph:
@@ -985,10 +984,11 @@ affordances:
     - match:
         action: rest
         mode: FREEZE
-        location: "情報源_夜の酒場"
+        location: "酒場"
       label: "酒場から家に帰る"
     - match:
         action: rest
         mode: FREEZE
         location: "拠点_安アパート"
       label: "仮眠をとる"
+

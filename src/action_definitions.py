@@ -55,6 +55,19 @@ actions = {
         "heart": {"axis": "blue", "value": 100},
         "id_aliases": ["進む"],
     },
+    "move_to_location": {
+        "label": "移動する",
+        "description": "location_graphに従って指定ロケーションへ移動する。",
+        "function": None,
+        "args_template": ["<destination>"],
+        "action_layer": "GUI",
+        "interaction_scope": "location_graph",
+        "requirements": None,
+        "available_to": ["player", "npc"],
+        "ui_visible": False,
+        "heart": {"axis": "blue", "value": 100},
+        "id_aliases": [],
+    },
     "rest": {
         "label": "休む",
         "description": "体力やスタミナを回復する。",
@@ -540,3 +553,4 @@ def get_action_spec(action_id: str) -> ActionSpec | None:
 def get_action_def(action_id: str) -> Dict[str, Any]:
     spec = get_action_spec(action_id)
     return spec.to_dict() if spec else {}
+

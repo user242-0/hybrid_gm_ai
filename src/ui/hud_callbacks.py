@@ -269,26 +269,6 @@ class HUDCallbacks:
                     label_rules, mode=action_mode,
                 )
 
-            action_params = [None for _ in ctx.current_actions]
-            list_move_actions = getattr(ctx.director, "list_move_actions_for_actor", None)
-            if callable(list_move_actions):
-                try:
-                    move_records = list_move_actions(
-                        actor_id,
-                        world=ctx.director_world,
-                        game_state=ctx.game_state,
-                    )
-                except TypeError:
-                    move_records = []
-                for record in move_records:
-                    if not isinstance(record, dict):
-                        continue
-                    action_id = record.get("action") or record.get("id") or record.get("action_id")
-                    label = record.get("text") or record.get("label") or action_id
-                    if not action_id or not label:
-                        continue
-                    ctx.current_actions.append((action_id, label, None))
-                    action_params.append(record.get("params") if isinstance(record.get("params"), dict) else None)
 
             # Suppress recommended action if governed and not currently visible
             if rec_action and rec_action in governed:
@@ -307,7 +287,7 @@ class HUDCallbacks:
             if is_hud_debug_enabled():
                 print("[HUD_DEBUG] actions=", [aid for (aid, _, _) in ctx.current_actions])
             ctx.game_state["hud_cached_actions"] = ctx.current_actions.copy()
-            ctx.game_state["hud_cached_action_params"] = action_params
+            ctx.game_state["hud_cached_action_params"] = [None for _ in ctx.current_actions]
             ctx.game_state["hud_cached_actor_id"] = actor_id
             ctx.game_state["hud_cached_action_mode"] = action_mode
             ctx.game_state["hud_last_rendered_rev"] = cache_rev
@@ -744,3 +724,4 @@ class HUDCallbacks:
             if self.ctx.director_world:
                 flags = self.ctx.director_world.get("flags", {})
                 print(f"[HUD_DEBUG] world.flags={flags}")
+

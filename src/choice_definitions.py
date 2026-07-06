@@ -1,4 +1,5 @@
 from src.choice_model import Choice
+from src.location_graph import MOVE_ACTION_ID, list_move_actions
 
 import yaml
 import numpy as np
@@ -76,10 +77,39 @@ def get_available_choices(actor, game_state):
         if choice.is_available(checker):
             available.append(choice)
 
+    actor_id = getattr(actor, "name", None)
+    world = game_state.get("director_world")
+    if not isinstance(world, dict):
+        world = game_state.get("world")
+    for record in list_move_actions(world, game_state, actor_id):
+        params = record.get("params")
+        if not isinstance(params, dict):
+            continue
+        available.append(
+            Choice(
+                label=record.get("label") or "移動する",
+                action_key=MOVE_ACTION_ID,
+                emotion_axis="blue",
+                emotion_value=100,
+                requirement_keys=None,
+                actor_id=actor_id,
+                params=params,
+            )
+        )
+
     return available
 
-##以下、features.yaml,行動.yaml(W_action含む)を実装した時に追加
 
+def choice_dispatch_args(choice: Choice) -> list[str]:
+    params = getattr(choice, "params", None)
+    if choice.action_key == MOVE_ACTION_ID and isinstance(params, dict):
+        destination = params.get("destination")
+        if isinstance(destination, str) and destination:
+            return [destination]
+    return []
+
+
+##以下、features.yaml,行動.yaml(W_action含む)を実装した時に追加
 def load_features():
     y = yaml.safe_load((RULES_DIR / "features.yaml").read_text(encoding="utf-8"))
     return [f["id"] for f in y["features"]], y.get("rgb_mode", "floats_0_1")

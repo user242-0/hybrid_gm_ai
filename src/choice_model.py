@@ -31,7 +31,8 @@ class Choice:
         self.requirement_keys = self.requirements
 
         # Choice生成時のactor_idをスナップショット（実行時に使用）
-        self.actor_id = actor_id        
+        self.actor_id = actor_id
+        self.params = kwargs.get("params") or {}
 
     def get_emotion_color(self):
         """emotion_axis と emotion_value を使って RGB 色を返す（明度底上げ）"""

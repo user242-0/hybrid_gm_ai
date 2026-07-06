@@ -84,10 +84,11 @@ current_target と narrative_targetの違い：
 
 - `location_graph` v0 を導入した。
 - GUI基礎動詞 `move_to_location(destination)` を追加した。
-- Actions欄に「移動する：〇〇へ」が出るようになった。
+- `move_to_location(destination)` はHUD ActionsではなくGUIアクション欄に表示されるGUI基礎動詞として接続した。
+- 実行本体は `ActionPipeline` + `location_graph.py` に寄せ、GUI候補の `params.destination` を選択経路から保持して渡す。
 - 移動実行時に `director_world["actor_locations"][actor_id]` を更新し、active actor viewとして `game_state["current_location"]` も同期する。
 - 移動先は現在地の `location_graph.exits` と `allowed_actors` によって制限される。
-- 刑事の移動先には `酒場` を含めた。
+- `酒場` / `情報源_夜の酒場` のlocation重複を整理し、Session53-Aでは `酒場` に統一した。
 - `time_min` はedge metadataとして定義したが、まだ時計や時間stateは進めない。
 - 移動してもOperation / Operation.MiniGoal / MicroGoalは勝手に変わらない。
 - perceived_world本実装 / GUI Action Compile / 自動移動 / 経路探索 / 時間消費 / Operation phase進行はまだ未実装。

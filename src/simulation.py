@@ -22,7 +22,7 @@ from queue import Empty        # ← 追加
 from src.scheduler import Scheduler
 from src.world import init_world, world_tick
 from src.rc_ai import pick_action, select_action
-from src.choice_definitions import get_available_choices
+from src.choice_definitions import choice_dispatch_args, get_available_choices
 from src.utility.args_parser import parse_args
 from src.utility.config_loader import (
     job_root_from_cfg,
@@ -532,6 +532,7 @@ def player_loop(gs):
         # 数字入力なら Choice に変換
         # Choice生成時のactor_idを使用（キャラ切替されても正しいactorで実行）
         choice_actor = None
+        selected_choice_args = None
         if cmd.isdigit():
             idx = int(cmd)
             if idx in num_choice_map:
@@ -541,6 +542,7 @@ def player_loop(gs):
                     choice_actor = gs["party"].get(selected_choice.actor_id)
                 # action_key と対象キャラ名を組み合わせて文字列化
                 cmd = selected_choice.action_key
+                selected_choice_args = choice_dispatch_args(selected_choice)
                 if selected_choice.action_key == "switch_character":
                     # シンプルに Actor 以外の最初のキャラをターゲット
                     exec_actor = choice_actor or actor
@@ -560,7 +562,7 @@ def player_loop(gs):
             time.sleep(0.01)
             continue
         action_id = parts[0]
-        args = parts[1:]
+        args = selected_choice_args if selected_choice_args is not None else parts[1:]
         result = dispatch_action(
             action_id,
             actor_obj=exec_actor,
@@ -616,3 +618,4 @@ if __name__ == "__main__":
             time.sleep(0.01)
     except SystemExit:
         pass
+
