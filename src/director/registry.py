@@ -38,6 +38,8 @@ def extract_goals_from_pack(pack_data: dict) -> dict:
         goals["hud_actions"] = pack_data["hud_actions"]
     if pack_data.get("actor_discovery_catalog"):
         goals["actor_discovery_catalog"] = pack_data["actor_discovery_catalog"]
+    if pack_data.get("location_graph"):
+        goals["location_graph"] = pack_data["location_graph"]
     return goals
 
 

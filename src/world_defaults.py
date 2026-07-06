@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from src.location_graph import install_location_graph_default
+
 
 _PRESERVE_BASE_DICT_KEYS = {
     "actor_discoveries",
@@ -38,6 +40,7 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
 def apply_world_defaults(world: Dict[str, Any], pack: Dict[str, Any] | None) -> Dict[str, Any]:
     if not isinstance(pack, dict):
         return world
+    install_location_graph_default(world, pack)
     defaults = pack.get("world_defaults")
     if not isinstance(defaults, dict):
         return world

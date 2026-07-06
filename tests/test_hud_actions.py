@@ -603,12 +603,15 @@ def test_refresh_hud_uses_active_actor_mode_independently_of_director_mode(monke
     callbacks.refresh_hud()
     trickster_action_ids = {action_id for action_id, _label, _minutes in hud.actions}
 
-    assert cop_action_ids == {"collect_fiber", "fix_cam_clock", "call_partner"}
+    assert {"collect_fiber", "fix_cam_clock", "call_partner"} <= cop_action_ids
+    assert "move_to_location" in cop_action_ids
     assert {
         "change_hideout",
         "move_low_profile",
     } <= trickster_action_ids
-    assert cop_action_ids.isdisjoint(trickster_action_ids)
+    assert (cop_action_ids - {"move_to_location"}).isdisjoint(
+        trickster_action_ids - {"move_to_location"}
+    )
 
 
 def test_refresh_hud_falls_back_to_director_mode_without_actor_modes(monkeypatch):
@@ -706,12 +709,9 @@ def test_actor_mode_dropdown_updates_world_cache_and_actions(monkeypatch):
     )
 
     callbacks.refresh_hud()
-    assert {
-        action_id for action_id, _label, _minutes in hud.actions
-    } == {
-        "change_hideout",
-        "move_low_profile",
-    }
+    action_ids = {action_id for action_id, _label, _minutes in hud.actions}
+    assert {"change_hideout", "move_low_profile"} <= action_ids
+    assert "move_to_location" in action_ids
     rev_before = ctx.game_state["hud_cache_rev"]
 
     callbacks.on_actor_mode_dropdown("MISLEAD")
@@ -719,7 +719,11 @@ def test_actor_mode_dropdown_updates_world_cache_and_actions(monkeypatch):
     assert world["actor_modes"]["愉快犯"] == "MISLEAD"
     assert ctx.game_state["hud_cache_rev"] == rev_before + 1
     assert hud.actor_mode == ("愉快犯", "MISLEAD")
-    assert hud.actions == []
+    non_move_actions = [
+        action for action in hud.actions if action[0] != "move_to_location"
+    ]
+    assert non_move_actions == []
+    assert any(action_id == "move_to_location" for action_id, _label, _minutes in hud.actions)
 
 
 def test_actor_modes_survive_hud_save_load_roundtrip(monkeypatch):
@@ -1121,9 +1125,7 @@ def test_refresh_hud_shows_basic_trickster_actions_when_governed_actions_are_hid
     callbacks.refresh_hud()
 
     visible_ids = {action_id for action_id, _label, _minutes in hud.actions}
-    assert visible_ids == {
-        "change_hideout",
-    }
+    assert {"change_hideout", "move_to_location"} <= visible_ids
     assert ctx.current_actions == hud.actions
 
 
@@ -1622,3 +1624,183 @@ def test_unknown_actor_falls_back_to_current_mode_actions():
     expected = director.list_actions_for_mode("PURSUE")
 
     assert director.list_actions_for_actor("Unknown", "PURSUE") == expected
+
+
+
+def _move_pipeline(director, world, ctx):
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    return ActionPipeline(game_state=ctx.game_state, director=director)
+
+
+def test_move_actions_appear_from_location_graph(monkeypatch):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    set_actor_location(world, "刑事", "警察署_控室")
+
+    labels = _refresh_action_labels(callbacks, ctx, hud)
+
+    assert "移動する：事件現場_路地裏へ" in labels
+    assert "移動する：酒場へ" in labels
+
+
+def test_move_actions_respect_allowed_actors(monkeypatch):
+    _pack, _director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    set_actor_location(world, "刑事", "事件現場_路地裏")
+    set_actor_location(world, "愉快犯", "事件現場_路地裏")
+
+    cop_labels = _refresh_action_labels(callbacks, ctx, hud)
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    trickster_labels = _refresh_action_labels(callbacks, ctx, hud)
+
+    assert "移動する：駅裏へ" not in cop_labels
+    assert "移動する：駅裏へ" in trickster_labels
+    assert "移動する：高架下へ" in trickster_labels
+
+
+def test_move_action_updates_active_actor_location():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    pipeline = _move_pipeline(director, world, ctx)
+
+    result = pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["酒場"],
+        source="HUD",
+    )
+
+    assert result is not None
+    assert world["actor_locations"]["刑事"] == "酒場"
+    assert ctx.game_state["current_location"] == "酒場"
+
+
+def test_move_action_does_not_change_other_actor_location():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    set_actor_location(world, "刑事", "警察署_控室")
+    set_actor_location(world, "愉快犯", "駅裏")
+    pipeline = _move_pipeline(director, world, ctx)
+
+    pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["酒場"],
+        source="HUD",
+    )
+
+    assert world["actor_locations"]["刑事"] == "酒場"
+    assert world["actor_locations"]["愉快犯"] == "駅裏"
+
+
+def test_switch_character_reflects_actor_location_after_move(monkeypatch):
+    _pack, _director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    set_actor_location(world, "刑事", "酒場")
+    set_actor_location(world, "愉快犯", "駅裏")
+
+    callbacks.refresh_hud()
+    assert ctx.game_state["current_location"] == "酒場"
+    assert hud.location == "酒場"
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    _refresh_action_ids(callbacks, ctx, hud)
+    assert ctx.game_state["current_location"] == "駅裏"
+    assert hud.location == "駅裏"
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="刑事")
+    _refresh_action_ids(callbacks, ctx, hud)
+    assert ctx.game_state["current_location"] == "酒場"
+    assert hud.location == "酒場"
+
+
+def test_move_action_rejects_unreachable_destination():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    set_actor_location(world, "刑事", "警察署_控室")
+    sync_actor_view_to_legacy(world, ctx.game_state, "刑事")
+    pipeline = _move_pipeline(director, world, ctx)
+
+    result = pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["駅裏"],
+        source="HUD",
+    )
+
+    assert result is None
+    assert world["actor_locations"]["刑事"] == "警察署_控室"
+    assert ctx.game_state["current_location"] == "警察署_控室"
+
+
+def test_move_action_does_not_advance_operation_or_microgoal():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    operation = _active_inquiry_operation("刑事")
+    set_active_operation(world, "刑事", operation)
+    world["actor_micro_goals"] = {
+        "刑事": {
+            "text": "existing_micro_goal",
+            "mode": "PURSUE",
+            "baseline": {"evidence_score": 0},
+            "id": "micro_existing",
+        }
+    }
+    operation_before = copy.deepcopy(get_active_operation(world, "刑事"))
+    micro_before = copy.deepcopy(world["actor_micro_goals"])
+    pipeline = _move_pipeline(director, world, ctx)
+
+    pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["酒場"],
+        source="HUD",
+    )
+
+    assert get_active_operation(world, "刑事") == operation_before
+    assert world["actor_micro_goals"] == micro_before
+
+
+def test_move_action_does_not_advance_time_yet():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    before = {
+        key: copy.deepcopy(world.get(key))
+        for key in ("clock", "clock_min", "t_min", "world_time", "elapsed_time")
+        if key in world
+    }
+    pipeline = _move_pipeline(director, world, ctx)
+
+    pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["酒場"],
+        source="HUD",
+    )
+
+    after = {key: copy.deepcopy(world.get(key)) for key in before}
+    assert after == before
+
+
+def test_move_action_preserves_same_location_gating():
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    set_actor_location(world, "刑事", "警察署_控室")
+    set_actor_location(world, "愉快犯", "酒場")
+    sync_actor_view_to_legacy(world, ctx.game_state, "刑事")
+    cop = ctx.game_state["party"]["刑事"]
+    trickster = ctx.game_state["party"]["愉快犯"]
+    cop.location = "警察署_控室"
+    trickster.location = "酒場"
+
+    before = {choice.action_key for choice in get_available_choices(cop, ctx.game_state)}
+    pipeline = _move_pipeline(director, world, ctx)
+    pipeline.request_action("move_to_location", actor_obj=cop, args=["酒場"], source="HUD")
+    after = {choice.action_key for choice in get_available_choices(cop, ctx.game_state)}
+
+    assert DIRECT_GUI_ACTIONS.isdisjoint(before)
+    assert DIRECT_GUI_ACTIONS <= after

@@ -7,6 +7,7 @@ from pathlib import Path
 from src import action_registry
 from src.action_definitions import actions as legacy_actions, get_action_spec
 from src.actor_operations import start_operation_once
+from src.location_graph import MOVE_ACTION_ID, move_to_location
 from src.requirements_checker import RequirementsChecker
 from src.simulation_utils import add_minutes, ensure_clock
 from src.world import world_tick
@@ -326,6 +327,19 @@ class ActionPipeline:
             else:
                 emotion_before = world.get("emotion", {}).copy() if isinstance(world.get("emotion"), dict) else {}
 
+        if action_id == MOVE_ACTION_ID:
+            actor_id = self._resolve_actor_id(actor_obj)
+            destination = arg_list[0] if arg_list and isinstance(arg_list[0], str) else None
+            ok, move_result = move_to_location(world, self.game_state, actor_id, destination)
+            if not ok:
+                print(f"[ActionPipeline] move_to_location rejected: {move_result.get('error')}")
+                return None
+            if actor_obj is not None and hasattr(actor_obj, "location"):
+                actor_obj.location = destination
+            self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
+            if self.ui_refresh is not None:
+                self.ui_refresh()
+            return move_result
         if action_id in legacy_actions and actor_obj is not None:
             if spec and spec.requirements:
                 checker = RequirementsChecker(self.game_state, actor_obj)

@@ -80,6 +80,18 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session53-A: GUI基礎動詞「移動する」縦切り
+
+- `location_graph` v0 を導入した。
+- GUI基礎動詞 `move_to_location(destination)` を追加した。
+- Actions欄に「移動する：〇〇へ」が出るようになった。
+- 移動実行時に `director_world["actor_locations"][actor_id]` を更新し、active actor viewとして `game_state["current_location"]` も同期する。
+- 移動先は現在地の `location_graph.exits` と `allowed_actors` によって制限される。
+- 刑事の移動先には `酒場` を含めた。
+- `time_min` はedge metadataとして定義したが、まだ時計や時間stateは進めない。
+- 移動してもOperation / Operation.MiniGoal / MicroGoalは勝手に変わらない。
+- perceived_world本実装 / GUI Action Compile / 自動移動 / 経路探索 / 時間消費 / Operation phase進行はまだ未実装。
+
 ### Session52-C: required_operation_type によるHUD候補の最小接続
 
 - `required_operation_type: inquiry` を導入し、inquiry Operation中だけ「聞き込み先を一件選ぶ」が出るようにした。
@@ -290,9 +302,10 @@ current_target と narrative_targetの違い：
 ## 4. 次にやること（最大3つ・小さく）
 ### 次の優先タスク
 
-1. Session53: Operationを支えるGUI基礎動詞補強を検討する。
-2. actor_location runtime移動経路を整理し、移動系GUI/HUD actionが actor_locations を正しく更新するようにする。
-3. Operation.MiniGoalをphase進行に接続するのは、GUI基礎動詞補強後に検討する。
+1. Session53-B: 移動結果とOperation中HUD候補の接続を検討する。
+2. 「聞き込み先を一件選ぶ」から、候補locationやsuggested destinationを出す最小実装を検討する。
+3. 時間消費は `location_graph.edge.time_min` を使って後続Sessionで導入する。
+4. Session54では、actor_locations / discoveries / active_operation を材料に RC別 perceived_world v0 を作る。
 
 
 ## 5. ブロッカー（止まってる理由があれば）

@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-07-06（Session53-A: GUI基礎動詞「移動する」縦切り）
+
+### 今日やったこと
+
+- `location_graph` v0 を導入した。
+- GUI基礎動詞 `move_to_location(destination)` を追加した。
+- Actions欄に「移動する：〇〇へ」が出るようにした。
+- 移動実行時に active actor の `actor_locations[actor_id]` を更新し、legacy `current_location` も同期するようにした。
+- `allowed_actors` により、actorごとに移動可能な出口を制限した。
+- 刑事の移動先として `酒場` を追加した。
+- `time_min` はedge metadataとして持たせたが、今回は時間消費には使わなかった。
+- 移動してもOperation / Operation.MiniGoal / MicroGoalが勝手に変わらないことを確認した。
+- perceived_world本実装、GUI Action Compile、自動移動、時間消費、経路探索、Operation phase進行はまだ行っていない。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- GUI基礎動詞「移動する」により、RCが世界に触る最初の実行可能な導線ができた。
+- `location_graph` は将来の perceived_world / RC_AI / GUI Action Compile の入力になり得る。
+- `time_min` は定義したが未消費にしたことで、瞬間移動感を将来解消する余地を残しつつ、Session53-Aの責務を小さく保てた。
+
+### 次回の最初の一手
+
+- Session53-Bとして、移動結果とOperation中HUD候補の接続を検討する。
+
 ## 2026-07-05（Session52-C: required_operation_type によるHUD候補の最小接続）
 
 ### 今日やったこと

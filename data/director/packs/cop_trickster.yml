@@ -820,6 +820,54 @@ locations:
     - "事件現場_路地裏"
     - "情報源_夜の酒場"
     - "警察署_控室"
+    - "酒場"
+location_graph:
+  警察署_控室:
+    exits:
+      - to: 事件現場_路地裏
+        allowed_actors: ["刑事"]
+        time_min: 15
+      - to: 酒場
+        allowed_actors: ["刑事"]
+        time_min: 10
+  事件現場_路地裏:
+    exits:
+      - to: 警察署_控室
+        allowed_actors: ["刑事"]
+        time_min: 15
+      - to: 酒場
+        allowed_actors: ["刑事"]
+        time_min: 15
+      - to: 高架下
+        allowed_actors: ["刑事", "愉快犯"]
+        time_min: 8
+      - to: 駅裏
+        allowed_actors: ["愉快犯"]
+        time_min: 10
+  酒場:
+    exits:
+      - to: 警察署_控室
+        allowed_actors: ["刑事"]
+        time_min: 10
+      - to: 事件現場_路地裏
+        allowed_actors: ["刑事"]
+        time_min: 15
+  高架下:
+    exits:
+      - to: 事件現場_路地裏
+        allowed_actors: ["刑事", "愉快犯"]
+        time_min: 8
+      - to: 駅裏
+        allowed_actors: ["愉快犯"]
+        time_min: 6
+  駅裏:
+    exits:
+      - to: 高架下
+        allowed_actors: ["愉快犯"]
+        time_min: 6
+      - to: 事件現場_路地裏
+        allowed_actors: ["愉快犯"]
+        time_min: 10
 targets:
   default: "愉快犯"
 seed: 41

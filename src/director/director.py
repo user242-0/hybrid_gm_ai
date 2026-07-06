@@ -9,6 +9,7 @@ import pathlib
 from logic.cond_eval import eval_cond, parse_cond, _get_path as get_path
 from logic.emotion_traits import derived_traits
 from src.actor_operations import get_active_operation
+from src.location_graph import list_move_actions
 
 
 LEGACY_MICRO_RULES: Dict[str, Dict[str, Any]] = {
@@ -197,6 +198,24 @@ class Director:
         if actor_id is not None:
             return normalized.get(actor_id, [])
         return normalized
+
+    def location_graph(self) -> Dict[str, Any]:
+        graph = (self.goals_dict or {}).get("location_graph", {})
+        return graph if isinstance(graph, dict) else {}
+
+    def list_move_actions_for_actor(
+        self,
+        actor_id: Optional[str],
+        *,
+        world: Optional[Dict[str, Any]] = None,
+        game_state: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        return list_move_actions(
+            world,
+            game_state,
+            actor_id,
+            fallback_graph=self.location_graph(),
+        )
 
     def set_mode(self, mode: str) -> bool:
         if mode in self._available_modes or not self._available_modes:
