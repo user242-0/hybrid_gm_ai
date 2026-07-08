@@ -1,3 +1,4 @@
+import json
 import copy
 from types import SimpleNamespace
 import yaml
@@ -1638,6 +1639,24 @@ def _gui_choices(ctx, world, actor_id):
     return get_available_choices(ctx.game_state["party"][actor_id], ctx.game_state)
 
 
+def _redirect_action_logs(monkeypatch, tmp_path):
+    full_path = tmp_path / "full.jsonl"
+    player_path = tmp_path / "player.jsonl"
+    monkeypatch.setattr("src.logger.LOG_PATH_FULL", full_path)
+    monkeypatch.setattr("src.logger.LOG_PATH_PLAYER", player_path)
+    monkeypatch.setattr(
+        "src.logger._get_logging_config",
+        lambda: {"full_enabled": True, "full_exclude_actions": []},
+    )
+    return player_path
+
+
+def _read_jsonl(path):
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
 def test_move_actions_are_not_added_to_hud_actions(monkeypatch):
     _pack, _director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
     monkeypatch.setattr(
@@ -1697,6 +1716,61 @@ def test_gui_move_action_selection_updates_location():
     assert result is not None
     assert world["actor_locations"]["刑事"] == "酒場"
     assert ctx.game_state["current_location"] == "酒場"
+
+
+def test_move_action_records_action_log(monkeypatch, tmp_path):
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    player_log = _redirect_action_logs(monkeypatch, tmp_path)
+    set_actor_location(world, "刑事", "警察署_控室")
+    pipeline = _move_pipeline(director, world, ctx)
+
+    result = pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["酒場"],
+        source="GUI",
+    )
+
+    entries = _read_jsonl(player_log)
+    assert result is not None
+    assert world["actor_locations"]["刑事"] == "酒場"
+    assert entries
+    entry = entries[-1]
+    assert entry["source"] == "GUI"
+    assert entry["controller_id"] == "PLAYER:GUI"
+    assert entry["actor_rc_id"] == "刑事"
+    assert entry["actor_id"] == "刑事"
+    assert entry["action_id"] == "move_to_location"
+    assert entry["args"] == ["酒場"]
+    assert entry["time_min"] == 0
+    assert entry["clock_before"] == entry["clock_after"]
+
+
+def test_gui_move_action_selection_records_log(monkeypatch, tmp_path):
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    player_log = _redirect_action_logs(monkeypatch, tmp_path)
+    set_actor_location(world, "刑事", "警察署_控室")
+    pipeline = _move_pipeline(director, world, ctx)
+    move_choice = next(
+        choice
+        for choice in _gui_choices(ctx, world, "刑事")
+        if choice.action_key == "move_to_location"
+        and choice.params.get("destination") == "酒場"
+    )
+
+    result = pipeline.request_action(
+        move_choice.action_key,
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=choice_dispatch_args(move_choice),
+        source="GUI",
+    )
+
+    entries = _read_jsonl(player_log)
+    assert result is not None
+    assert world["actor_locations"]["刑事"] == "酒場"
+    assert entries[-1]["action_id"] == "move_to_location"
+    assert entries[-1]["args"] == ["酒場"]
+    assert entries[-1]["controller_id"] == "PLAYER:GUI"
 
 
 def test_move_action_does_not_change_other_actor_location():
@@ -1828,6 +1902,53 @@ def test_invalid_gui_move_destination_is_rejected():
     assert result is None
     assert world["actor_locations"]["刑事"] == "警察署_控室"
     assert ctx.game_state["current_location"] == "警察署_控室"
+
+
+def test_invalid_move_action_does_not_record_success_log(monkeypatch, tmp_path):
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    player_log = _redirect_action_logs(monkeypatch, tmp_path)
+    set_actor_location(world, "刑事", "警察署_控室")
+    sync_actor_view_to_legacy(world, ctx.game_state, "刑事")
+    pipeline = _move_pipeline(director, world, ctx)
+
+    result = pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["駅裏"],
+        source="GUI",
+    )
+
+    entries = _read_jsonl(player_log)
+    assert result is None
+    assert world["actor_locations"]["刑事"] == "警察署_控室"
+    assert not any(
+        entry.get("action_id") == "move_to_location" and entry.get("args") == ["駅裏"]
+        for entry in entries
+    )
+
+
+def test_existing_action_logging_still_works_after_move_logging_fix(monkeypatch, tmp_path):
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    player_log = _redirect_action_logs(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "src.ui.action_pipeline.get_cfg",
+        lambda: {"datalab": {"emit_scene_graph": False}},
+    )
+    ctx.game_state["has_enemy"] = False
+    pipeline = _move_pipeline(director, world, ctx)
+
+    pipeline.request_action(
+        "explore",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=[],
+        source="GUI",
+    )
+
+    entries = _read_jsonl(player_log)
+    assert entries
+    assert entries[-1]["action_id"] == "explore"
+    assert entries[-1]["source"] == "GUI"
+    assert entries[-1]["controller_id"] == "PLAYER:GUI"
 
 
 def test_move_action_does_not_advance_operation_or_microgoal():

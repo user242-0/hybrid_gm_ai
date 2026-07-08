@@ -143,6 +143,45 @@ class ActionPipeline:
         # Fallback to default
         return {"day": 1, "hour": 0, "minute": 0}
 
+    def _emotion_snapshot(self, world: dict | None, actor_id: str | None) -> dict:
+        emotions_by_actor = self.game_state.get("emotions_by_actor", {})
+        if isinstance(emotions_by_actor, dict) and actor_id:
+            actor_emotion = emotions_by_actor.get(actor_id)
+            if isinstance(actor_emotion, dict):
+                return actor_emotion.copy()
+        if isinstance(world, dict) and isinstance(world.get("emotion"), dict):
+            return world.get("emotion", {}).copy()
+        return {}
+
+    def _record_action_log(
+        self,
+        *,
+        source: str,
+        actor_id: str | None,
+        action_id: str,
+        args: list,
+        time_min: int,
+        clock_before: dict | None,
+        emotion_before: dict | None,
+        microgoal: str | None,
+    ) -> None:
+        world = self._resolve_world()
+        if world is None:
+            return
+        log_action(
+            source=source,
+            actor_id=actor_id,
+            action_id=action_id,
+            args=args,
+            time_min=time_min,
+            clock_before=clock_before,
+            clock_after=self._normalize_clock(world.get("clock")),
+            emotion_before=emotion_before,
+            emotion_after=self._emotion_snapshot(world, actor_id),
+            mode=self.director.mode if self.director is not None else None,
+            microgoal=microgoal,
+        )
+
     def _build_ctx(self, actor_obj: Any, action: str, args: list, raw_key: str | None = None) -> dict:
         """Build context for scene resolution"""
         target_name = (args[0] if args else self.game_state.get("current_target"))
@@ -337,6 +376,16 @@ class ActionPipeline:
             if actor_obj is not None and hasattr(actor_obj, "location"):
                 actor_obj.location = destination
             self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
+            self._record_action_log(
+                source=source,
+                actor_id=actor_id,
+                action_id=action_id,
+                args=arg_list,
+                time_min=0,
+                clock_before=clock_before,
+                emotion_before=emotion_before,
+                microgoal=self.game_state.get("director_micro_goal"),
+            )
             if self.ui_refresh is not None:
                 self.ui_refresh()
             return move_result
@@ -489,27 +538,15 @@ class ActionPipeline:
 
         # ログ出力（director update の後、UI refresh の前）
         if action_executed and world is not None:
-            clock_after = self._normalize_clock(world.get("clock"))
             actor_id = actor_obj.name if actor_obj is not None and hasattr(actor_obj, "name") else None
-            # actor別emotionを優先、なければworld.emotionにfallback
-            emotions_by_actor = self.game_state.get("emotions_by_actor", {})
-            if actor_id and actor_id in emotions_by_actor:
-                emotion_after = emotions_by_actor[actor_id].copy()
-            else:
-                emotion_after = world.get("emotion", {}) if isinstance(world.get("emotion"), dict) else {}
-            mode = self.director.mode if self.director is not None else None
-            
-            log_action(
+            self._record_action_log(
                 source=source,
                 actor_id=actor_id,
                 action_id=action_id,
                 args=arg_list,
                 time_min=dt_value,
                 clock_before=clock_before,
-                clock_after=clock_after,
                 emotion_before=emotion_before,
-                emotion_after=emotion_after,
-                mode=mode,
                 microgoal=micro_goal,
             )
 

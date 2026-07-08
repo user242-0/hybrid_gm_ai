@@ -105,6 +105,8 @@ current_target と narrative_targetの違い：
 
 ### Session53-A: GUI基礎動詞「移動する」縦切り
 
+- Session53-A-Fix-3: `move_to_location(destination)` 成功時は通常アクションと同じ行動ログへ記録される。不正destination拒否時は成功ログを残さない。
+
 - `location_graph` v0 を導入した。
 - GUI基礎動詞 `move_to_location(destination)` を追加した。
 - `move_to_location(destination)` はHUD ActionsではなくGUIアクション欄に表示されるGUI基礎動詞として接続した。

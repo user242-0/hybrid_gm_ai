@@ -8,6 +8,15 @@
 
 ---
 
+## 2026-07-08（Session53-A-Fix-3: move_to_location logging）
+
+### 今日やったこと
+
+- GUI基礎動詞 `move_to_location(destination)` 成功時に、通常アクションと同じ行動ログへ記録されるようにした。
+- 不正destinationで拒否された場合は、成功ログを残さないようにした。
+- move_to_locationのGUI表示、actor_locations更新、switch_character、RCContextBundle分類は維持した。
+- `pytest -q` all greenを確認した。
+
 ## 2026-07-08（Session55-A: RCContextBundle v0）
 
 ### 今日やったこと
