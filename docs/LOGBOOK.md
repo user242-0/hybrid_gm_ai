@@ -8,6 +8,32 @@
 
 ---
 
+## 2026-07-08（Session55-A: RCContextBundle v0）
+
+### 今日やったこと
+
+- `src/rc_context.py` を新規作成した。
+- `build_rc_context_bundle(actor_id, game_state, director)` v0 を実装した。
+- RC_AIに渡すためのread-only文脈パッケージとして、perceived_world / actor_mode / micro_goal / active_operation / available_actions / recent_memory placeholder を束ねた。
+- `available_actions` を gui / hud / meta に分類した。
+- `move_to_location(destination)` は gui に分類した。
+- `switch_character` / `set_emotion` は meta に分類し、`rc_ai_eligible: false` とした。
+- Operation依存HUD候補は hud に含め、`required_operation_type` などで区別した。
+- RCContextBundleは保存せず、毎回生成する派生ビューとして扱うことを確認した。
+- rc_ai.py / LLM / 行動意図生成 / 自動実行 / Operation進行 / memory保存 / belief保存はまだ行っていない。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- perceived_world が「RCから見えている世界」だとすると、RCContextBundleは「RC_AIに渡せる現在文脈一式」になる。
+- available_actionsを gui / hud / meta に分けることで、GUI基礎動詞・HUD作戦候補・プレイヤー用メタ操作を混線させずに扱える。
+- meta actionはRC_AIに選ばせないため、`rc_ai_eligible: false` を持たせるのが重要。
+
+### 次回の最初の一手
+
+- Session56として、RCContextBundleを入力にした rc_ai.py advisory v0 を検討する。
+- その前または別枠で、`move_to_location` がログに記録されない問題を Session53-A-Fix-3 として調査する。
+
 ## 2026-07-08（Session54-A: RC別 perceived_world v0）
 
 ### 今日やったこと

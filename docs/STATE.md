@@ -80,6 +80,17 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session55-A: RCContextBundle v0
+
+- `src/rc_context.py` を新規作成した。
+- `build_rc_context_bundle(actor_id, game_state, director)` v0 を実装した。
+- `perceived_world` / actor_mode / micro_goal / active_operation / available_actions / recent_memory placeholder を束ねるRC_AI入力用bundleを生成できるようにした。
+- `available_actions` は gui / hud / meta に分類する。
+- `move_to_location(destination)` は gui に分類する。
+- `switch_character` / `set_emotion` は meta に分類し、`rc_ai_eligible: false` とする。
+- Operation依存HUD候補は hud に含め、`required_operation_type` 等で区別する。
+- RCContextBundleは保存せず、毎回生成する派生ビューとして扱う。
+- rc_ai.py / LLM / 行動意図生成 / 自動実行 / Operation進行 / memory保存 / belief保存はまだ未実装。
 
 ### Session54-A: RC別 perceived_world v0
 
@@ -316,10 +327,10 @@ current_target と narrative_targetの違い：
 
 ### 次の優先タスク
 
-1. Session55: RCContextBundle v0 を検討する。
-2. perceived_world + actorMode + MicroGoal + ActiveOperation + memory placeholder を束ねる。
-3. RC_AI/LLMはまだ自動実行せず、advisory出力から始める。
-4. 将来のCaseSeed / case_theory / clue真相役割は、perceived_worldとbelief設計が安定してから導入する。
+1. Session56: rc_ai.py advisory v0 を検討する。
+2. RCContextBundleを入力に、認識・葛藤・desired_intent・preferred_action候補をread-onlyで出す。
+3. RC_AI出力は自動実行せず、必ず既存gateで検証する方針を維持する。
+4. move_to_locationがログに記録されない問題を別途 Session53-A-Fix-3 として調査する。
 
 ## 5. ブロッカー（止まってる理由があれば）
 （現状）大きなブロッカーなし。
