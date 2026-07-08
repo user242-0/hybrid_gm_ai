@@ -80,6 +80,18 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+
+### Session54-A: RC別 perceived_world v0
+
+- `src/perceived_world.py` を新規作成した。
+- `build_perceived_world(actor_id, director_world)` v0 を実装した。
+- actor_id / location / actor_mode / discoveries / active_operation / visible_routes / interpretations を含むRC別viewを生成できるようにした。
+- `visible_routes` は `location_graph` と `allowed_actors` を反映する。
+- `interpretations` はルールベースで、刑事と愉快犯で異なる見え方を返す。
+- HUD_DEBUG時に perceived_world の短いread-only要約を表示する。
+- perceived_world は保存せず、director_world等から毎回生成する派生ビューとして扱う。
+- CaseSeed / hidden_role / case_theory / clue真相役割 / arrest判定 / belief_world / memory / RC_AI / LLM / Operation進行 / GUI Action Compile はまだ未実装。
+
 ### Session53-A: GUI基礎動詞「移動する」縦切り
 
 - `location_graph` v0 を導入した。
@@ -300,14 +312,14 @@ current_target と narrative_targetの違い：
 * 2026-06-29: Session50: RC別location/discoveryを実装。active actorごとに現在地と発見を保持し、HUD refresh時にlegacy互換の `current_location` / `affordances.discoveries` へ同期する。HUD_DEBUGで刑事/愉快犯の発見が混ざらないことを確認。
 * 2026-06-21: Session 49-C: 60秒デモ撮影用に `HUD_DEMO=1` を追加。RO / Recommended / ProgressはデモHUDから隠し、ActorMode / location / discovery操作は残す。`HUD_DEBUG=1` は開発用フルHUD、両方無効なら通常HUD。
 
-## 4. 次にやること（最大3つ・小さく）
+## 4. 次にやること
+
 ### 次の優先タスク
 
-1. Session53-B: 移動結果とOperation中HUD候補の接続を検討する。
-2. 「聞き込み先を一件選ぶ」から、候補locationやsuggested destinationを出す最小実装を検討する。
-3. 時間消費は `location_graph.edge.time_min` を使って後続Sessionで導入する。
-4. Session54では、actor_locations / discoveries / active_operation を材料に RC別 perceived_world v0 を作る。
-
+1. Session55: RCContextBundle v0 を検討する。
+2. perceived_world + actorMode + MicroGoal + ActiveOperation + memory placeholder を束ねる。
+3. RC_AI/LLMはまだ自動実行せず、advisory出力から始める。
+4. 将来のCaseSeed / case_theory / clue真相役割は、perceived_worldとbelief設計が安定してから導入する。
 
 ## 5. ブロッカー（止まってる理由があれば）
 （現状）大きなブロッカーなし。

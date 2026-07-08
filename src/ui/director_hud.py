@@ -146,6 +146,7 @@ class DirectorHUD:
         self.clock_var = tk.StringVar(value="Day1 00:00")
         self.micro_var = tk.StringVar(value="(MicroGoal 未設定)")
         self.operation_var = tk.StringVar(value="Operation(?): なし")
+        self.perceived_world_var = tk.StringVar(value="")
         self.progress_var = tk.StringVar(value="")
         self.ro_var = tk.StringVar(value="")
         self.advisory_var = tk.StringVar(value="")
@@ -307,6 +308,22 @@ class DirectorHUD:
             font=normal_font,
         )
         self.operation_lbl.pack(side="left", padx=6)
+
+        if self.show_debug_controls:
+            row_perceived = tk.Frame(frame, bg=frame["bg"])
+            row_perceived.pack(fill="x", **pad)
+            self.perceived_world_lbl = tk.Label(
+                row_perceived,
+                textvariable=self.perceived_world_var,
+                fg="#CDEB8B",
+                bg=frame["bg"],
+                wraplength=wraplength,
+                justify="left",
+                font=normal_font,
+            )
+            self.perceived_world_lbl.pack(side="left", padx=6)
+        else:
+            self.perceived_world_lbl = None
 
         if self.show_wip_controls:
             rowp = tk.Frame(frame, bg=frame["bg"])
@@ -535,6 +552,11 @@ class DirectorHUD:
 
     def set_operation_summary(self, text: Optional[str]) -> None:
         self._run_or_enqueue(lambda: self.operation_var.set(text or "Operation(?): なし"))
+
+    def set_perceived_world_summary(self, text: Optional[str]) -> None:
+        if not self.show_debug_controls:
+            return
+        self._run_or_enqueue(lambda: self.perceived_world_var.set(text or ""))
 
     def set_progress(self, text: Optional[str]) -> None:
         self._run_or_enqueue(lambda: self.progress_var.set(text or ""))

@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-07-08（Session54-A: RC別 perceived_world v0）
+
+### 今日やったこと
+
+- `src/perceived_world.py` を新規作成した。
+- `build_perceived_world(actor_id, director_world)` v0 を実装した。
+- RC別に actor_id / location / actor_mode / discoveries / active_operation / visible_routes / interpretations を持つviewを生成できるようにした。
+- `visible_routes` は `location_graph` と `allowed_actors` を反映するようにした。
+- `interpretations` はルールベースで、刑事と愉快犯で異なる見え方を返すようにした。
+- HUD_DEBUG時に perceived_world の短いread-only要約を表示した。
+- perceived_worldは保存せず、director_world等から毎回生成する派生ビューとして扱うことを確認した。
+- CaseSeed / hidden_role / case_theory / clue真相役割 / arrest判定 / belief_world / memory / RC_AI / LLM / Operation進行 / GUI Action Compile はまだ行っていない。
+- `pytest -q` all greenを確認した。
+
+### 気づき
+
+- actor_locations / actor_discoveries / actor_modes / active_operation が、RCごとの「世界の見え方」を作る材料になり始めた。
+- discoveryは「何を知っているか」、interpretationは「それをどう意味づけているか」と分けて扱うのが重要。
+- perceived_worldを保存しない派生ビューにしたことで、truth / discovery / belief の混線を避けやすくなった。
+
+### 次回の最初の一手
+
+- Session55として、perceived_world + actorMode + MicroGoal + ActiveOperation + memory placeholder を束ねる RCContextBundle v0 を検討する。
+
 ## 2026-07-06（Session53-A: GUI基礎動詞「移動する」縦切り）
 
 ### 今日やったこと

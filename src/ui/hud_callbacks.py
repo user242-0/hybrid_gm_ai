@@ -12,6 +12,7 @@ from src.actor_view_state import (
     set_actor_location,
     sync_actor_view_to_legacy,
 )
+from src.perceived_world import build_perceived_world, format_perceived_world_summary
 from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
 if TYPE_CHECKING:
@@ -121,6 +122,13 @@ class HUDCallbacks:
             set_operation_summary = getattr(ctx.director_hud, "set_operation_summary", None)
             if callable(set_operation_summary):
                 set_operation_summary(None)
+            set_perceived_world_summary = getattr(
+                ctx.director_hud,
+                "set_perceived_world_summary",
+                None,
+            )
+            if callable(set_perceived_world_summary):
+                set_perceived_world_summary(None)
             ctx.director_hud.set_recommended(None, enabled=False)
             ctx.director_hud.set_actions([])
             ctx.director_hud.set_advisory_items([])
@@ -144,6 +152,19 @@ class HUDCallbacks:
         if callable(set_operation_summary):
             operation = get_active_operation(ctx.director_world, actor_id)
             set_operation_summary(format_operation_summary(operation, actor_id))
+        set_perceived_world_summary = getattr(
+            ctx.director_hud,
+            "set_perceived_world_summary",
+            None,
+        )
+        if callable(set_perceived_world_summary):
+            if getattr(ctx.director_hud, "show_debug_controls", is_hud_debug_enabled()):
+                perceived_world = build_perceived_world(actor_id, ctx.director_world)
+                set_perceived_world_summary(
+                    format_perceived_world_summary(perceived_world)
+                )
+            else:
+                set_perceived_world_summary(None)
         set_actor_modes = getattr(ctx.director_hud, "set_actor_modes", None)
         available_actor_modes = getattr(ctx.director, "available_actor_modes", None)
         if callable(set_actor_modes) and callable(available_actor_modes):
@@ -724,4 +745,3 @@ class HUDCallbacks:
             if self.ctx.director_world:
                 flags = self.ctx.director_world.get("flags", {})
                 print(f"[HUD_DEBUG] world.flags={flags}")
-
