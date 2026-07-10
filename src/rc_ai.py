@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Dict, List, Optional, Tuple
 
 from src.action_definitions import get_action_spec
 from src.requirements_checker import RequirementsChecker
 from src.utility.config_loader import get_rc_excluded_actions
+
+
+RC_ADVISORY_SCHEMA_VERSION = "rc_advisory_v0.1"
+DETECTIVE_ID = "刑事"
+INQUIRY_OPERATION_TYPE = "inquiry"
+FIRST_TESTIMONY_MINI_GOAL_ID = "mini_goal_first_testimony"
+FIRST_INQUIRY_ACTION_ID = "choose_first_inquiry_target"
+FIRST_INQUIRY_INTENT_ID = "advance_inquiry_first_testimony"
 
 
 def select_action(rc_char, game_state, available):
@@ -53,6 +62,98 @@ def select_action(rc_char, game_state, available):
         print(f"[RC_AI] {rc_char.name}: → {selected.label} を選択")
 
     return selected
+
+
+def generate_rc_advisory(bundle: dict) -> dict:
+    """Return one read-only RC intent and preferred action without executing it."""
+
+    context = bundle if isinstance(bundle, dict) else {}
+    actor_id = context.get("actor_id")
+    actor_id = actor_id if isinstance(actor_id, str) and actor_id else None
+
+    intent = _build_intent(context, actor_id)
+    if intent is None:
+        return _no_safe_action_advisory(actor_id)
+
+    action = _select_action_for_intent(context, intent)
+    if action is None:
+        return _no_safe_action_advisory(actor_id)
+
+    params = action.get("params")
+    if not isinstance(params, dict):
+        params = {}
+
+    return {
+        "schema_version": RC_ADVISORY_SCHEMA_VERSION,
+        "actor_id": actor_id,
+        "interpretation": intent["interpretation"],
+        "selected_intent": intent["intent_id"],
+        "preferred_action_id": action["action_id"],
+        "preferred_action_layer": "HUD",
+        "preferred_params": deepcopy(params),
+        "rationale": intent["rationale"],
+        "confidence": intent["confidence"],
+        "auto_execute": False,
+    }
+
+
+def _build_intent(bundle: dict, actor_id: str | None) -> dict | None:
+    operation = bundle.get("active_operation")
+    if actor_id != DETECTIVE_ID or not isinstance(operation, dict):
+        return None
+    if operation.get("status") != "active":
+        return None
+    if operation.get("type") != INQUIRY_OPERATION_TYPE:
+        return None
+    if operation.get("mini_goal_id") != FIRST_TESTIMONY_MINI_GOAL_ID:
+        return None
+
+    return {
+        "intent_id": FIRST_INQUIRY_INTENT_ID,
+        "preferred_action_id": FIRST_INQUIRY_ACTION_ID,
+        "interpretation": "聞き込みOperationが進行中で、最初の証言を固める段階にいる。",
+        "rationale": (
+            "active inquiry OperationのMiniGoalに直接対応する利用可能候補だから。"
+        ),
+        "confidence": 1.0,
+    }
+
+
+def _select_action_for_intent(bundle: dict, intent: dict) -> dict | None:
+    actions = bundle.get("available_actions")
+    if not isinstance(actions, dict):
+        return None
+    hud_actions = actions.get("hud")
+    if not isinstance(hud_actions, list):
+        return None
+
+    preferred_action_id = intent.get("preferred_action_id")
+    for action in hud_actions:
+        if not isinstance(action, dict):
+            continue
+        if action.get("rc_ai_eligible") is False:
+            continue
+        action_layer = action.get("action_layer")
+        if action_layer not in (None, "HUD"):
+            continue
+        if action.get("action_id") == preferred_action_id:
+            return action
+    return None
+
+
+def _no_safe_action_advisory(actor_id: str | None) -> dict:
+    return {
+        "schema_version": RC_ADVISORY_SCHEMA_VERSION,
+        "actor_id": actor_id,
+        "interpretation": "現在の文脈から安全に選べる行動意図がない。",
+        "selected_intent": "no_safe_action",
+        "preferred_action_id": None,
+        "preferred_action_layer": None,
+        "preferred_params": {},
+        "rationale": "明示的に対応する利用可能候補がない。",
+        "confidence": 0.0,
+        "auto_execute": False,
+    }
 
 
 def get_emotion(world: Dict) -> Dict[str, float]:

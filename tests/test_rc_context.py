@@ -9,6 +9,7 @@ from director.registry import extract_goals_from_pack, load_pack
 
 from src.actor_operations import set_active_operation
 from src.actor_view_state import inject_actor_discovery, set_actor_location
+from src.rc_ai import generate_rc_advisory
 from src.rc_context import build_rc_context_bundle
 from src.world_defaults import apply_world_defaults
 
@@ -131,11 +132,38 @@ def test_build_rc_context_bundle_for_detective():
     assert bundle["actor_mode"] == "WITNESS"
     assert bundle["micro_goal"]["label"] == "existing detective micro"
     assert bundle["active_operation"]["type"] == "inquiry"
+    assert bundle["active_operation"]["mini_goal_id"] == "mini_goal_first_testimony"
     assert bundle["perceived_world"]["actor_id"] == cop_id
     assert bundle["perceived_world"]["location"] == location
     assert "camera_skew_noticed" in bundle["perceived_world"]["discoveries"]
     assert bundle["recent_memory"] == []
     assert set(bundle["available_actions"]) == {"gui", "hud", "meta"}
+
+
+def test_rc_context_bundle_includes_actor_scoped_emotion():
+    _pack, director, world, game_state, cop_id, trickster_id = _setup()
+    game_state["emotions_by_actor"] = {
+        cop_id: {"R": 10, "G": 20, "B": 30},
+        trickster_id: {"R": 210, "G": 220, "B": 230},
+    }
+    world["emotion"] = {"R": 10, "G": 20, "B": 30}
+
+    detective = build_rc_context_bundle(cop_id, game_state, director)
+    trickster = build_rc_context_bundle(trickster_id, game_state, director)
+
+    assert detective["emotion"] == {"R": 10, "G": 20, "B": 30}
+    assert trickster["emotion"] == {"R": 210, "G": 220, "B": 230}
+
+
+def test_rc_context_bundle_emotion_is_clamped_to_rgb_byte_range():
+    _pack, director, _world, game_state, cop_id, _trickster_id = _setup()
+    game_state["emotions_by_actor"] = {
+        cop_id: {"R": -10, "G": 127.9, "B": 999},
+    }
+
+    bundle = build_rc_context_bundle(cop_id, game_state, director)
+
+    assert bundle["emotion"] == {"R": 0, "G": 127, "B": 255}
 
 
 def test_build_rc_context_bundle_for_trickster():
@@ -229,6 +257,21 @@ def test_rc_context_operation_conditioned_action_is_hud_action():
     assert conditioned
     assert conditioned[0]["required_operation_type"] == "inquiry"
     assert conditioned[0]["action_layer"] == "HUD"
+
+
+def test_rc_context_bundle_drives_inquiry_advisory():
+    _pack, director, world, game_state, cop_id, _trickster_id = _setup()
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+
+    advisory = generate_rc_advisory(
+        build_rc_context_bundle(cop_id, game_state, director)
+    )
+
+    assert advisory["selected_intent"] == "advance_inquiry_first_testimony"
+    assert advisory["preferred_action_id"] == "choose_first_inquiry_target"
+    assert advisory["preferred_action_layer"] == "HUD"
+    assert advisory["auto_execute"] is False
 
 
 def test_rc_context_bundle_is_not_persisted():

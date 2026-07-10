@@ -31,6 +31,7 @@ def build_rc_context_bundle(actor_id: str, game_state: dict, director) -> dict:
         {
             "actor_id": actor_id,
             "actor_profile": _actor_profile(actor_id, state),
+            "emotion": _actor_emotion(actor_id, state, world),
             "actor_mode": actor_mode,
             "micro_goal": _micro_goal_summary(actor_id, world),
             "active_operation": active_operation,
@@ -86,6 +87,54 @@ def _actor_object(actor_id: str, game_state: dict[str, Any]) -> Any:
     return None
 
 
+def _actor_emotion(
+    actor_id: str,
+    game_state: dict[str, Any],
+    world: dict[str, Any],
+) -> dict[str, int]:
+    """Return an actor-scoped RGB snapshot without mutating source state."""
+
+    emotions_by_actor = game_state.get("emotions_by_actor")
+    if isinstance(emotions_by_actor, dict):
+        normalized = _normalize_emotion(emotions_by_actor.get(actor_id))
+        if normalized is not None:
+            return normalized
+
+    actor = _actor_object(actor_id, game_state)
+    normalized = _normalize_emotion(getattr(actor, "emotion_color", None))
+    if normalized is not None:
+        return normalized
+
+    active = game_state.get("active_char")
+    if getattr(active, "name", None) == actor_id:
+        normalized = _normalize_emotion(world.get("emotion"))
+        if normalized is not None:
+            return normalized
+
+    return {"R": 127, "G": 127, "B": 255}
+
+
+def _normalize_emotion(value: Any) -> dict[str, int] | None:
+    defaults = {"R": 127, "G": 127, "B": 255}
+    if isinstance(value, dict) and any(axis in value for axis in defaults):
+        return {
+            axis: _emotion_channel(value.get(axis), fallback)
+            for axis, fallback in defaults.items()
+        }
+    if isinstance(value, (list, tuple)) and len(value) >= 3:
+        return {
+            axis: _emotion_channel(raw, defaults[axis])
+            for axis, raw in zip(("R", "G", "B"), value[:3])
+        }
+    return None
+
+
+def _emotion_channel(value: Any, fallback: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return fallback
+    return max(0, min(255, int(value)))
+
+
 def _actor_mode(actor_id: str, world: dict[str, Any], director) -> str | None:
     if hasattr(director, "get_actor_mode"):
         mode = director.get_actor_mode(world, actor_id, fallback_mode=getattr(director, "mode", None))
@@ -131,8 +180,12 @@ def _active_operation_summary(operation: dict[str, Any] | None) -> dict[str, Any
         return None
 
     mini_goal = operation.get("mini_goal")
+    mini_goal_id = None
     mini_goal_label = None
     if isinstance(mini_goal, dict):
+        value = mini_goal.get("id")
+        if isinstance(value, str) and value:
+            mini_goal_id = value
         value = mini_goal.get("label") or mini_goal.get("id")
         if isinstance(value, str) and value:
             mini_goal_label = value
@@ -142,6 +195,7 @@ def _active_operation_summary(operation: dict[str, Any] | None) -> dict[str, Any
         "label": operation.get("label") if isinstance(operation.get("label"), str) else None,
         "status": operation.get("status") if isinstance(operation.get("status"), str) else None,
         "phase": operation.get("phase") if isinstance(operation.get("phase"), str) else None,
+        "mini_goal_id": mini_goal_id,
         "mini_goal": mini_goal_label,
     }
 

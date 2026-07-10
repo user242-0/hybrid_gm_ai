@@ -80,6 +80,18 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session56: RC_AI read-only advisory v0.1
+
+- 既存 `src/rc_ai.py` に `generate_rc_advisory(bundle)` を追加した。
+- 刑事の active inquiry Operation + `mini_goal_first_testimony` から、単一意図 `advance_inquiry_first_testimony` と `choose_first_inquiry_target` を返す最小縦切りを実装した。
+- advisory は単一のYAML/JSON-safe dictで、`preferred_action_layer: HUD` / `confidence: 1.0` / `auto_execute: false` を返す。
+- 対応する利用可能HUD候補がない場合は `no_safe_action` を返し、入力Bundleやworldを変更しない。
+- RCContextBundleへactor別RGB snapshotと `active_operation.mini_goal_id` を追加した。
+- actor別RGBは `emotions_by_actor` → actor object → active actorのworld emotion → default の順で解決し、0..255へ正規化する。
+- 既存 `select_action()` / `pick_action()` とその呼び出し経路は変更していない。
+- 自動実行 / ActionPipeline接続 / Operation進行 / RGB tie-breaker / 愉快犯FLEE rule / RO接続は未実装。
+- pytest: 398 passed, 1 skipped（399 collected）。
+
 ### Session55.5: HUDウィンドウ位置リセット修正
 
 - HUDの初期geometry指定は生成時の1回だけで、refreshやActor切替による再指定は無かった。

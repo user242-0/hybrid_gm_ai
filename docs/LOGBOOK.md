@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-07-10（Session56: RC_AI read-only advisory v0.1）
+
+### 今日やったこと
+
+- `src/rc_ai.py` にread-onlyな `generate_rc_advisory(bundle)` を追加した。
+- 刑事のactive inquiry Operationと `mini_goal_first_testimony` から、`advance_inquiry_first_testimony` / `choose_first_inquiry_target` を返す最小縦切りを実装した。
+- RCContextBundleへactor別RGB snapshotとOperation MiniGoal IDを追加した。
+- advisoryは候補を実行せず、ActionPipelineやOperation stateを更新しない。
+- RCContextBundleからadvisoryまでの統合テストを含む対象テスト26件と全回帰テストを実行し、全体は398 passed / 1 skippedだった。
+
+### 気づき
+
+- Operation typeとMiniGoal IDに明示一致するHUD候補を優先すれば、汎用スコアエンジンなしでも「意図を先に作る」縦切りを成立させられる。
+- `world["emotion"]` はactive actor互換ビューなので、非active RCの判断材料にはactor別emotion snapshotが必要。
+- `start_inquiry_operation` が開始後も候補に残っていても、意図に対応する `choose_first_inquiry_target` を明示選択することで再開始を避けられる。
+
+### 次回の最初の一手
+
+- Session57としてadvisoryをread-only表示経路へ接続するか、愉快犯FLEEの小さなfallback ruleを別縦切りで追加する。
+- 自動実行、Operation phase進行、RGB tie-breaker、RO strategy patchは引き続き分離する。
+
 ## 2026-07-10（Session55.5: HUDウィンドウ位置リセット修正）
 
 ### 今日やったこと
