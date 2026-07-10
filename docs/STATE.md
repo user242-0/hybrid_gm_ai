@@ -80,6 +80,16 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session55.5: HUDウィンドウ位置リセット修正
+
+- HUDの初期geometry指定は生成時の1回だけで、refreshやActor切替による再指定は無かった。
+- 根本原因は、simulation側の協調 pump() とHUDの33ms after がともに root.update() を実行し、Tkイベントループが再入していたことだった。
+- DirectorHUD.run_async() の内部タイマーを廃止し、初回描画後はsimulation側の協調 pump() だけで更新するようにした。
+- HUD内容更新、Actor切替、advisory更新は既存のenqueue経路を維持した。
+- GUI非依存の回帰テストで、run_async() が内部タイマーを登録しないことを固定した。
+- pytest -q: 381 passed。
+- Session56のRC_AI/advisory選択ロジックには着手していない。
+
 ### Session55-A: RCContextBundle v0
 
 - `src/rc_context.py` を新規作成した。

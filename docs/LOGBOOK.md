@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-07-10（Session55.5: HUDウィンドウ位置リセット修正）
+
+### 今日やったこと
+
+- Director HUDの生成、refresh、tick、enqueue、geometry指定をリポジトリ全体で追跡した。
+- geometry指定は生成時の1回だけで、HUDの再生成やrefresh時の位置上書きは無いことを確認した。
+- simulation側の協調 pump() 中にHUDの after コールバックが再度 root.update() を呼ぶ、Tkイベントループの再入を解消した。
+- run_async() は初回描画だけを行い、以後は既存のsimulation側 pump() に一本化した。
+- 内部タイマーを登録しないheadless回帰テストを追加し、pytest -q は381 passedだった。
+- Session56のRC_AI/advisory選択ロジックには触れていない。
+
+### 気づき
+
+- geometry再適用が無くても、Windowsのタイトルバードラッグ中にTkのネストしたイベントループが走ると、タイミング依存の位置戻りとして現れ得る。
+- UI更新源を協調 pump() に一本化すると、既存の別スレッドenqueueを保ったままドラッグとの競合を除去できる。
+
+### 次回の最初の一手
+
+- Windows上でHUD移動後のrefresh、Actor切替、advisory更新を手動確認する。
+- 確認後、Session56のRC_AI advisory v0へ進む。
+
 ## 2026-07-08（Session53-A-Fix-3: move_to_location logging）
 
 ### 今日やったこと

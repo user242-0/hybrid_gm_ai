@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 from types import SimpleNamespace
 
@@ -145,6 +147,24 @@ def test_actor_mode_selection_dispatches_bound_callback():
     DirectorHUD._on_actor_mode_change(hud, None)
 
     assert calls == ["PURSUE"]
+
+
+def test_run_async_uses_cooperative_pump_without_scheduling_internal_tick():
+    frame_calls = []
+
+    class RootWithoutTimer:
+        def after(self, *_args):
+            pytest.fail("run_async must not schedule a reentrant Tk update loop")
+
+    hud = SimpleNamespace(
+        root=RootWithoutTimer(),
+        _ui_thread=threading.current_thread(),
+        _process_frame=lambda: frame_calls.append(True),
+    )
+
+    DirectorHUD.run_async(hud)
+
+    assert frame_calls == [True]
 
 
 @pytest.mark.skipif(DirectorHUD is None or tk is None, reason="tkinter not available")

@@ -615,14 +615,13 @@ class DirectorHUD:
         self._run_or_enqueue(apply)
 
     def run_async(self) -> None:
-        # Tkの内部タイマーで自走。mainloopは使わない（協調ループ）
-        # 1度だけ即座にフレーム処理しておくとウインドウが早く表示される。
+        # mainloopは使わず、simulation側の協調ループからpump()する。
+        # 初回だけ即座に処理して、ウインドウを早く表示する。
         try:
             if threading.current_thread() is self._ui_thread:
                 self._process_frame()
         except tk.TclError:
             return
-        self.root.after(0, self._tick)
 
     def destroy(self) -> None:
         def tear_down() -> None:
@@ -632,12 +631,6 @@ class DirectorHUD:
                 pass
 
         self._run_or_enqueue(tear_down)
-
-    def _tick(self) -> None:
-        # HUD側の周期処理があればここで実行（軽く保つ）
-        if not self._process_frame():
-            return
-        self.root.after(33, self._tick)
 
     def pump(self) -> None:
         """メインループ側から1ステップだけイベントを捌く"""
