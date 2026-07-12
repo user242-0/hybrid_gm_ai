@@ -19,6 +19,8 @@ class FakeVar:
 class MinimalDirectorHUD:
     def __init__(self) -> None:
         self.advisory_var = FakeVar()
+        self.rc_advisory_var = FakeVar()
+        self.show_debug_controls = False
 
     def _run_or_enqueue(self, func) -> None:
         func()
@@ -28,6 +30,7 @@ class RecordingHUD:
     def __init__(self) -> None:
         self.actions_calls = []
         self.advisory_calls = []
+        self.rc_advisory_calls = []
         self.progress_calls = []
         self.recommended_calls = []
         self.ro_calls = []
@@ -45,6 +48,9 @@ class RecordingHUD:
 
     def set_advisory_items(self, items) -> None:
         self.advisory_calls.append(items)
+
+    def set_rc_advisory(self, item) -> None:
+        self.rc_advisory_calls.append(item)
 
     def set_ro_recommendation(self, text) -> None:
         self.ro_calls.append(text)
@@ -186,6 +192,7 @@ def test_refresh_hud_clears_advisory_when_provider_raises(monkeypatch):
     callbacks.refresh_hud()
 
     assert hud.advisory_calls == [[]]
+    assert hud.rc_advisory_calls == [None]
 
 
 def test_refresh_hud_clears_advisory_when_world_is_none(monkeypatch):
@@ -202,6 +209,7 @@ def test_refresh_hud_clears_advisory_when_world_is_none(monkeypatch):
     callbacks.refresh_hud()
 
     assert hud.advisory_calls == [[]]
+    assert hud.rc_advisory_calls == [None]
 
 
 def test_advisory_items_do_not_mix_into_current_actions(monkeypatch):

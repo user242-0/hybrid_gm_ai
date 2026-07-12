@@ -80,6 +80,17 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session57-A: Runtime RC_AI advisory → Director HUD read-only integration
+
+- `HUDCallbacks.refresh_hud()` の既存HUD action cache再計算直後で、active actorの `RCContextBundle` とRC advisoryを生成するread-only経路を実装した。
+- RC advisory表示cacheは永続stateへ保存せず `HUDCallbacks` インスタンス内にactor_id付きで保持し、表示反映は毎refreshでactor一致を確認する。cache revision差分に加えactor/mode不一致でも再計算し、switch時の残留を防ぐ。
+- `DirectorHUD.set_rc_advisory(display_item | None)`、専用StringVar/row/formatterを既存 `set_advisory_items()` と独立して追加した。通常HUDではactor/短いintent/action label/reason、DEBUG HUDでは内部advisory fieldsも表示する。
+- action labelは注入済み `get_action_spec()` を第一参照、Bundle内のHUD候補labelを第二参照とし、どちらもなければ通常HUDは空にする。
+- `no_safe_action` またはRC経路の例外時はRC_AI欄だけをclearし、Action Proposal由来AI提案、Actions、Operation等のrefreshを継続する。
+- 専用テストを追加し `git diff --check` は成功。ローカルPythonが未導入で、既存 `.venv` も削除済みPython 3.10を参照しているため、pytest実行は有効なPython環境待ち。
+- 手動確認で「聞き込みを開始する」後に刑事のRC_AI判断がHUDへ表示されることを確認済み。Session57-Aの受け入れ条件は達成。
+- RC_AI判断の複数行表示で縦方向が圧迫され、Actions/Operation周辺が隠れやすくなる。57-Aの機能完了とは分離し、右ペインへの水平分割などを次回以降のHUDレイアウト改善候補とする。
+
 ### Session56: RC_AI read-only advisory v0.1
 
 - 既存 `src/rc_ai.py` に `generate_rc_advisory(bundle)` を追加した。

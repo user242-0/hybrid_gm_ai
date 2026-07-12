@@ -13,10 +13,112 @@ from src.actor_view_state import (
     sync_actor_view_to_legacy,
 )
 from src.perceived_world import build_perceived_world, format_perceived_world_summary
+from src.rc_ai import generate_rc_advisory
+from src.rc_context import build_rc_context_bundle
 from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
 if TYPE_CHECKING:
     from src.game_context import GameContext
+
+
+RC_INTENT_LABELS = {
+    "advance_inquiry_first_testimony": "最初の証言を固める",
+}
+
+RC_INTENT_REASONS = {
+    "advance_inquiry_first_testimony": (
+        "進行中の聞き込みOperationのMiniGoalに対応している"
+    ),
+}
+
+
+def _build_rc_advisory_display_item(
+    advisory: dict | None,
+    bundle: dict | None,
+    *,
+    get_action_spec: Callable[[str], Any],
+) -> dict[str, Any] | None:
+    """Adapt one RC advisory into HUD-only display data."""
+    if not isinstance(advisory, dict) or not isinstance(bundle, dict):
+        return None
+
+    selected_intent = advisory.get("selected_intent")
+    preferred_action_id = advisory.get("preferred_action_id")
+    if selected_intent == "no_safe_action":
+        return None
+    if not isinstance(selected_intent, str) or not selected_intent:
+        return None
+    if not isinstance(preferred_action_id, str) or not preferred_action_id:
+        return None
+
+    actor_id = advisory.get("actor_id") or bundle.get("actor_id")
+    if not isinstance(actor_id, str) or not actor_id:
+        return None
+    actor_profile = bundle.get("actor_profile")
+    actor_label = (
+        actor_profile.get("label")
+        if isinstance(actor_profile, dict)
+        else None
+    )
+    if not isinstance(actor_label, str) or not actor_label:
+        actor_label = actor_id
+
+    intent_label = RC_INTENT_LABELS.get(selected_intent)
+    if not intent_label:
+        interpretation = advisory.get("interpretation")
+        intent_label = (
+            interpretation
+            if isinstance(interpretation, str) and interpretation
+            else None
+        )
+    if not intent_label:
+        return None
+
+    action_label = None
+    spec = get_action_spec(preferred_action_id)
+    spec_label = getattr(spec, "label", None)
+    if isinstance(spec_label, str) and spec_label:
+        action_label = spec_label
+    if not action_label:
+        available_actions = bundle.get("available_actions")
+        hud_actions = (
+            available_actions.get("hud")
+            if isinstance(available_actions, dict)
+            else None
+        )
+        if isinstance(hud_actions, list):
+            for action in hud_actions:
+                if not isinstance(action, dict):
+                    continue
+                if action.get("action_id") != preferred_action_id:
+                    continue
+                candidate_label = action.get("label")
+                if isinstance(candidate_label, str) and candidate_label:
+                    action_label = candidate_label
+                break
+    if not action_label:
+        return None
+
+    reason = RC_INTENT_REASONS.get(selected_intent)
+    if not reason:
+        rationale = advisory.get("rationale")
+        reason = rationale if isinstance(rationale, str) else ""
+
+    return {
+        "actor_id": actor_id,
+        "actor_label": actor_label,
+        "intent_label": intent_label,
+        "action_label": action_label,
+        "reason": reason,
+        "debug": {
+            "selected_intent": selected_intent,
+            "preferred_action_id": preferred_action_id,
+            "preferred_action_layer": advisory.get("preferred_action_layer"),
+            "preferred_params": advisory.get("preferred_params"),
+            "confidence": advisory.get("confidence"),
+            "auto_execute": advisory.get("auto_execute"),
+        },
+    }
 
 
 class HUDCallbacks:
@@ -51,6 +153,8 @@ class HUDCallbacks:
         self._load_director_world = load_director_world
         self._ensure_clock = ensure_clock
         self._request_auto_step = request_auto_step
+        self._rc_advisory_cache_actor_id: str | None = None
+        self._rc_advisory_display: dict[str, Any] | None = None
 
     def _active_actor_mode(self) -> tuple[str | None, str]:
         ctx = self.ctx
@@ -132,6 +236,9 @@ class HUDCallbacks:
             ctx.director_hud.set_recommended(None, enabled=False)
             ctx.director_hud.set_actions([])
             ctx.director_hud.set_advisory_items([])
+            self._rc_advisory_cache_actor_id = None
+            self._rc_advisory_display = None
+            self._set_rc_advisory_safely(None)
             ctx.game_state["hud_cached_progress"] = None
             ctx.game_state["hud_cached_actions"] = []
             ctx.game_state["hud_cached_action_params"] = []
@@ -178,7 +285,15 @@ class HUDCallbacks:
 
         cache_rev = ctx.game_state.get("hud_cache_rev", 0)
         last_rendered_rev = ctx.game_state.get("hud_last_rendered_rev", -1)
-        if cache_rev != last_rendered_rev:
+        cached_actor_id = ctx.game_state.get("hud_cached_actor_id")
+        cached_action_mode = ctx.game_state.get("hud_cached_action_mode")
+        needs_recompute = (
+            cache_rev != last_rendered_rev
+            or cached_actor_id != actor_id
+            or cached_action_mode != action_mode
+            or self._rc_advisory_cache_actor_id != actor_id
+        )
+        if needs_recompute:
             if is_hud_debug_enabled():
                 print(f"[HUD_DEBUG] recompute rev={cache_rev} last={last_rendered_rev}")
             progress_text = ctx.director.progress_text(ctx.director_world)
@@ -311,6 +426,7 @@ class HUDCallbacks:
             ctx.game_state["hud_cached_action_params"] = [None for _ in ctx.current_actions]
             ctx.game_state["hud_cached_actor_id"] = actor_id
             ctx.game_state["hud_cached_action_mode"] = action_mode
+            self._recompute_rc_advisory(actor_id)
             ctx.game_state["hud_last_rendered_rev"] = cache_rev
 
         ctx.director_hud.set_progress(ctx.game_state.get("hud_cached_progress"))
@@ -325,6 +441,7 @@ class HUDCallbacks:
         self._show_active_micro_goal(
             available_action_ids={action_id for action_id, _, _ in cached_actions},
         )
+        self._apply_cached_rc_advisory(actor_id)
         self._refresh_advisory_items()
 
         # RO 助言表示
@@ -358,6 +475,46 @@ class HUDCallbacks:
                 print(f"[HUD_DEBUG] advisory provider failed: {exc}")
             items = []
         hud.set_advisory_items(items)
+
+    def _recompute_rc_advisory(self, actor_id: str | None) -> None:
+        self._rc_advisory_cache_actor_id = actor_id
+        self._rc_advisory_display = None
+        if not actor_id:
+            return
+        try:
+            bundle = build_rc_context_bundle(
+                actor_id,
+                self.ctx.game_state,
+                self.ctx.director,
+            )
+            advisory = generate_rc_advisory(bundle)
+            self._rc_advisory_display = _build_rc_advisory_display_item(
+                advisory,
+                bundle,
+                get_action_spec=self._get_action_spec,
+            )
+        except Exception as exc:
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] RC advisory failed: {exc}")
+
+    def _apply_cached_rc_advisory(self, actor_id: str | None) -> None:
+        display_item = (
+            self._rc_advisory_display
+            if self._rc_advisory_cache_actor_id == actor_id
+            else None
+        )
+        self._set_rc_advisory_safely(display_item)
+
+    def _set_rc_advisory_safely(self, display_item: dict[str, Any] | None) -> None:
+        hud = self.ctx.director_hud
+        setter = getattr(hud, "set_rc_advisory", None)
+        if not callable(setter):
+            return
+        try:
+            setter(display_item)
+        except Exception as exc:
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] RC advisory HUD setter failed: {exc}")
 
     def hud_adjust_value(self, path: list, delta: float, *, minimum=None, maximum=None) -> None:
         """HUD から値を調整する"""

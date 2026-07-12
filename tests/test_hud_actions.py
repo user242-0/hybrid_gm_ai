@@ -37,6 +37,7 @@ class RecordingHUD:
         self.actor_mode = None
         self.microgoal = None
         self.operation_summary = None
+        self.rc_advisory = None
         self.location = None
         self.discovery_options = []
 
@@ -51,6 +52,9 @@ class RecordingHUD:
 
     def set_advisory_items(self, _items):
         pass
+
+    def set_rc_advisory(self, item):
+        self.rc_advisory = item
 
     def set_ro_recommendation(self, _text):
         pass

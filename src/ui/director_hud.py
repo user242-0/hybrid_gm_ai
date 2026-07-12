@@ -107,6 +107,45 @@ def _format_advisory_items(items: list[dict] | None) -> str:
     return "\n".join(lines)
 
 
+def _format_rc_advisory(
+    display_item: dict | None,
+    *,
+    debug: bool = False,
+) -> str:
+    if not isinstance(display_item, dict):
+        return ""
+
+    actor_label = _display_text(display_item.get("actor_label"))
+    intent_label = _display_text(display_item.get("intent_label"))
+    action_label = _display_text(display_item.get("action_label"))
+    reason = _display_text(display_item.get("reason"))
+    if not actor_label or not intent_label or not action_label:
+        return ""
+
+    lines = [
+        f"（{actor_label}）",
+        f"意図: {intent_label}",
+        f"候補: {action_label}",
+    ]
+    if reason:
+        lines.append(f"理由: {reason}")
+
+    debug_data = display_item.get("debug")
+    if debug and isinstance(debug_data, dict):
+        lines.append("[DEBUG]")
+        for key in (
+            "selected_intent",
+            "preferred_action_id",
+            "preferred_action_layer",
+            "preferred_params",
+            "confidence",
+            "auto_execute",
+        ):
+            lines.append(f"{key}: {_display_text(debug_data.get(key))}")
+
+    return "\n".join(lines)
+
+
 class DirectorHUD:
     """Small top-level window that exposes quick director controls."""
 
@@ -150,6 +189,7 @@ class DirectorHUD:
         self.progress_var = tk.StringVar(value="")
         self.ro_var = tk.StringVar(value="")
         self.advisory_var = tk.StringVar(value="")
+        self.rc_advisory_var = tk.StringVar(value="")
         self.auto_var = tk.BooleanVar(value=False)
         self.location_var = tk.StringVar(value="")
 
@@ -384,6 +424,26 @@ class DirectorHUD:
         )
         self.advisory_label.pack(side="left", padx=6)
 
+        row_rc_advisory = tk.Frame(frame, bg=frame["bg"])
+        row_rc_advisory.pack(fill="x", **pad)
+        tk.Label(
+            row_rc_advisory,
+            text="RC_AI判断:",
+            fg="#FFCB80",
+            bg=frame["bg"],
+            font=bold_font,
+        ).pack(side="left")
+        self.rc_advisory_label = tk.Label(
+            row_rc_advisory,
+            textvariable=self.rc_advisory_var,
+            fg="#FFCB80",
+            bg=frame["bg"],
+            wraplength=wraplength,
+            justify="left",
+            font=normal_font,
+        )
+        self.rc_advisory_label.pack(side="left", padx=6)
+
         row_actions = tk.Frame(frame, bg=frame["bg"])
         row_actions.pack(fill="both", expand=True, **pad)
         tk.Label(
@@ -567,6 +627,13 @@ class DirectorHUD:
     def set_advisory_items(self, items: list[dict] | None) -> None:
         text = _format_advisory_items(items)
         self._run_or_enqueue(lambda: self.advisory_var.set(text))
+
+    def set_rc_advisory(self, display_item: dict | None) -> None:
+        text = _format_rc_advisory(
+            display_item,
+            debug=bool(getattr(self, "show_debug_controls", False)),
+        )
+        self._run_or_enqueue(lambda: self.rc_advisory_var.set(text))
 
     def set_location(self, text: str) -> None:
         def apply() -> None:

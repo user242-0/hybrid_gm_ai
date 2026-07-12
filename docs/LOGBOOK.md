@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-07-12（Session57-A: Runtime RC_AI advisory HUD integration 仕様策定）
+
+- Session56のHEADから `feature/session57a-runtime-rc-ai-hud-readonly` を作成し、実装前のコードフロー調査を行った。
+- RCContext/advisoryは既存HUD action cache再計算後に生成し、actor_id付きの非永続・インスタンス内表示cacheを毎refreshで安全に反映する方針を確定した。
+- 既存Action Proposalの `set_advisory_items()` と分離し、`set_rc_advisory()`、専用formatter、独立StringVar/rowを追加する仕様とした。
+- switch_characterは `hud_cache_rev` を増やすが、actor mismatchも再計算条件・clear条件に含め、古い刑事表示を残さない。
+- `HUDCallbacks`へactor付き非永続cacheと安全な生成/clear境界を実装し、`DirectorHUD`へ独立した `RC_AI判断` rowと通常/DEBUG formatterを追加した。
+- ActionSpec日本語label、no_safe_action、switch往復、例外分離、Action Proposalとの独立性、非永続cacheを固定する専用テストを追加した。
+- ActionPipeline、既存 `select_action()` / `pick_action()` は変更していない。
+- `git diff --check` は成功。マシン上に利用可能なPythonがなく、既存 `.venv` も削除済みPython 3.10を参照しているためpytestは未実行。
+- 手動確認では「聞き込みを開始する」実行後、RC_AI判断が期待どおり表示された。Session57-AはChatへ持ち帰れる状態。
+- 気づき: RC_AI判断の複数行表示でHUDの縦領域が圧迫される。機能不具合ではないため57-Aを閉じ、右ペイン化などの水平レイアウトを別課題として検討する。
+
 ## 2026-07-10（Session56: RC_AI read-only advisory v0.1）
 
 ### 今日やったこと
