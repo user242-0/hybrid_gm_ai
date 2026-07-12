@@ -87,7 +87,7 @@ current_target と narrative_targetの違い：
 - `DirectorHUD.set_rc_advisory(display_item | None)`、専用StringVar/row/formatterを既存 `set_advisory_items()` と独立して追加した。通常HUDではactor/短いintent/action label/reason、DEBUG HUDでは内部advisory fieldsも表示する。
 - action labelは注入済み `get_action_spec()` を第一参照、Bundle内のHUD候補labelを第二参照とし、どちらもなければ通常HUDは空にする。
 - `no_safe_action` またはRC経路の例外時はRC_AI欄だけをclearし、Action Proposal由来AI提案、Actions、Operation等のrefreshを継続する。
-- 専用テストを追加し `git diff --check` は成功。ローカルPythonが未導入で、既存 `.venv` も削除済みPython 3.10を参照しているため、pytest実行は有効なPython環境待ち。
+- 専用テストを追加し `git diff --check` は成功。ローカルPythonが未導入で、既存 `.venv` も削除済みPython 3.10を参照しているため、pytest実行はpython -m pytest -q: all passed, 0 skipped.実行環境では合計件数が表示されなかった
 - 手動確認で「聞き込みを開始する」後に刑事のRC_AI判断がHUDへ表示されることを確認済み。Session57-Aの受け入れ条件は達成。
 - RC_AI判断の複数行表示で縦方向が圧迫され、Actions/Operation周辺が隠れやすくなる。57-Aの機能完了とは分離し、右ペインへの水平分割などを次回以降のHUDレイアウト改善候補とする。
 

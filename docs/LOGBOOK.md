@@ -19,6 +19,7 @@
 - ActionPipeline、既存 `select_action()` / `pick_action()` は変更していない。
 - `git diff --check` は成功。マシン上に利用可能なPythonがなく、既存 `.venv` も削除済みPython 3.10を参照しているためpytestは未実行。
 - 手動確認では「聞き込みを開始する」実行後、RC_AI判断が期待どおり表示された。Session57-AはChatへ持ち帰れる状態。
+- python -m pytest -q: all passed, 0 skipped. 実行環境では合計件数が表示されなかった
 - 気づき: RC_AI判断の複数行表示でHUDの縦領域が圧迫される。機能不具合ではないため57-Aを閉じ、右ペイン化などの水平レイアウトを別課題として検討する。
 
 ## 2026-07-10（Session56: RC_AI read-only advisory v0.1）
