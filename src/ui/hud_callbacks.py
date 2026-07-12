@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 RC_INTENT_LABELS = {
     "advance_inquiry_first_testimony": "最初の証言を固める",
+    "avoid_unsafe_escape_route": "危険な逃走経路を避ける",
 }
 
 RC_INTENT_REASONS = {

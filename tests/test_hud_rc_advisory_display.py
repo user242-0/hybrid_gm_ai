@@ -80,6 +80,17 @@ class DummySpec:
     time_min = 0
 
 
+class TricksterSpec:
+    label = "逃走経路を変更する"
+    time_min = 6
+
+
+def _get_action_spec(action_id):
+    if action_id == "change_escape_route":
+        return TricksterSpec()
+    return DummySpec()
+
+
 def _advisory(**overrides):
     value = {
         "actor_id": "刑事",
@@ -96,15 +107,37 @@ def _advisory(**overrides):
     return value
 
 
+def _trickster_advisory(**overrides):
+    value = {
+        "actor_id": "愉快犯",
+        "interpretation": "逃走経路に危険を認識しており、安全な経路へ切り替える必要がある。",
+        "selected_intent": "avoid_unsafe_escape_route",
+        "preferred_action_id": "change_escape_route",
+        "preferred_action_layer": "HUD",
+        "preferred_params": {},
+        "rationale": "逃走経路の危険を認識しており、直接対応する利用可能候補だから。",
+        "confidence": 1.0,
+        "auto_execute": False,
+    }
+    value.update(overrides)
+    return value
+
+
 def _bundle(actor_id="刑事"):
+    if actor_id == "愉快犯":
+        action_id = "change_escape_route"
+        action_label = "逃走経路を変更する"
+    else:
+        action_id = "choose_first_inquiry_target"
+        action_label = "Bundle側ラベル"
     return {
         "actor_id": actor_id,
         "actor_profile": {"id": actor_id, "label": actor_id},
         "available_actions": {
             "hud": [
                 {
-                    "action_id": "choose_first_inquiry_target",
-                    "label": "Bundle側ラベル",
+                    "action_id": action_id,
+                    "label": action_label,
                     "action_layer": "HUD",
                     "rc_ai_eligible": True,
                 }
@@ -141,7 +174,7 @@ def _make_callbacks(hud=None):
     )
     callbacks = HUDCallbacks(
         ctx,
-        get_action_spec=lambda _action_id: DummySpec(),
+        get_action_spec=_get_action_spec,
         pick_action=lambda *_args, **_kwargs: (None, None, None),
         dispatch_action=lambda *_args, **_kwargs: None,
         ui_show_micro=lambda *_args, **_kwargs: None,
@@ -185,6 +218,26 @@ def test_format_rc_advisory_debug_includes_internal_fields():
     assert "preferred_action_layer: HUD" in text
     assert "confidence: 1.0" in text
     assert "auto_execute: False" in text
+
+
+def test_format_trickster_rc_advisory_uses_human_labels():
+    display_item = _build_rc_advisory_display_item(
+        _trickster_advisory(),
+        _bundle("愉快犯"),
+        get_action_spec=_get_action_spec,
+    )
+
+    normal_text = _format_rc_advisory(display_item, debug=False)
+    debug_text = _format_rc_advisory(display_item, debug=True)
+
+    assert "（愉快犯）" in normal_text
+    assert "意図: 危険な逃走経路を避ける" in normal_text
+    assert "候補: 逃走経路を変更する" in normal_text
+    assert "理由: 逃走経路の危険を認識しており、直接対応する利用可能候補だから。" in normal_text
+    assert "avoid_unsafe_escape_route" not in normal_text
+    assert "change_escape_route" not in normal_text
+    assert "selected_intent: avoid_unsafe_escape_route" in debug_text
+    assert "preferred_action_id: change_escape_route" in debug_text
 
 
 def test_display_adapter_uses_action_spec_then_bundle_label():
@@ -263,7 +316,7 @@ def test_refresh_hud_no_safe_action_clears_only_rc_advisory(monkeypatch):
     assert hud.advisory_calls[-1] == [{"title": "外部提案"}]
 
 
-def test_refresh_hud_switch_clears_then_rebuilds_from_current_context(monkeypatch):
+def test_refresh_hud_switches_detective_trickster_detective_advisories(monkeypatch):
     callbacks, ctx, hud = _make_callbacks()
     build_calls = []
 
@@ -274,11 +327,7 @@ def test_refresh_hud_switch_clears_then_rebuilds_from_current_context(monkeypatc
     def fake_generate(bundle):
         if bundle["actor_id"] == "刑事":
             return _advisory(actor_id="刑事")
-        return _advisory(
-            actor_id="愉快犯",
-            selected_intent="no_safe_action",
-            preferred_action_id=None,
-        )
+        return _trickster_advisory()
 
     monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", fake_build)
     monkeypatch.setattr(hud_callbacks, "generate_rc_advisory", fake_generate)
@@ -296,8 +345,12 @@ def test_refresh_hud_switch_clears_then_rebuilds_from_current_context(monkeypatc
 
     assert build_calls == ["刑事", "愉快犯", "刑事"]
     assert hud.rc_advisory_calls[-3]["actor_id"] == "刑事"
-    assert hud.rc_advisory_calls[-2] is None
+    assert hud.rc_advisory_calls[-3]["intent_label"] == "最初の証言を固める"
+    assert hud.rc_advisory_calls[-2]["actor_id"] == "愉快犯"
+    assert hud.rc_advisory_calls[-2]["intent_label"] == "危険な逃走経路を避ける"
+    assert hud.rc_advisory_calls[-2]["action_label"] == "逃走経路を変更する"
     assert hud.rc_advisory_calls[-1]["actor_id"] == "刑事"
+    assert hud.rc_advisory_calls[-1]["intent_label"] == "最初の証言を固める"
 
 
 def test_refresh_hud_rc_failure_clears_rc_and_keeps_other_hud(monkeypatch):

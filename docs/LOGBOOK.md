@@ -8,6 +8,20 @@
 
 ---
 
+## 2026-07-12（Session57-B: Trickster FLEE reactive intent rule 仕様策定）
+
+- 57-Aの確定HEADから `feature/session57b-trickster-flee-intent` を作成した。57-Aの全テスト成功追記は既に `1653e63` でコミット済みだった。
+- 愉快犯の `FLEE + perceived unsafe_route_identified` を、Operationがない場合だけ評価するreactive intent ruleとして追加する仕様を確定した。
+- active Operationがある場合はOperation rule未対応でもreactiveへ降りず、安全に無回答とする。completed/suspended等の明示的な非active statusはreactive評価を許可する。
+- `change_escape_route`と日本語labelはpack/ActionSpecに既にあり、複数候補中のID完全一致も既存matcherで可能。安全性のためeligibility/layerは明示一致へ締める。
+- HUD表示・actor付きcache・switch再生成は57-Aをそのまま再利用する。次回の最初の一手は `src/rc_ai.py` のresolver最小分割と単体/Bundle/HUD switchテスト。
+- Operation優先resolverと愉快犯FLEE reactive resolverを実装し、action matcherのeligibility/layerを明示一致へ締めた。
+- 57-Aのintent日本語label mappingへ「危険な逃走経路を避ける」を追加し、ActionSpecの「逃走経路を変更する」を既存adapter経由で表示できるようにした。
+- 対象149件、全回帰446件（445 passed / 1 skipped）が成功。刑事→愉快犯→刑事の実Bundle switchでもadvisoryが再生成された。
+- discovery消費、再推薦抑制、自動実行、HUD水平2ペイン化は意図どおり未実装のまま残した。
+- `.venv`で手動確認し、愉快犯FLEEへ `unsafe_route_identified` を注入すると「危険な逃走経路を避ける」intent表示が成立した。Session57-Bは完了。
+- 次の流れは、57.5候補としてHUD Intelligence Panel／水平ペイン、その後58-Aでadvisory手動採用とActionPipeline再検証による1件実行、58-BでOperation.MiniGoalまたはphaseの最小進行を想定する。
+
 ## 2026-07-12（Session57-A: Runtime RC_AI advisory HUD integration 仕様策定）
 
 - Session56のHEADから `feature/session57a-runtime-rc-ai-hud-readonly` を作成し、実装前のコードフロー調査を行った。

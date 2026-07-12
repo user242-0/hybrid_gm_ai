@@ -10,10 +10,15 @@ from src.utility.config_loader import get_rc_excluded_actions
 
 RC_ADVISORY_SCHEMA_VERSION = "rc_advisory_v0.1"
 DETECTIVE_ID = "刑事"
+TRICKSTER_ID = "愉快犯"
 INQUIRY_OPERATION_TYPE = "inquiry"
 FIRST_TESTIMONY_MINI_GOAL_ID = "mini_goal_first_testimony"
 FIRST_INQUIRY_ACTION_ID = "choose_first_inquiry_target"
 FIRST_INQUIRY_INTENT_ID = "advance_inquiry_first_testimony"
+FLEE_MODE = "FLEE"
+UNSAFE_ROUTE_DISCOVERY_ID = "unsafe_route_identified"
+AVOID_UNSAFE_ROUTE_INTENT_ID = "avoid_unsafe_escape_route"
+CHANGE_ESCAPE_ROUTE_ACTION_ID = "change_escape_route"
 
 
 def select_action(rc_char, game_state, available):
@@ -99,9 +104,27 @@ def generate_rc_advisory(bundle: dict) -> dict:
 
 def _build_intent(bundle: dict, actor_id: str | None) -> dict | None:
     operation = bundle.get("active_operation")
-    if actor_id != DETECTIVE_ID or not isinstance(operation, dict):
+
+    if operation is not None and not isinstance(operation, dict):
         return None
-    if operation.get("status") != "active":
+
+    if isinstance(operation, dict):
+        status = operation.get("status")
+        if status == "active":
+            # An active Operation always owns intent resolution. A missing
+            # Operation rule must not fall through to a reactive rule.
+            return _build_operation_intent(actor_id, operation)
+        if not isinstance(status, str) or not status:
+            return None
+
+    return _build_reactive_intent(bundle, actor_id)
+
+
+def _build_operation_intent(
+    actor_id: str | None,
+    operation: dict,
+) -> dict | None:
+    if actor_id != DETECTIVE_ID:
         return None
     if operation.get("type") != INQUIRY_OPERATION_TYPE:
         return None
@@ -119,6 +142,32 @@ def _build_intent(bundle: dict, actor_id: str | None) -> dict | None:
     }
 
 
+def _build_reactive_intent(bundle: dict, actor_id: str | None) -> dict | None:
+    if actor_id != TRICKSTER_ID or bundle.get("actor_mode") != FLEE_MODE:
+        return None
+
+    perceived_world = bundle.get("perceived_world")
+    if not isinstance(perceived_world, dict):
+        return None
+    discoveries = perceived_world.get("discoveries")
+    if not isinstance(discoveries, list):
+        return None
+    if UNSAFE_ROUTE_DISCOVERY_ID not in discoveries:
+        return None
+
+    return {
+        "intent_id": AVOID_UNSAFE_ROUTE_INTENT_ID,
+        "preferred_action_id": CHANGE_ESCAPE_ROUTE_ACTION_ID,
+        "interpretation": (
+            "逃走経路に危険を認識しており、安全な経路へ切り替える必要がある。"
+        ),
+        "rationale": (
+            "逃走経路の危険を認識しており、直接対応する利用可能候補だから。"
+        ),
+        "confidence": 1.0,
+    }
+
+
 def _select_action_for_intent(bundle: dict, intent: dict) -> dict | None:
     actions = bundle.get("available_actions")
     if not isinstance(actions, dict):
@@ -131,10 +180,9 @@ def _select_action_for_intent(bundle: dict, intent: dict) -> dict | None:
     for action in hud_actions:
         if not isinstance(action, dict):
             continue
-        if action.get("rc_ai_eligible") is False:
+        if action.get("rc_ai_eligible") is not True:
             continue
-        action_layer = action.get("action_layer")
-        if action_layer not in (None, "HUD"):
+        if action.get("action_layer") != "HUD":
             continue
         if action.get("action_id") == preferred_action_id:
             return action

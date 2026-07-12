@@ -274,6 +274,36 @@ def test_rc_context_bundle_drives_inquiry_advisory():
     assert advisory["auto_execute"] is False
 
 
+def test_rc_context_bundle_drives_trickster_flee_advisory():
+    _pack, director, world, game_state, _cop_id, trickster_id = _setup(
+        active_actor_id="愉快犯"
+    )
+    director.set_actor_mode(world, trickster_id, "FLEE")
+    inject_actor_discovery(world, trickster_id, "unsafe_route_identified")
+
+    bundle = build_rc_context_bundle(trickster_id, game_state, director)
+    advisory = generate_rc_advisory(bundle)
+
+    assert "change_escape_route" in _action_ids(bundle["available_actions"]["hud"])
+    assert advisory["selected_intent"] == "avoid_unsafe_escape_route"
+    assert advisory["preferred_action_id"] == "change_escape_route"
+    assert advisory["preferred_action_layer"] == "HUD"
+    assert advisory["auto_execute"] is False
+
+
+def test_rc_context_trickster_advisory_does_not_use_detective_discovery():
+    _pack, director, world, game_state, cop_id, trickster_id = _setup(
+        active_actor_id="愉快犯"
+    )
+    director.set_actor_mode(world, trickster_id, "FLEE")
+    inject_actor_discovery(world, cop_id, "unsafe_route_identified")
+
+    bundle = build_rc_context_bundle(trickster_id, game_state, director)
+
+    assert "unsafe_route_identified" not in bundle["perceived_world"]["discoveries"]
+    assert generate_rc_advisory(bundle)["selected_intent"] == "no_safe_action"
+
+
 def test_rc_context_bundle_is_not_persisted():
     _pack, director, world, game_state, cop_id, _trickster_id = _setup()
     world_before = copy.deepcopy(world)

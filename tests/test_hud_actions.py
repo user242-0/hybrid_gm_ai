@@ -485,6 +485,44 @@ def test_switch_character_switches_tpo_hud_candidates_by_actor_mode_and_discover
     assert "mislead_witness_testimony" not in trickster
 
 
+def test_rc_advisory_switches_detective_trickster_detective_with_real_bundles(
+    monkeypatch,
+):
+    _pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    director.set_actor_mode(world, "刑事", "PURSUE")
+    director.set_actor_mode(world, "愉快犯", "FLEE")
+    set_active_operation(world, "刑事", _active_inquiry_operation("刑事"))
+    inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    callbacks.refresh_hud()
+    detective_first = copy.deepcopy(hud.rc_advisory)
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+    trickster = copy.deepcopy(hud.rc_advisory)
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="刑事")
+    ctx.game_state["hud_cache_rev"] += 1
+    callbacks.refresh_hud()
+    detective_second = copy.deepcopy(hud.rc_advisory)
+
+    assert detective_first["actor_id"] == "刑事"
+    assert detective_first["debug"]["selected_intent"] == "advance_inquiry_first_testimony"
+    assert detective_first["action_label"] == "聞き込み先を一件選ぶ"
+    assert trickster["actor_id"] == "愉快犯"
+    assert trickster["debug"]["selected_intent"] == "avoid_unsafe_escape_route"
+    assert trickster["action_label"] == "逃走経路を変更する"
+    assert detective_second["actor_id"] == "刑事"
+    assert detective_second["debug"]["selected_intent"] == "advance_inquiry_first_testimony"
+
+
 def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():
     premise = load_yaml("data/director/premise.yml").get("premise", {})
     goals = extract_goals_from_pack(load_pack("cop_trickster"))
