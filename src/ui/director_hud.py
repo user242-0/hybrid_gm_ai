@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from tkinter import ttk
 from typing import Callable, Optional
 
-from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
+from src.utility.config_loader import (
+    is_hud_debug_enabled,
+    is_hud_demo_enabled,
+    is_hud_intelligence_panel_enabled,
+)
 
 MODE_COLORS = {
     "FREEZE": "#3b3b3b",
@@ -26,9 +30,32 @@ HUD_FONT_SIZES = {
 }
 
 HUD_WINDOW_SIZES = {
-    "normal": (520, 380),
-    "demo": (700, 600),
-    "debug": (520, 520),
+    "normal": (960, 480),
+    "demo": (1240, 680),
+    "debug": (1120, 720),
+}
+
+HUD_PANE_MIN_WIDTHS = {
+    "normal": (480, 320),
+    "demo": (620, 400),
+    "debug": (560, 380),
+}
+
+HUD_WRAPLENGTHS = {
+    "normal": {"operational": 500, "intelligence": 330},
+    "demo": {"operational": 650, "intelligence": 430},
+    "debug": {"operational": 590, "intelligence": 390},
+}
+
+INTELLIGENCE_COLORS = {
+    "header": "#DCEBFF",
+    "active": "#80FF80",
+    "rc": "#FFCB80",
+    "ro": "#FFD700",
+    "external": "#9FE7FF",
+    "border": "#617080",
+    "muted": "#AAB4C0",
+    "affect_fallback": "#7A8490",
 }
 
 
@@ -75,6 +102,41 @@ def resolve_hud_display_mode(
 def format_actor_mode_label(actor_id: object) -> str:
     actor_name = _display_text(actor_id) or "?"
     return f"ActorMode({actor_name}):"
+
+
+def format_active_rc_summary(actor_id: object, mode: object) -> str:
+    actor_name = _display_text(actor_id)
+    actor_mode = _display_text(mode)
+    if not actor_name:
+        return ""
+    return f"{actor_name} / {actor_mode or '?'}"
+
+
+def rc_advisory_initially_expanded(display_mode_name: str) -> bool:
+    return display_mode_name in {"demo", "debug"}
+
+
+def _normalize_affect_rgb(value: object) -> tuple[int, int, int] | None:
+    if isinstance(value, dict):
+        raw_values = [value.get(axis) for axis in ("R", "G", "B")]
+    elif isinstance(value, (list, tuple)) and len(value) >= 3:
+        raw_values = list(value[:3])
+    else:
+        return None
+
+    channels: list[int] = []
+    for raw in raw_values:
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            return None
+        channels.append(max(0, min(255, int(raw))))
+    return tuple(channels)
+
+
+def _format_affect_value(value: object, *, debug: bool) -> str:
+    rgb = _normalize_affect_rgb(value)
+    if not debug or rgb is None:
+        return ""
+    return f"RGB({rgb[0]}, {rgb[1]}, {rgb[2]})"
 
 
 def advisory_heading_for_mode(display_mode_name: str) -> str:
@@ -159,6 +221,11 @@ class DirectorHUD:
         self.show_demo_controls = self.display_mode.show_demo_controls
         self.show_wip_controls = self.display_mode.show_wip_controls
         self.show_debug_controls = self.display_mode.show_debug_controls
+        self.show_intelligence_panel = is_hud_intelligence_panel_enabled()
+        self._rc_advisory_expanded = rc_advisory_initially_expanded(
+            self.display_mode.name
+        )
+        self._rc_advisory_available = False
 
         self.root = tk.Tk()
         self.root.title(title)
@@ -190,6 +257,9 @@ class DirectorHUD:
         self.ro_var = tk.StringVar(value="")
         self.advisory_var = tk.StringVar(value="")
         self.rc_advisory_var = tk.StringVar(value="")
+        self.rc_advisory_status_var = tk.StringVar(value="")
+        self.active_rc_var = tk.StringVar(value="")
+        self.affect_value_var = tk.StringVar(value="")
         self.auto_var = tk.BooleanVar(value=False)
         self.location_var = tk.StringVar(value="")
 
@@ -202,6 +272,12 @@ class DirectorHUD:
         self._last_mode_value: Optional[str] = None
 
         self._frame: Optional[tk.Frame] = None
+        self.main_paned: Optional[tk.PanedWindow] = None
+        self.operational_pane: Optional[tk.Frame] = None
+        self.intelligence_pane: Optional[tk.Frame] = None
+        self.rc_advisory_content_frame: Optional[tk.Frame] = None
+        self.rc_advisory_toggle_button: Optional[tk.Button] = None
+        self.affect_indicator_label: Optional[tk.Label] = None
         self._ui_thread = threading.current_thread()
         self._pending_calls: "queue.Queue[Callable[[], None]]" = queue.Queue()
 
@@ -218,7 +294,9 @@ class DirectorHUD:
         font_size = HUD_FONT_SIZES[self.display_mode.name]
         normal_font = ("TkDefaultFont", font_size)
         bold_font = ("TkDefaultFont", font_size, "bold")
-        wraplength = 560 if self.display_mode.name == "demo" else 420
+        wraplengths = HUD_WRAPLENGTHS[self.display_mode.name]
+        operational_wrap = wraplengths["operational"]
+        intelligence_wrap = wraplengths["intelligence"]
         pad = (
             {"padx": 12, "pady": 6}
             if self.display_mode.name == "demo"
@@ -229,7 +307,43 @@ class DirectorHUD:
         frame.pack(fill="both", expand=True)
         self._frame = frame
 
-        row1 = tk.Frame(frame, bg=frame["bg"])
+        self.main_paned = tk.PanedWindow(
+            frame,
+            orient=tk.HORIZONTAL,
+            bd=0,
+            relief=tk.FLAT,
+            sashwidth=6,
+            sashrelief=tk.RAISED,
+            opaqueresize=True,
+            showhandle=False,
+            bg=frame["bg"],
+        )
+        self.main_paned.pack(fill="both", expand=True)
+        self.operational_pane = tk.Frame(self.main_paned, bg=frame["bg"])
+        window_width, _window_height = HUD_WINDOW_SIZES[self.display_mode.name]
+        left_width = int(window_width * 0.60)
+        right_width = window_width - left_width
+        left_min_width, right_min_width = HUD_PANE_MIN_WIDTHS[
+            self.display_mode.name
+        ]
+        self.main_paned.add(
+            self.operational_pane,
+            width=left_width,
+            minsize=left_min_width,
+            stretch="always",
+        )
+        operational = self.operational_pane
+
+        if self.show_intelligence_panel:
+            self.intelligence_pane = tk.Frame(self.main_paned, bg=frame["bg"])
+            self.main_paned.add(
+                self.intelligence_pane,
+                width=right_width,
+                minsize=right_min_width,
+                stretch="always",
+            )
+
+        row1 = tk.Frame(operational, bg=frame["bg"])
         row1.pack(fill="x", **pad)
         tk.Label(
             row1,
@@ -257,7 +371,7 @@ class DirectorHUD:
             font=normal_font,
         ).pack(side="left", padx=6)
 
-        row_actor_mode = tk.Frame(frame, bg=frame["bg"])
+        row_actor_mode = tk.Frame(operational, bg=frame["bg"])
         row_actor_mode.pack(fill="x", **pad)
         tk.Label(
             row_actor_mode,
@@ -291,7 +405,7 @@ class DirectorHUD:
 
         # --- Debug: location controls ---
         if self.show_debug_controls:
-            row_loc = tk.Frame(frame, bg=frame["bg"])
+            row_loc = tk.Frame(operational, bg=frame["bg"])
             row_loc.pack(fill="x", **pad)
             tk.Label(row_loc, text="\U0001f4cd", fg="white", bg=frame["bg"]).pack(side="left")
             self.location_combo = ttk.Combobox(
@@ -304,7 +418,7 @@ class DirectorHUD:
 
         # --- Debug: discovery injection ---
         if self.show_debug_controls:
-            row_disc = tk.Frame(frame, bg=frame["bg"])
+            row_disc = tk.Frame(operational, bg=frame["bg"])
             row_disc.pack(fill="x", **pad)
             tk.Label(row_disc, text="\U0001f50d Disc:", fg="#80FF80", bg=frame["bg"]).pack(side="left")
             self._disc_var = tk.StringVar(value="")
@@ -316,7 +430,7 @@ class DirectorHUD:
                 row_disc, text="Inject", command=self._on_inject_click,
             ).pack(side="left", padx=4)
 
-        row2 = tk.Frame(frame, bg=frame["bg"])
+        row2 = tk.Frame(operational, bg=frame["bg"])
         row2.pack(fill="x", **pad)
         tk.Label(
             row2,
@@ -330,34 +444,34 @@ class DirectorHUD:
             textvariable=self.micro_var,
             fg="white",
             bg=frame["bg"],
-            wraplength=wraplength,
+            wraplength=operational_wrap,
             justify="left",
             font=normal_font,
         )
         self.micro_lbl.pack(side="left", padx=6)
 
-        row_operation = tk.Frame(frame, bg=frame["bg"])
+        row_operation = tk.Frame(operational, bg=frame["bg"])
         row_operation.pack(fill="x", **pad)
         self.operation_lbl = tk.Label(
             row_operation,
             textvariable=self.operation_var,
             fg="white",
             bg=frame["bg"],
-            wraplength=wraplength,
+            wraplength=operational_wrap,
             justify="left",
             font=normal_font,
         )
         self.operation_lbl.pack(side="left", padx=6)
 
         if self.show_debug_controls:
-            row_perceived = tk.Frame(frame, bg=frame["bg"])
+            row_perceived = tk.Frame(operational, bg=frame["bg"])
             row_perceived.pack(fill="x", **pad)
             self.perceived_world_lbl = tk.Label(
                 row_perceived,
                 textvariable=self.perceived_world_var,
                 fg="#CDEB8B",
                 bg=frame["bg"],
-                wraplength=wraplength,
+                wraplength=operational_wrap,
                 justify="left",
                 font=normal_font,
             )
@@ -366,7 +480,7 @@ class DirectorHUD:
             self.perceived_world_lbl = None
 
         if self.show_wip_controls:
-            rowp = tk.Frame(frame, bg=frame["bg"])
+            rowp = tk.Frame(operational, bg=frame["bg"])
             rowp.pack(fill="x", **pad)
             tk.Label(
                 rowp,
@@ -380,12 +494,12 @@ class DirectorHUD:
                 textvariable=self.progress_var,
                 fg="white",
                 bg=frame["bg"],
-                wraplength=wraplength,
+                wraplength=operational_wrap,
                 justify="left",
                 font=normal_font,
             ).pack(side="left", padx=6)
 
-            row_rec = tk.Frame(frame, bg=frame["bg"])
+            row_rec = tk.Frame(operational, bg=frame["bg"])
             row_rec.pack(fill="x", **pad)
             self.rec_btn = tk.Button(
                 row_rec,
@@ -394,57 +508,10 @@ class DirectorHUD:
             )
             self.rec_btn.pack(side="left")
 
-            row_ro = tk.Frame(frame, bg=frame["bg"])
-            row_ro.pack(fill="x", **pad)
-            tk.Label(
-                row_ro, text="RO:", fg="#FFD700", bg=frame["bg"],
-                font=bold_font,
-            ).pack(side="left")
-            self.ro_label = tk.Label(
-                row_ro, textvariable=self.ro_var, fg="#FFD700", bg=frame["bg"],
-                wraplength=wraplength, justify="left", font=normal_font,
-            )
-            self.ro_label.pack(side="left", padx=6)
         else:
             self.rec_btn = None
-            self.ro_label = None
 
-        row_advisory = tk.Frame(frame, bg=frame["bg"])
-        row_advisory.pack(fill="x", **pad)
-        tk.Label(
-            row_advisory,
-            text=advisory_heading_for_mode(self.display_mode.name),
-            fg="#9FE7FF",
-            bg=frame["bg"],
-            font=bold_font,
-        ).pack(side="left")
-        self.advisory_label = tk.Label(
-            row_advisory, textvariable=self.advisory_var, fg="#9FE7FF", bg=frame["bg"],
-            wraplength=wraplength, justify="left", font=normal_font,
-        )
-        self.advisory_label.pack(side="left", padx=6)
-
-        row_rc_advisory = tk.Frame(frame, bg=frame["bg"])
-        row_rc_advisory.pack(fill="x", **pad)
-        tk.Label(
-            row_rc_advisory,
-            text="RC_AI判断:",
-            fg="#FFCB80",
-            bg=frame["bg"],
-            font=bold_font,
-        ).pack(side="left")
-        self.rc_advisory_label = tk.Label(
-            row_rc_advisory,
-            textvariable=self.rc_advisory_var,
-            fg="#FFCB80",
-            bg=frame["bg"],
-            wraplength=wraplength,
-            justify="left",
-            font=normal_font,
-        )
-        self.rc_advisory_label.pack(side="left", padx=6)
-
-        row_actions = tk.Frame(frame, bg=frame["bg"])
+        row_actions = tk.Frame(operational, bg=frame["bg"])
         row_actions.pack(fill="both", expand=True, **pad)
         tk.Label(
             row_actions,
@@ -469,7 +536,7 @@ class DirectorHUD:
         )
         self.help_text = help_text
         if self._debug:
-            row_auto = tk.Frame(frame, bg=frame["bg"])
+            row_auto = tk.Frame(operational, bg=frame["bg"])
             row_auto.pack(fill="x", **pad)
             tk.Checkbutton(
                 row_auto,
@@ -484,7 +551,7 @@ class DirectorHUD:
                 command=lambda: self.on_ai_step and self.on_ai_step(),
             ).pack(side="left", padx=8)
 
-            row3 = tk.Frame(frame, bg=frame["bg"])
+            row3 = tk.Frame(operational, bg=frame["bg"])
             row3.pack(fill="x", **pad)
             self.help_label = tk.Label(
                 row3,
@@ -492,11 +559,189 @@ class DirectorHUD:
                 fg="white",
                 bg=frame["bg"],
                 justify="left",
-                wraplength=460,
+                wraplength=operational_wrap,
             )
             self.help_label.pack(side="left")
         else:
             self.help_label = None
+
+        if not self.show_intelligence_panel or self.intelligence_pane is None:
+            self.intelligence_heading_label = None
+            self.active_rc_heading_label = None
+            self.rc_advisory_heading_label = None
+            self.ro_heading_label = None
+            self.external_heading_label = None
+            self.ro_label = None
+            self.advisory_label = None
+            self.rc_advisory_label = None
+            return
+
+        intelligence = self.intelligence_pane
+        section_pad = 10 if self.display_mode.name == "demo" else 7
+        self.intelligence_heading_label = tk.Label(
+            intelligence,
+            text="INTELLIGENCE PANEL",
+            fg=INTELLIGENCE_COLORS["header"],
+            bg=frame["bg"],
+            font=bold_font,
+            anchor="w",
+        )
+        self.intelligence_heading_label.pack(
+            fill="x", padx=section_pad, pady=(section_pad, 4)
+        )
+
+        def section_frame() -> tk.Frame:
+            section = tk.Frame(
+                intelligence,
+                bg=frame["bg"],
+                highlightthickness=1,
+                highlightbackground=INTELLIGENCE_COLORS["border"],
+            )
+            section.pack(fill="x", padx=section_pad, pady=(3, 5))
+            return section
+
+        active_section = section_frame()
+        self.active_rc_heading_label = tk.Label(
+            active_section,
+            text="ACTIVE RC",
+            fg=INTELLIGENCE_COLORS["active"],
+            bg=frame["bg"],
+            font=bold_font,
+            anchor="w",
+        )
+        self.active_rc_heading_label.pack(fill="x", padx=6, pady=(5, 1))
+        tk.Label(
+            active_section,
+            textvariable=self.active_rc_var,
+            fg="white",
+            bg=frame["bg"],
+            font=normal_font,
+            anchor="w",
+        ).pack(fill="x", padx=6, pady=(0, 3))
+        affect_row = tk.Frame(active_section, bg=frame["bg"])
+        affect_row.pack(fill="x", padx=6, pady=(1, 6))
+        tk.Label(
+            affect_row,
+            text="AFFECT",
+            fg=INTELLIGENCE_COLORS["muted"],
+            bg=frame["bg"],
+            font=bold_font,
+        ).pack(side="left")
+        self.affect_indicator_label = tk.Label(
+            affect_row,
+            text="●",
+            fg=INTELLIGENCE_COLORS["affect_fallback"],
+            bg=frame["bg"],
+            bd=1,
+            relief=tk.SOLID,
+            highlightthickness=1,
+            highlightbackground=INTELLIGENCE_COLORS["border"],
+            font=normal_font,
+            padx=2,
+        )
+        self.affect_indicator_label.pack(side="left", padx=(6, 4))
+        tk.Label(
+            affect_row,
+            textvariable=self.affect_value_var,
+            fg=INTELLIGENCE_COLORS["muted"],
+            bg=frame["bg"],
+            font=normal_font,
+        ).pack(side="left")
+
+        rc_section = section_frame()
+        self.rc_advisory_toggle_button = tk.Button(
+            rc_section,
+            text=self._rc_advisory_toggle_text(),
+            command=self._toggle_rc_advisory,
+            fg=INTELLIGENCE_COLORS["rc"],
+            bg=frame["bg"],
+            activeforeground=INTELLIGENCE_COLORS["rc"],
+            activebackground=frame["bg"],
+            font=bold_font,
+            relief=tk.FLAT,
+            bd=0,
+            anchor="w",
+            justify="left",
+            wraplength=intelligence_wrap,
+        )
+        self.rc_advisory_toggle_button.pack(fill="x", padx=4, pady=(3, 0))
+        self.rc_advisory_heading_label = self.rc_advisory_toggle_button
+        tk.Label(
+            rc_section,
+            text="現在文脈から生成された潜在意図・継続候補",
+            fg=INTELLIGENCE_COLORS["muted"],
+            bg=frame["bg"],
+            font=normal_font,
+            wraplength=intelligence_wrap,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=6, pady=(0, 2))
+        tk.Label(
+            rc_section,
+            textvariable=self.rc_advisory_status_var,
+            fg=INTELLIGENCE_COLORS["rc"],
+            bg=frame["bg"],
+            font=normal_font,
+            anchor="w",
+        ).pack(fill="x", padx=6)
+        self.rc_advisory_content_frame = tk.Frame(rc_section, bg=frame["bg"])
+        self.rc_advisory_label = tk.Label(
+            self.rc_advisory_content_frame,
+            textvariable=self.rc_advisory_var,
+            fg=INTELLIGENCE_COLORS["rc"],
+            bg=frame["bg"],
+            wraplength=intelligence_wrap,
+            justify="left",
+            anchor="w",
+            font=normal_font,
+        )
+        self.rc_advisory_label.pack(fill="x", padx=6, pady=(2, 6))
+        if self._rc_advisory_expanded:
+            self.rc_advisory_content_frame.pack(fill="x")
+
+        ro_section = section_frame()
+        self.ro_heading_label = tk.Label(
+            ro_section,
+            text="[RO] RO STRATEGY",
+            fg=INTELLIGENCE_COLORS["ro"],
+            bg=frame["bg"],
+            font=bold_font,
+            anchor="w",
+        )
+        self.ro_heading_label.pack(fill="x", padx=6, pady=(5, 1))
+        self.ro_label = tk.Label(
+            ro_section,
+            textvariable=self.ro_var,
+            fg=INTELLIGENCE_COLORS["ro"],
+            bg=frame["bg"],
+            wraplength=intelligence_wrap,
+            justify="left",
+            anchor="w",
+            font=normal_font,
+        )
+        self.ro_label.pack(fill="x", padx=6, pady=(0, 6))
+
+        external_section = section_frame()
+        self.external_heading_label = tk.Label(
+            external_section,
+            text="[EXT] EXTERNAL PROPOSALS",
+            fg=INTELLIGENCE_COLORS["external"],
+            bg=frame["bg"],
+            font=bold_font,
+            anchor="w",
+        )
+        self.external_heading_label.pack(fill="x", padx=6, pady=(5, 1))
+        self.advisory_label = tk.Label(
+            external_section,
+            textvariable=self.advisory_var,
+            fg=INTELLIGENCE_COLORS["external"],
+            bg=frame["bg"],
+            wraplength=intelligence_wrap,
+            justify="left",
+            anchor="w",
+            font=normal_font,
+        )
+        self.advisory_label.pack(fill="x", padx=6, pady=(0, 6))
 
     def _bind_keys(self) -> None:
         root = self.root
@@ -577,6 +822,40 @@ class DirectorHUD:
         def apply() -> None:
             self.actor_mode_label_var.set(format_actor_mode_label(actor_id))
             self.actor_mode_var.set(mode or "")
+            self.active_rc_var.set(format_active_rc_summary(actor_id, mode))
+
+        self._run_or_enqueue(apply)
+
+    def _rc_advisory_toggle_text(self) -> str:
+        marker = "▼" if self._rc_advisory_expanded else "▶"
+        return f"{marker} [RC] RC_AI判断 / INTERPRETATION"
+
+    def _sync_rc_advisory_status(self) -> None:
+        status = (
+            "● 潜在意図あり"
+            if getattr(self, "_rc_advisory_available", False)
+            and not getattr(self, "_rc_advisory_expanded", True)
+            else ""
+        )
+        status_var = getattr(self, "rc_advisory_status_var", None)
+        if status_var is not None:
+            status_var.set(status)
+
+    def _toggle_rc_advisory(self) -> None:
+        def apply() -> None:
+            self._rc_advisory_expanded = not self._rc_advisory_expanded
+            if self.rc_advisory_toggle_button is not None:
+                self.rc_advisory_toggle_button.configure(
+                    text=self._rc_advisory_toggle_text()
+                )
+            content = self.rc_advisory_content_frame
+            if content is not None:
+                if self._rc_advisory_expanded:
+                    if not content.winfo_manager():
+                        content.pack(fill="x")
+                else:
+                    content.pack_forget()
+            self._sync_rc_advisory_status()
 
         self._run_or_enqueue(apply)
 
@@ -633,7 +912,32 @@ class DirectorHUD:
             display_item,
             debug=bool(getattr(self, "show_debug_controls", False)),
         )
-        self._run_or_enqueue(lambda: self.rc_advisory_var.set(text))
+
+        def apply() -> None:
+            self.rc_advisory_var.set(text)
+            self._rc_advisory_available = bool(text)
+            DirectorHUD._sync_rc_advisory_status(self)
+
+        self._run_or_enqueue(apply)
+
+    def set_affect(self, emotion: object | None) -> None:
+        rgb = _normalize_affect_rgb(emotion)
+        color = (
+            f"#{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
+            if rgb is not None
+            else INTELLIGENCE_COLORS["affect_fallback"]
+        )
+        value_text = _format_affect_value(
+            emotion,
+            debug=bool(getattr(self, "show_debug_controls", False)),
+        )
+
+        def apply() -> None:
+            self.affect_value_var.set(value_text)
+            if self.affect_indicator_label is not None:
+                self.affect_indicator_label.configure(fg=color)
+
+        self._run_or_enqueue(apply)
 
     def set_location(self, text: str) -> None:
         def apply() -> None:

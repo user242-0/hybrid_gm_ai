@@ -82,6 +82,24 @@ def is_hud_demo_enabled() -> bool:
     return bool(debug_cfg.get("hud_demo", False))
 
 
+def is_hud_intelligence_panel_enabled() -> bool:
+    """Return whether the Director HUD intelligence pane is visible.
+
+    Priority: HUD_INTELLIGENCE_PANEL environment variable > config.yml.
+    The panel is enabled by default so older configs gain the two-pane HUD
+    without requiring a migration.
+    """
+    env_val = os.environ.get("HUD_INTELLIGENCE_PANEL", "").lower()
+    if env_val in ("1", "true", "yes", "on"):
+        return True
+    if env_val in ("0", "false", "no", "off"):
+        return False
+
+    cfg = get_cfg()
+    debug_cfg = cfg.get("debug", {})
+    return bool(debug_cfg.get("hud_intelligence_panel", True))
+
+
 def _latest_job_directory(jobs_root: Path) -> Optional[Path]:
     if not jobs_root.exists():
         return None

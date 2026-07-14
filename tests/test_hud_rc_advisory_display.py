@@ -25,6 +25,8 @@ class RecordingHUD:
         self.rc_advisory_calls = []
         self.advisory_calls = []
         self.actions_calls = []
+        self.ro_calls = []
+        self.affect_calls = []
 
     def set_progress(self, _value) -> None:
         pass
@@ -41,8 +43,11 @@ class RecordingHUD:
     def set_rc_advisory(self, item) -> None:
         self.rc_advisory_calls.append(item)
 
-    def set_ro_recommendation(self, _text) -> None:
-        pass
+    def set_ro_recommendation(self, text) -> None:
+        self.ro_calls.append(text)
+
+    def set_affect(self, emotion) -> None:
+        self.affect_calls.append(emotion)
 
     def set_location(self, _text) -> None:
         pass
@@ -127,12 +132,15 @@ def _bundle(actor_id="刑事"):
     if actor_id == "愉快犯":
         action_id = "change_escape_route"
         action_label = "逃走経路を変更する"
+        emotion = {"R": 210, "G": 80, "B": 40}
     else:
         action_id = "choose_first_inquiry_target"
         action_label = "Bundle側ラベル"
+        emotion = {"R": 20, "G": 120, "B": 230}
     return {
         "actor_id": actor_id,
         "actor_profile": {"id": actor_id, "label": actor_id},
+        "emotion": emotion,
         "available_actions": {
             "hud": [
                 {
@@ -290,6 +298,7 @@ def test_refresh_hud_builds_and_displays_active_actor_advisory(monkeypatch):
 
     assert calls[0][0] == "刑事"
     assert hud.rc_advisory_calls[-1]["action_label"] == "聞き込み先を一件選ぶ"
+    assert hud.affect_calls[-1] == {"R": 20, "G": 120, "B": 230}
     assert hud.advisory_calls[-1] == [{"title": "外部提案"}]
 
 
@@ -313,6 +322,7 @@ def test_refresh_hud_no_safe_action_clears_only_rc_advisory(monkeypatch):
     callbacks.refresh_hud()
 
     assert hud.rc_advisory_calls[-1] is None
+    assert hud.affect_calls[-1] == {"R": 20, "G": 120, "B": 230}
     assert hud.advisory_calls[-1] == [{"title": "外部提案"}]
 
 
@@ -351,10 +361,19 @@ def test_refresh_hud_switches_detective_trickster_detective_advisories(monkeypat
     assert hud.rc_advisory_calls[-2]["action_label"] == "逃走経路を変更する"
     assert hud.rc_advisory_calls[-1]["actor_id"] == "刑事"
     assert hud.rc_advisory_calls[-1]["intent_label"] == "最初の証言を固める"
+    assert hud.affect_calls[-3:] == [
+        {"R": 20, "G": 120, "B": 230},
+        {"R": 210, "G": 80, "B": 40},
+        {"R": 20, "G": 120, "B": 230},
+    ]
 
 
 def test_refresh_hud_rc_failure_clears_rc_and_keeps_other_hud(monkeypatch):
-    callbacks, _ctx, hud = _make_callbacks()
+    callbacks, ctx, hud = _make_callbacks()
+    ctx.game_state["ro_recommendation"] = {
+        "action_id": "check_tip",
+        "why": "新鮮",
+    }
     monkeypatch.setattr(
         hud_callbacks,
         "build_rc_context_bundle",
@@ -369,12 +388,48 @@ def test_refresh_hud_rc_failure_clears_rc_and_keeps_other_hud(monkeypatch):
     callbacks.refresh_hud()
 
     assert hud.rc_advisory_calls[-1] is None
+    assert hud.affect_calls[-1] is None
     assert hud.actions_calls
     assert hud.advisory_calls[-1] == [{"title": "外部提案"}]
+    assert hud.ro_calls[-1] == "[check_tip] 新鮮"
+
+
+def test_advisory_generation_failure_keeps_bundle_affect_ro_and_external(monkeypatch):
+    callbacks, ctx, hud = _make_callbacks()
+    ctx.game_state["ro_recommendation"] = {
+        "action_id": "check_tip",
+        "why": "新鮮",
+    }
+    monkeypatch.setattr(
+        hud_callbacks,
+        "build_rc_context_bundle",
+        lambda *_args: _bundle(),
+    )
+    monkeypatch.setattr(
+        hud_callbacks,
+        "generate_rc_advisory",
+        lambda _bundle: (_ for _ in ()).throw(RuntimeError("advisory failed")),
+    )
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda *, actor_id, limit: [{"title": "外部提案"}],
+    )
+
+    callbacks.refresh_hud()
+
+    assert hud.rc_advisory_calls[-1] is None
+    assert hud.affect_calls[-1] == {"R": 20, "G": 120, "B": 230}
+    assert hud.advisory_calls[-1] == [{"title": "外部提案"}]
+    assert hud.ro_calls[-1] == "[check_tip] 新鮮"
 
 
 def test_action_proposal_provider_failure_does_not_clear_rc_advisory(monkeypatch):
-    callbacks, _ctx, hud = _make_callbacks()
+    callbacks, ctx, hud = _make_callbacks()
+    ctx.game_state["ro_recommendation"] = {
+        "action_id": "check_tip",
+        "why": "新鮮",
+    }
     monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", lambda *_args: _bundle())
     monkeypatch.setattr(hud_callbacks, "generate_rc_advisory", lambda _bundle: _advisory())
     monkeypatch.setattr(
@@ -386,7 +441,9 @@ def test_action_proposal_provider_failure_does_not_clear_rc_advisory(monkeypatch
     callbacks.refresh_hud()
 
     assert hud.rc_advisory_calls[-1]["actor_id"] == "刑事"
+    assert hud.affect_calls[-1] == {"R": 20, "G": 120, "B": 230}
     assert hud.advisory_calls[-1] == []
+    assert hud.ro_calls[-1] == "[check_tip] 新鮮"
 
 
 def test_rc_advisory_reuses_cache_and_does_not_write_bundle_to_game_state(monkeypatch):

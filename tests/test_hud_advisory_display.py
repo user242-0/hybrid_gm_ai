@@ -20,7 +20,11 @@ class MinimalDirectorHUD:
     def __init__(self) -> None:
         self.advisory_var = FakeVar()
         self.rc_advisory_var = FakeVar()
+        self.rc_advisory_status_var = FakeVar()
+        self.ro_var = FakeVar()
         self.show_debug_controls = False
+        self._rc_advisory_expanded = False
+        self._rc_advisory_available = False
 
     def _run_or_enqueue(self, func) -> None:
         func()
@@ -34,6 +38,7 @@ class RecordingHUD:
         self.progress_calls = []
         self.recommended_calls = []
         self.ro_calls = []
+        self.affect_calls = []
         self.location_calls = []
         self.actor_mode_calls = []
 
@@ -54,6 +59,9 @@ class RecordingHUD:
 
     def set_ro_recommendation(self, text) -> None:
         self.ro_calls.append(text)
+
+    def set_affect(self, emotion) -> None:
+        self.affect_calls.append(emotion)
 
     def set_location(self, text) -> None:
         self.location_calls.append(text)
@@ -162,6 +170,33 @@ def test_format_advisory_items_limits_to_three():
     assert text.count("•") == 3
 
 
+def test_intelligence_section_setters_clear_independently():
+    hud = MinimalDirectorHUD()
+    rc_item = {
+        "actor_label": "刑事",
+        "intent_label": "最初の証言を固める",
+        "action_label": "聞き込み先を一件選ぶ",
+        "reason": "Operationに対応している",
+    }
+    external = [{"title": "証言時刻を照合する", "detail": "外部提案"}]
+
+    DirectorHUD.set_ro_recommendation(hud, "[check_tip] 新鮮")
+    DirectorHUD.set_advisory_items(hud, external)
+    DirectorHUD.set_rc_advisory(hud, rc_item)
+
+    DirectorHUD.set_rc_advisory(hud, None)
+    assert hud.rc_advisory_var.get() == ""
+    assert hud.ro_var.get() == "[check_tip] 新鮮"
+    assert "証言時刻を照合する" in hud.advisory_var.get()
+
+    DirectorHUD.set_advisory_items(hud, None)
+    assert hud.advisory_var.get() == ""
+    assert hud.ro_var.get() == "[check_tip] 新鮮"
+
+    DirectorHUD.set_ro_recommendation(hud, None)
+    assert hud.ro_var.get() == ""
+
+
 def test_refresh_hud_reads_provider_and_sets_advisory_items(monkeypatch):
     hud = RecordingHUD()
     callbacks, _ctx = make_callbacks(hud)
@@ -210,6 +245,8 @@ def test_refresh_hud_clears_advisory_when_world_is_none(monkeypatch):
 
     assert hud.advisory_calls == [[]]
     assert hud.rc_advisory_calls == [None]
+    assert hud.affect_calls == [None]
+    assert hud.actor_mode_calls == [(None, "")]
 
 
 def test_advisory_items_do_not_mix_into_current_actions(monkeypatch):

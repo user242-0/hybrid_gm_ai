@@ -1,10 +1,15 @@
 import threading
+import inspect
 
 import pytest
 from types import SimpleNamespace
 
 from src.utility import config_loader
-from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
+from src.utility.config_loader import (
+    is_hud_debug_enabled,
+    is_hud_demo_enabled,
+    is_hud_intelligence_panel_enabled,
+)
 
 try:
     import tkinter as tk
@@ -15,21 +20,86 @@ try:
     from src.ui.director_hud import (
         DirectorHUD,
         HUD_FONT_SIZES,
+        HUD_PANE_MIN_WIDTHS,
+        HUD_WINDOW_SIZES,
+        _format_affect_value,
+        _normalize_affect_rgb,
         advisory_heading_for_mode,
+        format_active_rc_summary,
         format_actor_mode_label,
+        rc_advisory_initially_expanded,
         resolve_hud_display_mode,
     )
 except Exception:  # pragma: no cover - module depends on tkinter
     DirectorHUD = None  # type: ignore
     HUD_FONT_SIZES = None  # type: ignore
+    HUD_PANE_MIN_WIDTHS = None  # type: ignore
+    HUD_WINDOW_SIZES = None  # type: ignore
+    _format_affect_value = None  # type: ignore
+    _normalize_affect_rgb = None  # type: ignore
     advisory_heading_for_mode = None  # type: ignore
+    format_active_rc_summary = None  # type: ignore
     format_actor_mode_label = None  # type: ignore
+    rc_advisory_initially_expanded = None  # type: ignore
     resolve_hud_display_mode = None  # type: ignore
+
+
+class RecordingValue:
+    def __init__(self, value=""):
+        self.value = value
+
+    def set(self, value):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+
+class RecordingLabel:
+    def __init__(self):
+        self.options = {}
+
+    def configure(self, **options):
+        self.options.update(options)
 
 
 def test_format_actor_mode_label():
     assert format_actor_mode_label("刑事") == "ActorMode(刑事):"
     assert format_actor_mode_label(None) == "ActorMode(?):"
+
+
+def test_format_active_rc_summary():
+    assert format_active_rc_summary("愉快犯", "FLEE") == "愉快犯 / FLEE"
+    assert format_active_rc_summary("刑事", None) == "刑事 / ?"
+    assert format_active_rc_summary(None, "PURSUE") == ""
+
+
+def test_rc_advisory_initial_expansion_depends_on_display_mode():
+    assert rc_advisory_initially_expanded("normal") is False
+    assert rc_advisory_initially_expanded("demo") is True
+    assert rc_advisory_initially_expanded("debug") is True
+
+
+def test_horizontal_hud_sizes_and_pane_minima():
+    for mode, (width, height) in HUD_WINDOW_SIZES.items():
+        left_min, right_min = HUD_PANE_MIN_WIDTHS[mode]
+        assert width >= 960
+        assert height >= 480
+        assert left_min + right_min < width
+        assert 0.58 <= int(width * 0.60) / width <= 0.62
+
+
+def test_affect_formatting_is_safe_and_debug_only():
+    assert _normalize_affect_rgb({"R": -1, "G": 127.9, "B": 999}) == (
+        0,
+        127,
+        255,
+    )
+    assert _normalize_affect_rgb({"R": True, "G": 2, "B": 3}) is None
+    assert _normalize_affect_rgb({"R": 1, "G": 2}) is None
+    assert _format_affect_value((10, 20, 30), debug=False) == ""
+    assert _format_affect_value((10, 20, 30), debug=True) == "RGB(10, 20, 30)"
+    assert _format_affect_value("broken", debug=True) == ""
 
 
 @pytest.mark.parametrize(
@@ -101,6 +171,37 @@ def test_hud_debug_uses_config_when_environment_is_unset(monkeypatch):
     assert is_hud_debug_enabled() is True
 
 
+def test_intelligence_panel_defaults_enabled_and_respects_config(monkeypatch):
+    monkeypatch.delenv("HUD_INTELLIGENCE_PANEL", raising=False)
+    monkeypatch.setattr(config_loader, "_CFG", {"debug": {}})
+    assert is_hud_intelligence_panel_enabled() is True
+
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_intelligence_panel": False}},
+    )
+    assert is_hud_intelligence_panel_enabled() is False
+
+
+def test_intelligence_panel_environment_overrides_config(monkeypatch):
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_intelligence_panel": False}},
+    )
+    monkeypatch.setenv("HUD_INTELLIGENCE_PANEL", "1")
+    assert is_hud_intelligence_panel_enabled() is True
+
+    monkeypatch.setattr(
+        config_loader,
+        "_CFG",
+        {"debug": {"hud_intelligence_panel": True}},
+    )
+    monkeypatch.setenv("HUD_INTELLIGENCE_PANEL", "0")
+    assert is_hud_intelligence_panel_enabled() is False
+
+
 def test_hud_demo_environment_overrides_config(monkeypatch):
     monkeypatch.setattr(
         config_loader,
@@ -149,6 +250,75 @@ def test_actor_mode_selection_dispatches_bound_callback():
     assert calls == ["PURSUE"]
 
 
+def test_set_actor_mode_updates_active_rc_summary():
+    hud = SimpleNamespace(
+        actor_mode_label_var=RecordingValue(),
+        actor_mode_var=RecordingValue(),
+        active_rc_var=RecordingValue(),
+        _run_or_enqueue=lambda func: func(),
+    )
+
+    DirectorHUD.set_actor_mode(hud, "愉快犯", "FLEE")
+
+    assert hud.actor_mode_label_var.get() == "ActorMode(愉快犯):"
+    assert hud.actor_mode_var.get() == "FLEE"
+    assert hud.active_rc_var.get() == "愉快犯 / FLEE"
+
+
+def test_set_affect_hides_values_outside_debug_and_clamps_color():
+    hud = SimpleNamespace(
+        affect_value_var=RecordingValue(),
+        affect_indicator_label=RecordingLabel(),
+        show_debug_controls=False,
+        _run_or_enqueue=lambda func: func(),
+    )
+
+    DirectorHUD.set_affect(hud, {"R": -1, "G": 127.9, "B": 999})
+
+    assert hud.affect_value_var.get() == ""
+    assert hud.affect_indicator_label.options["fg"] == "#007FFF"
+
+
+def test_set_affect_debug_shows_rgb_and_invalid_input_uses_fallback():
+    hud = SimpleNamespace(
+        affect_value_var=RecordingValue(),
+        affect_indicator_label=RecordingLabel(),
+        show_debug_controls=True,
+        _run_or_enqueue=lambda func: func(),
+    )
+
+    DirectorHUD.set_affect(hud, (10, 20, 30))
+    assert hud.affect_value_var.get() == "RGB(10, 20, 30)"
+    assert hud.affect_indicator_label.options["fg"] == "#0A141E"
+
+    DirectorHUD.set_affect(hud, {"R": 1, "G": "bad", "B": 3})
+    assert hud.affect_value_var.get() == ""
+    assert hud.affect_indicator_label.options["fg"] == "#7A8490"
+
+
+def test_new_rc_advisory_does_not_auto_expand_normal_mode():
+    hud = SimpleNamespace(
+        rc_advisory_var=RecordingValue(),
+        rc_advisory_status_var=RecordingValue(),
+        show_debug_controls=False,
+        _rc_advisory_expanded=False,
+        _rc_advisory_available=False,
+        _run_or_enqueue=lambda func: func(),
+    )
+    display_item = {
+        "actor_label": "刑事",
+        "intent_label": "最初の証言を固める",
+        "action_label": "聞き込み先を一件選ぶ",
+        "reason": "進行中のOperationに対応している",
+    }
+
+    DirectorHUD.set_rc_advisory(hud, display_item)
+
+    assert hud._rc_advisory_expanded is False
+    assert hud.rc_advisory_status_var.get() == "● 潜在意図あり"
+    assert "意図: 最初の証言を固める" in hud.rc_advisory_var.get()
+
+
 def test_run_async_uses_cooperative_pump_without_scheduling_internal_tick():
     frame_calls = []
 
@@ -165,6 +335,37 @@ def test_run_async_uses_cooperative_pump_without_scheduling_internal_tick():
     DirectorHUD.run_async(hud)
 
     assert frame_calls == [True]
+
+
+def test_geometry_remains_initialization_only_and_no_timer_is_added():
+    source = inspect.getsource(DirectorHUD)
+
+    assert source.count(".geometry(") == 1
+    assert ".after(" not in source
+
+
+@pytest.mark.skipif(DirectorHUD is None or tk is None, reason="tkinter not available")
+def test_director_hud_builds_horizontal_intelligence_panel(monkeypatch):
+    monkeypatch.setenv("HUD_DEBUG", "0")
+    monkeypatch.setenv("HUD_DEMO", "0")
+    monkeypatch.setenv("HUD_INTELLIGENCE_PANEL", "1")
+    try:
+        hud = DirectorHUD(title="Two Pane Test HUD")
+    except tk.TclError:  # pragma: no cover - headless CI
+        pytest.skip("Tkinter display not available")
+
+    assert hud.main_paned is not None
+    assert str(hud.main_paned.cget("orient")) == "horizontal"
+    assert hud.operational_pane is not None
+    assert hud.intelligence_pane is not None
+    assert hud.intelligence_heading_label.cget("text") == "INTELLIGENCE PANEL"
+    assert "RC_AI判断" in hud.rc_advisory_heading_label.cget("text")
+    assert hud.ro_heading_label.cget("text") == "[RO] RO STRATEGY"
+    assert hud.external_heading_label.cget("text") == "[EXT] EXTERNAL PROPOSALS"
+    assert hud._rc_advisory_expanded is False
+    assert not hud.rc_advisory_content_frame.winfo_manager()
+
+    hud.destroy()
 
 
 @pytest.mark.skipif(DirectorHUD is None or tk is None, reason="tkinter not available")
@@ -198,6 +399,7 @@ def test_director_hud_exposes_callbacks():
     hud.set_actor_mode("刑事", "PURSUE")
     assert hud.actor_mode_label_var.get() == "ActorMode(刑事):"
     assert hud.actor_mode_var.get() == "PURSUE"
+    assert hud.active_rc_var.get() == "刑事 / PURSUE"
 
     if hud.on_ai_step:
         hud.on_ai_step()

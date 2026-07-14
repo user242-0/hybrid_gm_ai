@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-07-14（Session57.5: HUD Intelligence Panel実装）
+
+- 57-AでRC_AI長文がActionsを押し下げた問題に対し、Director HUDを `tk.PanedWindow` の水平2ペインへ分割した。左をゲーム状態と操作、右をRC / RO / External Proposalの知性チャンネルとして整理した。
+- Intelligence Panelはnormal / demo / debugすべてで利用可能にし、normalだけRC_AI判断を初期折りたたみにした。advisory更新で勝手に開かず、単純なbutton切替だけで展開する。
+- RC_AI判断は「現在文脈から生成された潜在意図・継続候補」と注記した。AFFECTは判断原因ではなくRCContextBundle入力snapshotとして表示し、debugのみRGB数値を出す。
+- 既存3 setterとactor付きRC cacheを維持し、Bundle生成済みならadvisory生成失敗時もAFFECTを残す一方、Bundle失敗時はRC/AFFECTだけをclearする境界をテストした。
+- 新しいtimer / after / polling / animationは追加せず、geometryも初期化時の1回だけを維持した。全460件は458 passed / 2 skippedで成功。2件はheadless環境のTk widget生成テスト。
+- 気づき: normalで潜在意図の存在だけ示して詳細をユーザー選択に委ねると、RC内部候補を観察可能にしつつプレイヤーへの過度な誘導を抑えられる。
+- WindowsでSession57.5の手動確認を完了した。水平2ペインの表示と操作を確認し、Session57.5の受け入れ条件を達成した。
+- 次回の最初の一手: Session58-AでRC COGNITION sectionへ手動採用controlsを追加し、Bundle/advisory再生成とActionPipeline再検証を経て1件だけ実行する。
+
 ## 2026-07-12（Session57-B: Trickster FLEE reactive intent rule 仕様策定）
 
 - 57-Aの確定HEADから `feature/session57b-trickster-flee-intent` を作成した。57-Aの全テスト成功追記は既に `1653e63` でコミット済みだった。

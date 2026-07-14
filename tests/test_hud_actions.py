@@ -38,6 +38,7 @@ class RecordingHUD:
         self.microgoal = None
         self.operation_summary = None
         self.rc_advisory = None
+        self.affect = None
         self.location = None
         self.discovery_options = []
 
@@ -58,6 +59,9 @@ class RecordingHUD:
 
     def set_ro_recommendation(self, _text):
         pass
+
+    def set_affect(self, emotion):
+        self.affect = emotion
 
     def set_location(self, text):
         self.location = text
@@ -499,19 +503,26 @@ def test_rc_advisory_switches_detective_trickster_detective_with_real_bundles(
     inject_actor_discovery(world, "愉快犯", "unsafe_route_identified")
     ctx.game_state["director_world"] = world
     ctx.game_state["world"] = world
+    ctx.game_state["emotions_by_actor"] = {
+        "刑事": {"R": 20, "G": 120, "B": 230},
+        "愉快犯": {"R": 210, "G": 80, "B": 40},
+    }
 
     callbacks.refresh_hud()
     detective_first = copy.deepcopy(hud.rc_advisory)
+    detective_first_affect = copy.deepcopy(hud.affect)
 
     ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
     ctx.game_state["hud_cache_rev"] += 1
     callbacks.refresh_hud()
     trickster = copy.deepcopy(hud.rc_advisory)
+    trickster_affect = copy.deepcopy(hud.affect)
 
     ctx.game_state["active_char"] = SimpleNamespace(name="刑事")
     ctx.game_state["hud_cache_rev"] += 1
     callbacks.refresh_hud()
     detective_second = copy.deepcopy(hud.rc_advisory)
+    detective_second_affect = copy.deepcopy(hud.affect)
 
     assert detective_first["actor_id"] == "刑事"
     assert detective_first["debug"]["selected_intent"] == "advance_inquiry_first_testimony"
@@ -521,6 +532,9 @@ def test_rc_advisory_switches_detective_trickster_detective_with_real_bundles(
     assert trickster["action_label"] == "逃走経路を変更する"
     assert detective_second["actor_id"] == "刑事"
     assert detective_second["debug"]["selected_intent"] == "advance_inquiry_first_testimony"
+    assert detective_first_affect == {"R": 20, "G": 120, "B": 230}
+    assert trickster_affect == {"R": 210, "G": 80, "B": 40}
+    assert detective_second_affect == {"R": 20, "G": 120, "B": 230}
 
 
 def test_actor_specific_hud_actions_do_not_mix_cop_and_trickster_actions():

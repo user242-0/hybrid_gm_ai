@@ -80,6 +80,16 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session57.5: HUD Intelligence Panel / horizontal two-pane layout
+
+- `feature/session57-5-hud-intelligence-panel` 上で、Director HUDを `tk.PanedWindow` による水平2ペインへ変更した。左はDirectorMode / Clock / ActorMode / Operation / Actions等のOperational Core、右はACTIVE RC / AFFECT / RC_AI判断 / RO / External Proposalsを分離表示する。
+- Intelligence Panelはnormal / demo / debugの全モードで既定有効。`debug.hud_intelligence_panel` または `HUD_INTELLIGENCE_PANEL` で非表示にでき、設定省略時はtrueとする。
+- RC_AI判断はnormalだけ初期折りたたみ、demo/debugは初期展開とした。normalでは「潜在意図あり」の状態表示から手動展開でき、新advisory到着では自動展開しない。折りたたみ状態は非永続で、timer / after / animationは追加していない。
+- RC欄を「現在文脈から生成された潜在意図・継続候補」と明記し、RCの確定した本心とは扱わない。通常/demoは人間向けlabelのみ、debugは既存internal advisory fieldsを表示する。
+- AFFECTは既存 `RCContextBundle["emotion"]` を再利用し、actor付き非永続cacheから表示する。通常/demoは色点のみ、debugはRGB数値も表示する。switch時はactor mismatchでRC advisoryとRGBを再生成し、Bundle失敗時はRC/AFFECTだけを安全にclearする。
+- `set_ro_recommendation()` / `set_advisory_items()` / `set_rc_advisory()` は維持し、各sectionを独立更新する。Action Proposal、RC_AI rule、RO、ActionPipeline、Operation進行は変更していない。
+- geometryは初期化時の1回だけ、`run_async()`と協調pumpも変更していない。全460件は458 passed / 2 skipped（headless Tk widget tests）で成功し、`git diff --check`も成功。Windows手動確認も完了し、Session57.5の受け入れ条件を達成した。
+
 ### Session57-B: Trickster FLEE reactive intent rule
 
 - 57-A HEADから `feature/session57b-trickster-flee-intent` を分岐し、実装前のコードフロー調査を完了した。

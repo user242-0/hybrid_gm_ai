@@ -156,6 +156,7 @@ class HUDCallbacks:
         self._request_auto_step = request_auto_step
         self._rc_advisory_cache_actor_id: str | None = None
         self._rc_advisory_display: dict[str, Any] | None = None
+        self._rc_affect_rgb: dict[str, Any] | None = None
 
     def _active_actor_mode(self) -> tuple[str | None, str]:
         ctx = self.ctx
@@ -239,7 +240,12 @@ class HUDCallbacks:
             ctx.director_hud.set_advisory_items([])
             self._rc_advisory_cache_actor_id = None
             self._rc_advisory_display = None
+            self._rc_affect_rgb = None
             self._set_rc_advisory_safely(None)
+            self._set_affect_safely(None)
+            set_actor_mode = getattr(ctx.director_hud, "set_actor_mode", None)
+            if callable(set_actor_mode):
+                set_actor_mode(None, "")
             ctx.game_state["hud_cached_progress"] = None
             ctx.game_state["hud_cached_actions"] = []
             ctx.game_state["hud_cached_action_params"] = []
@@ -443,6 +449,7 @@ class HUDCallbacks:
             available_action_ids={action_id for action_id, _, _ in cached_actions},
         )
         self._apply_cached_rc_advisory(actor_id)
+        self._apply_cached_affect(actor_id)
         self._refresh_advisory_items()
 
         # RO 助言表示
@@ -480,6 +487,7 @@ class HUDCallbacks:
     def _recompute_rc_advisory(self, actor_id: str | None) -> None:
         self._rc_advisory_cache_actor_id = actor_id
         self._rc_advisory_display = None
+        self._rc_affect_rgb = None
         if not actor_id:
             return
         try:
@@ -488,6 +496,16 @@ class HUDCallbacks:
                 self.ctx.game_state,
                 self.ctx.director,
             )
+        except Exception as exc:
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] RC context bundle failed: {exc}")
+            return
+
+        emotion = bundle.get("emotion") if isinstance(bundle, dict) else None
+        if isinstance(emotion, dict):
+            self._rc_affect_rgb = dict(emotion)
+
+        try:
             advisory = generate_rc_advisory(bundle)
             self._rc_advisory_display = _build_rc_advisory_display_item(
                 advisory,
@@ -506,6 +524,14 @@ class HUDCallbacks:
         )
         self._set_rc_advisory_safely(display_item)
 
+    def _apply_cached_affect(self, actor_id: str | None) -> None:
+        emotion = (
+            self._rc_affect_rgb
+            if self._rc_advisory_cache_actor_id == actor_id
+            else None
+        )
+        self._set_affect_safely(emotion)
+
     def _set_rc_advisory_safely(self, display_item: dict[str, Any] | None) -> None:
         hud = self.ctx.director_hud
         setter = getattr(hud, "set_rc_advisory", None)
@@ -516,6 +542,17 @@ class HUDCallbacks:
         except Exception as exc:
             if is_hud_debug_enabled():
                 print(f"[HUD_DEBUG] RC advisory HUD setter failed: {exc}")
+
+    def _set_affect_safely(self, emotion: dict[str, Any] | None) -> None:
+        hud = self.ctx.director_hud
+        setter = getattr(hud, "set_affect", None)
+        if not callable(setter):
+            return
+        try:
+            setter(emotion)
+        except Exception as exc:
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] AFFECT HUD setter failed: {exc}")
 
     def hud_adjust_value(self, path: list, delta: float, *, minimum=None, maximum=None) -> None:
         """HUD から値を調整する"""
