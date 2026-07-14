@@ -80,6 +80,16 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session58-A: RC advisory manual adoption / execution 実装
+
+- Session57.5の確定HEAD `5ab44e3` を `staging/session57-5-hud-intelligence-panel` としてoriginへcheckpoint化し、同HEADから `feature/session58a-rc-advisory-manual-execution` を作成した。
+- RC COGNITION本文内へ「採用して実行」buttonと非modal statusを追加した。normalの折りたたみ時はbuttonも隠れ、demo/debugの既存展開方針、水平2ペイン、AFFECT、RO/Externalの独立setterは維持している。
+- 表示済みRC advisoryは、HUDCallbacks内の非永続な構造化snapshotとして保持する。手動採用時にactive actorを再確認し、fresh RCContextBundle/advisoryを再生成してschema/actor/intent/action/layer/paramsが完全一致した場合だけ、既存 `source="HUD"` のActionPipeline経路へ1件渡す。不一致・switch・例外時はworldを変更せずstatus表示とHUD再生成へ安全に倒す。
+- Session58-Aの実行allowlistは `choose_first_inquiry_target` のみ。ActionPipelineへ既存戻り値を変えないopt-in `ActionExecutionOutcome` を追加し、成功と拒否を区別した。愉快犯 `change_escape_route`、RO、External Proposalは表示のみを維持する。
+- 二重実行防止は、TPO candidateへactor別 `forbidden_discoveries: [inquiry_target_chosen]` を追加し、Directorの候補生成時と実行時gateの双方で評価する。1回目にdiscovery追加と`investigation_progress +1`を適用すると候補/advisoryが消え、直接2回目を要求してもgateで拒否される。
+- 58-AではOperation / Operation.MiniGoal / phaseを進めない。達成条件の読取りと進行は58-Bへ分離する。Operation interruption / arbitration（suspend/resume/cancel/replace/urgent discovery競合）も将来課題であり、58-Aへ持ち込まない。
+- 全475件は473 passed / 2 skipped（headless Tk widget tests）で成功し、`git diff --check`も成功した。Windows手動確認では、刑事のactive inquiry Operationから「採用して実行」が成功し、effects 2件の適用、advisory消去、二重実行拒否、愉快犯advisory実行不可、Operation / MiniGoal / phase不変を確認済み。Session58-Aの受け入れ条件は達成した。
+
 ### Session57.5: HUD Intelligence Panel / horizontal two-pane layout
 
 - `feature/session57-5-hud-intelligence-panel` 上で、Director HUDを `tk.PanedWindow` による水平2ペインへ変更した。左はDirectorMode / Clock / ActorMode / Operation / Actions等のOperational Core、右はACTIVE RC / AFFECT / RC_AI判断 / RO / External Proposalsを分離表示する。

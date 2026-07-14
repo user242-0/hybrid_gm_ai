@@ -319,6 +319,39 @@ def test_new_rc_advisory_does_not_auto_expand_normal_mode():
     assert "意図: 最初の証言を固める" in hud.rc_advisory_var.get()
 
 
+def test_rc_advisory_execution_state_updates_only_button_and_status():
+    hud = SimpleNamespace(
+        rc_advisory_execution_status_var=RecordingValue(),
+        rc_advisory_execute_button=RecordingLabel(),
+        _rc_advisory_available=True,
+        _run_or_enqueue=lambda func: func(),
+    )
+
+    DirectorHUD.set_rc_advisory_execution_state(
+        hud,
+        enabled=True,
+        status="再検証中…",
+    )
+
+    assert hud.rc_advisory_execution_status_var.get() == "再検証中…"
+    assert hud.rc_advisory_execute_button.options["state"] == "normal"
+
+    hud._rc_advisory_available = False
+    DirectorHUD.set_rc_advisory_execution_state(hud, enabled=True, status=None)
+
+    assert hud.rc_advisory_execution_status_var.get() == ""
+    assert hud.rc_advisory_execute_button.options["state"] == "disabled"
+
+
+def test_rc_advisory_execution_click_dispatches_bound_callback():
+    calls = []
+    hud = SimpleNamespace(on_rc_advisory_execute=lambda: calls.append(True))
+
+    DirectorHUD._on_rc_advisory_execute_click(hud)
+
+    assert calls == [True]
+
+
 def test_run_async_uses_cooperative_pump_without_scheduling_internal_tick():
     frame_calls = []
 
@@ -364,6 +397,9 @@ def test_director_hud_builds_horizontal_intelligence_panel(monkeypatch):
     assert hud.external_heading_label.cget("text") == "[EXT] EXTERNAL PROPOSALS"
     assert hud._rc_advisory_expanded is False
     assert not hud.rc_advisory_content_frame.winfo_manager()
+    assert hud.rc_advisory_controls_frame.master is hud.rc_advisory_content_frame
+    assert hud.rc_advisory_execute_button.master is hud.rc_advisory_controls_frame
+    assert hud.rc_advisory_execute_button.cget("state") == "disabled"
 
     hud.destroy()
 

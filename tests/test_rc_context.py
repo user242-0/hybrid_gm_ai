@@ -274,6 +274,21 @@ def test_rc_context_bundle_drives_inquiry_advisory():
     assert advisory["auto_execute"] is False
 
 
+def test_completed_inquiry_target_hides_candidate_and_advisory():
+    _pack, director, world, game_state, cop_id, _trickster_id = _setup()
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    inject_actor_discovery(world, cop_id, "inquiry_target_chosen")
+
+    bundle = build_rc_context_bundle(cop_id, game_state, director)
+    advisory = generate_rc_advisory(bundle)
+
+    assert "choose_first_inquiry_target" not in _action_ids(
+        bundle["available_actions"]["hud"]
+    )
+    assert advisory["selected_intent"] == "no_safe_action"
+
+
 def test_rc_context_bundle_drives_trickster_flee_advisory():
     _pack, director, world, game_state, _cop_id, trickster_id = _setup(
         active_actor_id="愉快犯"

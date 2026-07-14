@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-07-14（Session58-A: RC advisory手動採用・実行 実装）
+
+- Session57.5のHEAD `5ab44e3` を `staging/session57-5-hud-intelligence-panel` としてoriginへpushし、そこから `feature/session58a-rc-advisory-manual-execution` を作成した。
+- RC COGNITIONの折りたたみ内へ「採用して実行」buttonとstatus表示を追加した。実行allowlistは `choose_first_inquiry_target` だけで、愉快犯、RO、External Proposalは実行可能化していない。
+- 現行RC cacheへschema / actor / selected_intent / action / layer / paramsだけをdeepcopyした非永続snapshotを追加した。クリック時はfresh Bundle/advisoryを必ず再生成し、snapshot完全一致時だけ既存 `source="HUD"` のdispatchを1回呼ぶ。switch、stale、no_safe_action、例外では実行しない。
+- ActionPipelineには既存戻り値を変えないopt-in `ActionExecutionOutcome` を追加し、TPOの成功と拒否をHUDCallbacksが区別できるようにした。TPO実行gateはactive actor、HUD layer/source、ActorMode、discovery、Operation、locationを現在stateで再確認する。
+- `choose_first_inquiry_target`の二重実行は、packの `forbidden_discoveries: [inquiry_target_chosen]` をDirectorの列挙・実行gate双方で評価して防いだ。1回目はdiscovery追加とprogress +1、2回目は効果なしとなり、実行後のfresh advisoryもno_safe_actionになる。
+- Operation / MiniGoal / phaseは実行前後で不変に固定した。全475件は473 passed / 2 skippedで成功し、`git diff --check`も成功した。
+- Windows手動確認で、刑事のactive inquiry Operationから「採用して実行」を押すと `[EFFECTS] action=choose_first_inquiry_target applied=2` が出力され、advisory消去と二重実行拒否が成立した。愉快犯advisoryは実行不可で、Operation / MiniGoal / phaseも不変だった。Session58-Aの受け入れ条件は達成。
+- 気づき: advisoryの再生成は意図の鮮度を保証し、ActionPipeline gateは実行権限を保証する。両者を分けることでRCの提案とプレイヤー承認、世界状態の最終権限を混同せずに済む。
+- 次回の最初の一手: Session58-Bで `inquiry_target_chosen` を達成条件として読み、Operation.MiniGoalまたはphaseを最小進行させる仕様を詰める。
+- 将来課題: Operation interruption / arbitration（suspend / resume / cancel / replace、urgent discoveryとの競合）は58-A対象外。58-Bでinquiry_target_chosenを達成条件としてOperation.MiniGoal / phaseの最小進行を扱う。
+
 ## 2026-07-14（Session57.5: HUD Intelligence Panel実装）
 
 - 57-AでRC_AI長文がActionsを押し下げた問題に対し、Director HUDを `tk.PanedWindow` の水平2ペインへ分割した。左をゲーム状態と操作、右をRC / RO / External Proposalの知性チャンネルとして整理した。

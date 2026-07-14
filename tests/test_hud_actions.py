@@ -38,6 +38,8 @@ class RecordingHUD:
         self.microgoal = None
         self.operation_summary = None
         self.rc_advisory = None
+        self.rc_execution_states = []
+        self.on_rc_advisory_execute = None
         self.affect = None
         self.location = None
         self.discovery_options = []
@@ -56,6 +58,9 @@ class RecordingHUD:
 
     def set_rc_advisory(self, item):
         self.rc_advisory = item
+
+    def set_rc_advisory_execution_state(self, enabled, status=None):
+        self.rc_execution_states.append((enabled, status))
 
     def set_ro_recommendation(self, _text):
         pass
@@ -1534,6 +1539,149 @@ def test_operation_required_hud_action_execution_rechecks_operation_type():
     )
 
     assert result is None
+    assert "inquiry_target_chosen" not in get_actor_discoveries(world, cop_id)
+    assert world.get("investigation_progress") in (None, 0)
+
+
+def test_choose_first_inquiry_target_executes_once_and_preserves_operation():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    operation_before = copy.deepcopy(get_active_operation(world, cop_id))
+    progress_before = world.get("investigation_progress", 0)
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    first = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    assert first.executed is True
+    assert first.reason is None
+    assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
+    assert world["investigation_progress"] == progress_before + 1
+    assert get_active_operation(world, cop_id) == operation_before
+
+    second = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    assert second.executed is False
+    assert second.reason == "tpo_gate_failed"
+    assert world["investigation_progress"] == progress_before + 1
+    assert get_active_operation(world, cop_id) == operation_before
+
+
+def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    assert "choose_first_inquiry_target" in _refresh_action_ids(callbacks, ctx, hud)
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+    action_ids_after = _refresh_action_ids(callbacks, ctx, hud)
+
+    assert outcome.executed is True
+    assert "choose_first_inquiry_target" not in action_ids_after
+    assert hud.rc_advisory is None
+
+
+def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    operation_before = copy.deepcopy(get_active_operation(world, cop_id))
+    progress_before = world.get("investigation_progress", 0)
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    dispatch_calls = []
+
+    def dispatch(action_id, **kwargs):
+        dispatch_calls.append((action_id, kwargs))
+        return pipeline.request_action(action_id, **kwargs)
+
+    callbacks._dispatch_action = dispatch
+    callbacks.refresh_hud()
+    assert (
+        callbacks._rc_advisory_snapshot["preferred_action_id"]
+        == "choose_first_inquiry_target"
+    )
+    assert hud.rc_execution_states[-1] == (True, None)
+
+    callbacks.on_rc_advisory_execute()
+
+    assert len(dispatch_calls) == 1
+    assert dispatch_calls[0][0] == "choose_first_inquiry_target"
+    assert dispatch_calls[0][1]["source"] == "HUD"
+    assert dispatch_calls[0][1]["return_outcome"] is True
+    assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
+    assert world["investigation_progress"] == progress_before + 1
+    assert get_active_operation(world, cop_id) == operation_before
+    assert hud.rc_advisory is None
+    assert hud.rc_execution_states[-1][0] is False
+    assert hud.rc_execution_states[-1][1].startswith("実行しました:")
+
+    callbacks.on_rc_advisory_execute()
+
+    assert len(dispatch_calls) == 1
+    assert world["investigation_progress"] == progress_before + 1
+    assert get_active_operation(world, cop_id) == operation_before
+
+
+def test_tpo_hud_action_rejects_non_hud_source_without_effects():
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="GUI",
+        return_outcome=True,
+    )
+
+    assert outcome.executed is False
+    assert outcome.reason == "tpo_gate_failed"
     assert "inquiry_target_chosen" not in get_actor_discoveries(world, cop_id)
     assert world.get("investigation_progress") in (None, 0)
 

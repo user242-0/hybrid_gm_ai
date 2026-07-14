@@ -503,6 +503,8 @@ hud_actions:
         - PURSUE
         - WITNESS
       required_operation_type: inquiry
+      forbidden_discoveries:
+        - inquiry_target_chosen
     - id: infer_escape_route
       label: "逃走経路を推理する"
       actor_id: 刑事

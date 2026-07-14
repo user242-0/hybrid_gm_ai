@@ -6,6 +6,8 @@ from src.ui.director_hud import DirectorHUD, _format_rc_advisory
 from src.ui.hud_callbacks import (
     HUDCallbacks,
     _build_rc_advisory_display_item,
+    _build_rc_advisory_execution_snapshot,
+    _is_supported_rc_advisory_execution,
 )
 
 
@@ -27,6 +29,8 @@ class RecordingHUD:
         self.actions_calls = []
         self.ro_calls = []
         self.affect_calls = []
+        self.rc_execution_state_calls = []
+        self.on_rc_advisory_execute = None
 
     def set_progress(self, _value) -> None:
         pass
@@ -48,6 +52,9 @@ class RecordingHUD:
 
     def set_affect(self, emotion) -> None:
         self.affect_calls.append(emotion)
+
+    def set_rc_advisory_execution_state(self, enabled, status=None) -> None:
+        self.rc_execution_state_calls.append((enabled, status))
 
     def set_location(self, _text) -> None:
         pass
@@ -98,6 +105,7 @@ def _get_action_spec(action_id):
 
 def _advisory(**overrides):
     value = {
+        "schema_version": "rc_advisory_v0.1",
         "actor_id": "刑事",
         "interpretation": "聞き込みOperationが進行中で、最初の証言を固める段階にいる。",
         "selected_intent": "advance_inquiry_first_testimony",
@@ -114,6 +122,7 @@ def _advisory(**overrides):
 
 def _trickster_advisory(**overrides):
     value = {
+        "schema_version": "rc_advisory_v0.1",
         "actor_id": "愉快犯",
         "interpretation": "逃走経路に危険を認識しており、安全な経路へ切り替える必要がある。",
         "selected_intent": "avoid_unsafe_escape_route",
@@ -470,3 +479,221 @@ def test_rc_advisory_reuses_cache_and_does_not_write_bundle_to_game_state(monkey
     assert "rc_context_bundle" not in ctx.game_state
     assert "rc_advisory" not in ctx.game_state
     assert before_second_refresh == ctx.game_state
+
+
+def test_execution_snapshot_is_structured_deepcopy_and_allowlisted():
+    advisory = _advisory(preferred_params={"nested": {"value": 1}})
+
+    snapshot = _build_rc_advisory_execution_snapshot(advisory)
+    advisory["preferred_params"]["nested"]["value"] = 99
+
+    assert snapshot == {
+        "schema_version": "rc_advisory_v0.1",
+        "actor_id": "刑事",
+        "selected_intent": "advance_inquiry_first_testimony",
+        "preferred_action_id": "choose_first_inquiry_target",
+        "preferred_action_layer": "HUD",
+        "preferred_params": {"nested": {"value": 1}},
+    }
+    assert _is_supported_rc_advisory_execution(snapshot, "刑事") is False
+    snapshot["preferred_params"] = {}
+    assert _is_supported_rc_advisory_execution(snapshot, "刑事") is True
+    assert _is_supported_rc_advisory_execution(snapshot, "愉快犯") is False
+
+
+def test_refresh_enables_only_supported_rc_advisory_execution(monkeypatch):
+    callbacks, _ctx, hud = _make_callbacks()
+    monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", lambda *_args: _bundle())
+    monkeypatch.setattr(hud_callbacks, "generate_rc_advisory", lambda _bundle: _advisory())
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda **_kwargs: [],
+    )
+
+    callbacks.refresh_hud()
+
+    assert hud.rc_execution_state_calls[-1] == (True, None)
+
+    callbacks._rc_advisory_snapshot = _build_rc_advisory_execution_snapshot(
+        _trickster_advisory()
+    )
+    callbacks._rc_advisory_cache_actor_id = "愉快犯"
+    callbacks._rc_advisory_display = {"actor_id": "愉快犯"}
+    callbacks._apply_cached_rc_advisory_execution_state("愉快犯")
+    assert hud.rc_execution_state_calls[-1] == (False, None)
+
+
+def test_matching_fresh_advisory_dispatches_once_with_hud_source(monkeypatch):
+    callbacks, _ctx, hud = _make_callbacks()
+    dispatch_calls = []
+    monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", lambda *_args: _bundle())
+    monkeypatch.setattr(hud_callbacks, "generate_rc_advisory", lambda _bundle: _advisory())
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda **_kwargs: [],
+    )
+
+    def dispatch(action_id, **kwargs):
+        dispatch_calls.append((action_id, kwargs))
+        return SimpleNamespace(executed=True, reason=None)
+
+    callbacks._dispatch_action = dispatch
+    callbacks.refresh_hud()
+    callbacks.on_rc_advisory_execute()
+
+    assert len(dispatch_calls) == 1
+    action_id, kwargs = dispatch_calls[0]
+    assert action_id == "choose_first_inquiry_target"
+    assert kwargs["actor_obj"].name == "刑事"
+    assert kwargs["args"] == []
+    assert kwargs["source"] == "HUD"
+    assert kwargs["return_outcome"] is True
+    assert (False, "再検証中…") in hud.rc_execution_state_calls
+    assert hud.rc_execution_state_calls[-1] == (
+        False,
+        "実行しました: 聞き込み先を一件選ぶ",
+    )
+
+
+def test_pipeline_rejection_clears_only_rc_execution_state(monkeypatch):
+    callbacks, ctx, hud = _make_callbacks()
+    ctx.game_state["ro_recommendation"] = {
+        "action_id": "check_tip",
+        "why": "新鮮",
+    }
+    monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", lambda *_args: _bundle())
+    monkeypatch.setattr(hud_callbacks, "generate_rc_advisory", lambda _bundle: _advisory())
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda **_kwargs: [{"title": "外部提案"}],
+    )
+    callbacks._dispatch_action = lambda *_args, **_kwargs: SimpleNamespace(
+        executed=False,
+        reason="tpo_gate_failed",
+    )
+
+    callbacks.refresh_hud()
+    callbacks.on_rc_advisory_execute()
+
+    assert hud.rc_execution_state_calls[-1] == (False, "現在は実行できません")
+    assert hud.ro_calls[-1] == "[check_tip] 新鮮"
+    assert hud.advisory_calls[-1] == [{"title": "外部提案"}]
+
+
+def test_fresh_contract_mismatch_and_no_safe_action_do_not_dispatch(monkeypatch):
+    changed_advisories = (
+        _advisory(schema_version="rc_advisory_future"),
+        _advisory(selected_intent="changed_intent"),
+        _advisory(preferred_action_id="changed_action"),
+        _advisory(preferred_action_layer="GUI"),
+        _advisory(preferred_params={"target_id": "someone"}),
+        _advisory(
+            selected_intent="no_safe_action",
+            preferred_action_id=None,
+            preferred_action_layer=None,
+        ),
+    )
+    monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", lambda *_args: _bundle())
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda **_kwargs: [],
+    )
+
+    for changed_advisory in changed_advisories:
+        callbacks, _ctx, hud = _make_callbacks()
+        generated = [_advisory()]
+        dispatch_calls = []
+        monkeypatch.setattr(
+            hud_callbacks,
+            "generate_rc_advisory",
+            lambda _bundle, generated=generated: generated[0],
+        )
+        callbacks._dispatch_action = (
+            lambda *args, **kwargs: dispatch_calls.append((args, kwargs))
+        )
+
+        callbacks.refresh_hud()
+        generated[0] = changed_advisory
+        callbacks.on_rc_advisory_execute()
+
+        assert dispatch_calls == []
+        assert (
+            hud.rc_execution_state_calls[-1][1]
+            == "状況が変化したため判断を更新しました"
+        )
+
+
+def test_switch_actor_and_busy_guard_block_old_advisory_execution(monkeypatch):
+    callbacks, ctx, hud = _make_callbacks()
+    dispatch_calls = []
+    monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", lambda actor_id, *_args: _bundle(actor_id))
+    monkeypatch.setattr(
+        hud_callbacks,
+        "generate_rc_advisory",
+        lambda bundle: _advisory() if bundle["actor_id"] == "刑事" else _trickster_advisory(),
+    )
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda **_kwargs: [],
+    )
+    callbacks._dispatch_action = lambda *args, **kwargs: dispatch_calls.append((args, kwargs))
+
+    callbacks.refresh_hud()
+    callbacks._rc_advisory_execution_in_progress = True
+    callbacks.on_rc_advisory_execute()
+    callbacks._rc_advisory_execution_in_progress = False
+    assert dispatch_calls == []
+
+    ctx.game_state["active_char"] = SimpleNamespace(name="愉快犯")
+    callbacks.on_rc_advisory_execute()
+
+    assert dispatch_calls == []
+    assert hud.rc_execution_state_calls[-1][1] == "状況が変化したため判断を更新しました"
+
+
+def test_execution_exception_sets_error_without_raising(monkeypatch):
+    callbacks, _ctx, hud = _make_callbacks()
+    should_fail = [False]
+
+    def build(*_args):
+        if should_fail[0]:
+            raise RuntimeError("bundle failed")
+        return _bundle()
+
+    monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", build)
+    monkeypatch.setattr(hud_callbacks, "generate_rc_advisory", lambda _bundle: _advisory())
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda **_kwargs: [],
+    )
+
+    callbacks.refresh_hud()
+    should_fail[0] = True
+    callbacks.on_rc_advisory_execute()
+
+    assert hud.rc_execution_state_calls[-1] == (False, "実行に失敗しました")
+
+
+def test_pipeline_exception_sets_error_without_raising(monkeypatch):
+    callbacks, _ctx, hud = _make_callbacks()
+    monkeypatch.setattr(hud_callbacks, "build_rc_context_bundle", lambda *_args: _bundle())
+    monkeypatch.setattr(hud_callbacks, "generate_rc_advisory", lambda _bundle: _advisory())
+    monkeypatch.setattr(
+        hud_callbacks,
+        "get_advisory_display_items",
+        lambda **_kwargs: [],
+    )
+    callbacks._dispatch_action = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        RuntimeError("pipeline failed")
+    )
+
+    callbacks.refresh_hud()
+    callbacks.on_rc_advisory_execute()
+
+    assert hud.rc_execution_state_calls[-1] == (False, "実行に失敗しました")

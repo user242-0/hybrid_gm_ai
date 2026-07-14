@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import time
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -13,7 +14,7 @@ from src.actor_view_state import (
     sync_actor_view_to_legacy,
 )
 from src.perceived_world import build_perceived_world, format_perceived_world_summary
-from src.rc_ai import generate_rc_advisory
+from src.rc_ai import RC_ADVISORY_SCHEMA_VERSION, generate_rc_advisory
 from src.rc_context import build_rc_context_bundle
 from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
@@ -31,6 +32,61 @@ RC_INTENT_REASONS = {
         "進行中の聞き込みOperationのMiniGoalに対応している"
     ),
 }
+
+RC_ADVISORY_EXECUTION_FIELDS = (
+    "schema_version",
+    "actor_id",
+    "selected_intent",
+    "preferred_action_id",
+    "preferred_action_layer",
+    "preferred_params",
+)
+RC_ADVISORY_EXECUTABLE_ACTION_IDS = frozenset({"choose_first_inquiry_target"})
+
+
+def _build_rc_advisory_execution_snapshot(
+    advisory: dict | None,
+) -> dict[str, Any] | None:
+    """Return the non-persistent fields used to revalidate manual adoption."""
+
+    if not isinstance(advisory, dict):
+        return None
+    if advisory.get("schema_version") != RC_ADVISORY_SCHEMA_VERSION:
+        return None
+    actor_id = advisory.get("actor_id")
+    selected_intent = advisory.get("selected_intent")
+    action_id = advisory.get("preferred_action_id")
+    layer = advisory.get("preferred_action_layer")
+    params = advisory.get("preferred_params")
+    if not isinstance(actor_id, str) or not actor_id:
+        return None
+    if not isinstance(selected_intent, str) or not selected_intent:
+        return None
+    if selected_intent == "no_safe_action":
+        return None
+    if not isinstance(action_id, str) or not action_id:
+        return None
+    if not isinstance(layer, str) or not layer:
+        return None
+    if not isinstance(params, dict):
+        return None
+    return {
+        field: deepcopy(advisory.get(field))
+        for field in RC_ADVISORY_EXECUTION_FIELDS
+    }
+
+
+def _is_supported_rc_advisory_execution(
+    snapshot: dict[str, Any] | None,
+    actor_id: str | None,
+) -> bool:
+    if not isinstance(snapshot, dict) or snapshot.get("actor_id") != actor_id:
+        return False
+    if snapshot.get("preferred_action_id") not in RC_ADVISORY_EXECUTABLE_ACTION_IDS:
+        return False
+    if snapshot.get("preferred_action_layer") != "HUD":
+        return False
+    return snapshot.get("preferred_params") == {}
 
 
 def _build_rc_advisory_display_item(
@@ -156,7 +212,9 @@ class HUDCallbacks:
         self._request_auto_step = request_auto_step
         self._rc_advisory_cache_actor_id: str | None = None
         self._rc_advisory_display: dict[str, Any] | None = None
+        self._rc_advisory_snapshot: dict[str, Any] | None = None
         self._rc_affect_rgb: dict[str, Any] | None = None
+        self._rc_advisory_execution_in_progress = False
 
     def _active_actor_mode(self) -> tuple[str | None, str]:
         ctx = self.ctx
@@ -240,8 +298,10 @@ class HUDCallbacks:
             ctx.director_hud.set_advisory_items([])
             self._rc_advisory_cache_actor_id = None
             self._rc_advisory_display = None
+            self._rc_advisory_snapshot = None
             self._rc_affect_rgb = None
             self._set_rc_advisory_safely(None)
+            self._set_rc_advisory_execution_state_safely(False, None)
             self._set_affect_safely(None)
             set_actor_mode = getattr(ctx.director_hud, "set_actor_mode", None)
             if callable(set_actor_mode):
@@ -449,6 +509,7 @@ class HUDCallbacks:
             available_action_ids={action_id for action_id, _, _ in cached_actions},
         )
         self._apply_cached_rc_advisory(actor_id)
+        self._apply_cached_rc_advisory_execution_state(actor_id)
         self._apply_cached_affect(actor_id)
         self._refresh_advisory_items()
 
@@ -487,6 +548,7 @@ class HUDCallbacks:
     def _recompute_rc_advisory(self, actor_id: str | None) -> None:
         self._rc_advisory_cache_actor_id = actor_id
         self._rc_advisory_display = None
+        self._rc_advisory_snapshot = None
         self._rc_affect_rgb = None
         if not actor_id:
             return
@@ -507,6 +569,9 @@ class HUDCallbacks:
 
         try:
             advisory = generate_rc_advisory(bundle)
+            self._rc_advisory_snapshot = _build_rc_advisory_execution_snapshot(
+                advisory
+            )
             self._rc_advisory_display = _build_rc_advisory_display_item(
                 advisory,
                 bundle,
@@ -523,6 +588,34 @@ class HUDCallbacks:
             else None
         )
         self._set_rc_advisory_safely(display_item)
+
+    def _rc_advisory_execution_available(
+        self,
+        actor_id: str | None,
+        *,
+        ignore_busy: bool = False,
+    ) -> bool:
+        return (
+            self._rc_advisory_cache_actor_id == actor_id
+            and self._rc_advisory_display is not None
+            and _is_supported_rc_advisory_execution(
+                self._rc_advisory_snapshot,
+                actor_id,
+            )
+            and (ignore_busy or not self._rc_advisory_execution_in_progress)
+        )
+
+    def _apply_cached_rc_advisory_execution_state(
+        self,
+        actor_id: str | None,
+    ) -> None:
+        if self._rc_advisory_execution_in_progress:
+            self._set_rc_advisory_execution_state_safely(False, "再検証中…")
+            return
+        self._set_rc_advisory_execution_state_safely(
+            self._rc_advisory_execution_available(actor_id),
+            None,
+        )
 
     def _apply_cached_affect(self, actor_id: str | None) -> None:
         emotion = (
@@ -542,6 +635,21 @@ class HUDCallbacks:
         except Exception as exc:
             if is_hud_debug_enabled():
                 print(f"[HUD_DEBUG] RC advisory HUD setter failed: {exc}")
+
+    def _set_rc_advisory_execution_state_safely(
+        self,
+        enabled: bool,
+        status: str | None,
+    ) -> None:
+        hud = self.ctx.director_hud
+        setter = getattr(hud, "set_rc_advisory_execution_state", None)
+        if not callable(setter):
+            return
+        try:
+            setter(enabled, status)
+        except Exception as exc:
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] RC advisory execution HUD setter failed: {exc}")
 
     def _set_affect_safely(self, emotion: dict[str, Any] | None) -> None:
         hud = self.ctx.director_hud
@@ -728,6 +836,130 @@ class HUDCallbacks:
         )
         print(f"[LOAD] world loaded; reload_epoch={reload_epoch}")
 
+    def _invalidate_rc_advisory_and_refresh(self, reason: str) -> None:
+        self._rc_advisory_cache_actor_id = None
+        self._rc_advisory_display = None
+        self._rc_advisory_snapshot = None
+        self._rc_affect_rgb = None
+        bump = getattr(self.ctx, "bump_hud_cache_rev", None)
+        if callable(bump):
+            bump(reason=reason)
+        else:
+            state = self.ctx.game_state
+            state["hud_cache_rev"] = state.get("hud_cache_rev", 0) + 1
+        self.refresh_hud()
+
+    def on_rc_advisory_execute(self) -> None:
+        """Adopt the displayed RC advisory after rebuilding and revalidating it."""
+
+        if self._rc_advisory_execution_in_progress:
+            return
+
+        actor_obj = self.ctx.game_state.get("active_char")
+        actor_id = getattr(actor_obj, "name", None)
+        displayed_snapshot = (
+            deepcopy(self._rc_advisory_snapshot)
+            if self._rc_advisory_cache_actor_id == actor_id
+            else None
+        )
+        if not _is_supported_rc_advisory_execution(displayed_snapshot, actor_id):
+            if isinstance(displayed_snapshot, dict) or self._rc_advisory_snapshot is not None:
+                try:
+                    self._invalidate_rc_advisory_and_refresh("rc_advisory_stale")
+                except Exception as exc:
+                    if is_hud_debug_enabled():
+                        print(f"[HUD_DEBUG] RC advisory stale refresh failed: {exc}")
+                self._set_rc_advisory_execution_state_safely(
+                    False,
+                    "状況が変化したため判断を更新しました",
+                )
+            else:
+                self._set_rc_advisory_execution_state_safely(
+                    False,
+                    "現在は実行できません",
+                )
+            return
+
+        self._rc_advisory_execution_in_progress = True
+        self._set_rc_advisory_execution_state_safely(False, "再検証中…")
+        final_status = "実行に失敗しました"
+        force_disabled = False
+
+        try:
+            fresh_bundle = build_rc_context_bundle(
+                actor_id,
+                self.ctx.game_state,
+                self.ctx.director,
+            )
+            fresh_advisory = generate_rc_advisory(fresh_bundle)
+            fresh_snapshot = _build_rc_advisory_execution_snapshot(fresh_advisory)
+            current_actor = self.ctx.game_state.get("active_char")
+            current_actor_id = getattr(current_actor, "name", None)
+            if (
+                current_actor_id != actor_id
+                or fresh_snapshot != displayed_snapshot
+            ):
+                self._invalidate_rc_advisory_and_refresh("rc_advisory_stale")
+                final_status = "状況が変化したため判断を更新しました"
+                return
+
+            action_id = fresh_snapshot["preferred_action_id"]
+            if not _is_supported_rc_advisory_execution(fresh_snapshot, actor_id):
+                self._invalidate_rc_advisory_and_refresh("rc_advisory_unsupported")
+                final_status = "現在は実行できません"
+                return
+
+            outcome = self._dispatch_action(
+                action_id,
+                actor_obj=current_actor,
+                args=[],
+                time_min_override=None,
+                source="HUD",
+                return_outcome=True,
+            )
+            if getattr(outcome, "executed", False):
+                # The runtime pipeline refreshes on success. Calling refresh again
+                # is cheap and keeps injected/test dispatchers on the same contract.
+                self.refresh_hud()
+                spec = self._get_action_spec(action_id)
+                action_label = getattr(spec, "label", None) or action_id
+                final_status = f"実行しました: {action_label}"
+                force_disabled = True
+            else:
+                if is_hud_debug_enabled():
+                    print(
+                        "[HUD_DEBUG] RC advisory execution rejected: "
+                        f"{getattr(outcome, 'reason', None)}"
+                    )
+                self._invalidate_rc_advisory_and_refresh("rc_advisory_rejected")
+                final_status = "現在は実行できません"
+                force_disabled = True
+        except Exception as exc:
+            if is_hud_debug_enabled():
+                print(f"[HUD_DEBUG] RC advisory execution failed: {exc}")
+            try:
+                self._invalidate_rc_advisory_and_refresh("rc_advisory_execution_error")
+            except Exception as refresh_exc:
+                if is_hud_debug_enabled():
+                    print(
+                        "[HUD_DEBUG] RC advisory error refresh failed: "
+                        f"{refresh_exc}"
+                    )
+            final_status = "実行に失敗しました"
+            force_disabled = True
+        finally:
+            self._rc_advisory_execution_in_progress = False
+            active_actor = self.ctx.game_state.get("active_char")
+            active_actor_id = getattr(active_actor, "name", None)
+            enabled = (
+                not force_disabled
+                and self._rc_advisory_execution_available(
+                    active_actor_id,
+                    ignore_busy=True,
+                )
+            )
+            self._set_rc_advisory_execution_state_safely(enabled, final_status)
+
     def on_action_select(self, which: object) -> None:
         """HUD からアクションを選択する"""
         ctx = self.ctx
@@ -887,6 +1119,7 @@ class HUDCallbacks:
         hud.on_load = self.on_load
         hud.on_show_micro = self.on_show_micro
         hud.on_action_select = self.on_action_select
+        hud.on_rc_advisory_execute = self.on_rc_advisory_execute
 
         # Demo/debug ActorMode dropdown
         actor_mode_hud = getattr(

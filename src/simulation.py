@@ -347,6 +347,7 @@ def dispatch_action(
     args: list[object] | None = None,
     time_min_override: int | None = None,
     source: str = "UI",
+    return_outcome: bool = False,
 ):
     if ctx.pipeline is None:
         return None
@@ -356,6 +357,7 @@ def dispatch_action(
         args=args or [],
         time_min_override=time_min_override,
         source=source,
+        return_outcome=return_outcome,
     )
 
 

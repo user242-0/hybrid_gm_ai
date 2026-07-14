@@ -783,6 +783,11 @@ class Director:
                 required_discoveries = [required_discoveries]
             if not all(discovery in discoveries for discovery in required_discoveries):
                 continue
+            forbidden_discoveries = candidate.get("forbidden_discoveries") or []
+            if isinstance(forbidden_discoveries, str):
+                forbidden_discoveries = [forbidden_discoveries]
+            if any(discovery in discoveries for discovery in forbidden_discoveries):
+                continue
             if not self._passes_required_operation_type(candidate, world, actor_id):
                 continue
             scope = candidate.get("interaction_scope")
@@ -809,6 +814,9 @@ class Director:
         game_state: Optional[Dict[str, Any]],
         actor_id: Optional[str],
         action_id: str,
+        *,
+        source: Optional[str] = None,
+        action_layer: Optional[str] = None,
     ) -> bool:
         """Recheck pack-defined TPO HUD gates before executing a HUD action.
 
@@ -835,6 +843,16 @@ class Director:
             return False
         if matched_candidate.get("actor_id") != actor_id:
             return False
+        if matched_candidate.get("action_layer") != "HUD":
+            return False
+        if action_layer is not None and action_layer != "HUD":
+            return False
+        if source is not None and source not in {"HUD", "RC_AI"}:
+            return False
+        if source == "HUD":
+            active_actor = game_state.get("active_char") if isinstance(game_state, dict) else None
+            if getattr(active_actor, "name", None) != actor_id:
+                return False
 
         mode = self.get_actor_mode(world, actor_id, fallback_mode=self.mode)
         required_modes = matched_candidate.get("required_actor_mode") or []
@@ -848,6 +866,11 @@ class Director:
         if isinstance(required_discoveries, str):
             required_discoveries = [required_discoveries]
         if not all(discovery in discoveries for discovery in required_discoveries):
+            return False
+        forbidden_discoveries = matched_candidate.get("forbidden_discoveries") or []
+        if isinstance(forbidden_discoveries, str):
+            forbidden_discoveries = [forbidden_discoveries]
+        if any(discovery in discoveries for discovery in forbidden_discoveries):
             return False
         if not self._passes_required_operation_type(matched_candidate, world, actor_id):
             return False

@@ -20,6 +20,34 @@ from datalab.emitters.emotion_emitter import emit_emotion_eval, summarize_why_no
 from schemas.scene_graph import ObjectSpec, Pose
 
 
+@dataclass(frozen=True)
+class ActionExecutionOutcome:
+    """Opt-in execution result that leaves the legacy return contract intact."""
+
+    action_id: str
+    executed: bool
+    reason: str | None = None
+    value: Any | None = None
+
+
+def _action_result(
+    action_id: str,
+    *,
+    return_outcome: bool,
+    executed: bool,
+    reason: str | None = None,
+    value: Any | None = None,
+) -> Any | ActionExecutionOutcome | None:
+    if return_outcome:
+        return ActionExecutionOutcome(
+            action_id=action_id,
+            executed=executed,
+            reason=reason,
+            value=value,
+        )
+    return value
+
+
 @dataclass
 class ActionPipeline:
     game_state: dict
@@ -343,12 +371,25 @@ class ActionPipeline:
         args: Iterable[Any] | None = None,
         time_min_override: int | None = None,
         source: str = "UI",
-    ) -> Any | None:
+        return_outcome: bool = False,
+    ) -> Any | ActionExecutionOutcome | None:
         if not action_id:
-            return None
+            return _action_result(
+                "",
+                return_outcome=return_outcome,
+                executed=False,
+                reason="missing_action_id",
+            )
 
         world = self._resolve_world()
         spec = get_action_spec(action_id)
+        if spec is None:
+            return _action_result(
+                action_id,
+                return_outcome=return_outcome,
+                executed=False,
+                reason="missing_action_spec",
+            )
         arg_list = list(args) if args else []
         result: Any | None = None
         action_executed = False
@@ -372,7 +413,12 @@ class ActionPipeline:
             ok, move_result = move_to_location(world, self.game_state, actor_id, destination)
             if not ok:
                 print(f"[ActionPipeline] move_to_location rejected: {move_result.get('error')}")
-                return None
+                return _action_result(
+                    action_id,
+                    return_outcome=return_outcome,
+                    executed=False,
+                    reason="move_rejected",
+                )
             if actor_obj is not None and hasattr(actor_obj, "location"):
                 actor_obj.location = destination
             self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
@@ -388,12 +434,22 @@ class ActionPipeline:
             )
             if self.ui_refresh is not None:
                 self.ui_refresh()
-            return move_result
+            return _action_result(
+                action_id,
+                return_outcome=return_outcome,
+                executed=True,
+                value=move_result,
+            )
         if action_id in legacy_actions and actor_obj is not None:
             if spec and spec.requirements:
                 checker = RequirementsChecker(self.game_state, actor_obj)
                 if not checker.check_all(spec.requirements, args=arg_list):
-                    return None
+                    return _action_result(
+                        action_id,
+                        return_outcome=return_outcome,
+                        executed=False,
+                        reason="requirements_failed",
+                    )
             if spec and spec.function:
                 result = spec.function(actor_obj, self.game_state, *arg_list)
             # アクションが認識された時点で action_executed = True（function が None でも時間進行する）
@@ -404,17 +460,41 @@ class ActionPipeline:
                     can_execute_tpo = getattr(self.director, "can_execute_tpo_hud_action", None)
                     if callable(can_execute_tpo):
                         actor_id = self._resolve_actor_id(actor_obj)
-                        if not can_execute_tpo(world, self.game_state, actor_id, action_id):
+                        if not can_execute_tpo(
+                            world,
+                            self.game_state,
+                            actor_id,
+                            action_id,
+                            source=source,
+                            action_layer=getattr(spec, "action_layer", None),
+                        ):
                             print(
                                 "[ActionPipeline] TPO HUD action rejected at execution gate: "
                                 f"actor={actor_id} action={action_id}"
                             )
-                            return None
+                            return _action_result(
+                                action_id,
+                                return_outcome=return_outcome,
+                                executed=False,
+                                reason="tpo_gate_failed",
+                            )
                 if hasattr(action_registry, "execute_action_core"):
-                    action_registry.execute_action_core(world, action_id)
+                    core_executed = action_registry.execute_action_core(world, action_id)
+                    if core_executed is not True:
+                        return _action_result(
+                            action_id,
+                            return_outcome=return_outcome,
+                            executed=False,
+                            reason="core_requirements_failed",
+                        )
                     action_executed = True
                 else:  # TODO: implement execute_action_core in src.action_registry
-                    return None
+                    return _action_result(
+                        action_id,
+                        return_outcome=return_outcome,
+                        executed=False,
+                        reason="core_executor_missing",
+                    )
 
         if action_executed:
             self._start_operation_from_spec(
@@ -608,4 +688,10 @@ class ActionPipeline:
         if self.ui_refresh is not None:
             self.ui_refresh()
 
-        return result
+        return _action_result(
+            action_id,
+            return_outcome=return_outcome,
+            executed=action_executed,
+            reason=None if action_executed else "not_executed",
+            value=result,
+        )

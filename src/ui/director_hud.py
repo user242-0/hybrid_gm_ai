@@ -241,6 +241,7 @@ class DirectorHUD:
         self.on_load: Optional[Callable[[], None]] = None
         self.on_show_micro: Optional[Callable[[], None]] = None
         self.on_action_select: Optional[Callable[[object], None]] = None
+        self.on_rc_advisory_execute: Optional[Callable[[], None]] = None
         self.on_toggle_auto: Optional[Callable[[bool], None]] = None
         self.on_ai_step: Optional[Callable[[], None]] = None
         self.on_inject_discovery: Optional[Callable[[str], None]] = None
@@ -258,6 +259,7 @@ class DirectorHUD:
         self.advisory_var = tk.StringVar(value="")
         self.rc_advisory_var = tk.StringVar(value="")
         self.rc_advisory_status_var = tk.StringVar(value="")
+        self.rc_advisory_execution_status_var = tk.StringVar(value="")
         self.active_rc_var = tk.StringVar(value="")
         self.affect_value_var = tk.StringVar(value="")
         self.auto_var = tk.BooleanVar(value=False)
@@ -276,7 +278,9 @@ class DirectorHUD:
         self.operational_pane: Optional[tk.Frame] = None
         self.intelligence_pane: Optional[tk.Frame] = None
         self.rc_advisory_content_frame: Optional[tk.Frame] = None
+        self.rc_advisory_controls_frame: Optional[tk.Frame] = None
         self.rc_advisory_toggle_button: Optional[tk.Button] = None
+        self.rc_advisory_execute_button: Optional[tk.Button] = None
         self.affect_indicator_label: Optional[tk.Label] = None
         self._ui_thread = threading.current_thread()
         self._pending_calls: "queue.Queue[Callable[[], None]]" = queue.Queue()
@@ -696,6 +700,33 @@ class DirectorHUD:
             font=normal_font,
         )
         self.rc_advisory_label.pack(fill="x", padx=6, pady=(2, 6))
+        self.rc_advisory_controls_frame = tk.Frame(
+            self.rc_advisory_content_frame,
+            bg=frame["bg"],
+        )
+        self.rc_advisory_controls_frame.pack(fill="x", padx=6, pady=(0, 6))
+        self.rc_advisory_execute_button = tk.Button(
+            self.rc_advisory_controls_frame,
+            text="採用して実行",
+            command=self._on_rc_advisory_execute_click,
+            state=tk.DISABLED,
+            fg=INTELLIGENCE_COLORS["rc"],
+            bg=frame["bg"],
+            activeforeground=INTELLIGENCE_COLORS["rc"],
+            activebackground=frame["bg"],
+            font=normal_font,
+        )
+        self.rc_advisory_execute_button.pack(side="left")
+        tk.Label(
+            self.rc_advisory_controls_frame,
+            textvariable=self.rc_advisory_execution_status_var,
+            fg=INTELLIGENCE_COLORS["muted"],
+            bg=frame["bg"],
+            wraplength=intelligence_wrap,
+            justify="left",
+            anchor="w",
+            font=normal_font,
+        ).pack(side="left", padx=(8, 0), fill="x", expand=True)
         if self._rc_advisory_expanded:
             self.rc_advisory_content_frame.pack(fill="x")
 
@@ -920,6 +951,22 @@ class DirectorHUD:
 
         self._run_or_enqueue(apply)
 
+    def set_rc_advisory_execution_state(
+        self,
+        enabled: bool,
+        status: str | None = None,
+    ) -> None:
+        def apply() -> None:
+            status_var = getattr(self, "rc_advisory_execution_status_var", None)
+            if status_var is not None:
+                status_var.set(status or "")
+            button = getattr(self, "rc_advisory_execute_button", None)
+            if button is not None:
+                available = bool(getattr(self, "_rc_advisory_available", False))
+                button.configure(state=tk.NORMAL if enabled and available else tk.DISABLED)
+
+        self._run_or_enqueue(apply)
+
     def set_affect(self, emotion: object | None) -> None:
         rgb = _normalize_affect_rgb(emotion)
         color = (
@@ -1076,6 +1123,10 @@ class DirectorHUD:
     def _run_index(self, idx: int) -> None:
         if self.on_action_select:
             self.on_action_select(idx)
+
+    def _on_rc_advisory_execute_click(self) -> None:
+        if self.on_rc_advisory_execute:
+            self.on_rc_advisory_execute()
 
     # --- Debug: discovery injection ---
 
