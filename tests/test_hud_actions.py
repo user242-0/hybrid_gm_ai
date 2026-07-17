@@ -2,6 +2,7 @@ import json
 import copy
 from types import SimpleNamespace
 import yaml
+import pytest
 
 from director.director import Director, load_yaml
 from director.registry import load_pack, extract_goals_from_pack
@@ -205,8 +206,8 @@ def _active_inquiry_operation(actor_id, *, status="active"):
         "parent_microgoal_id": None,
         "created_from": "test",
         "mini_goal": {
-            "id": "mini_goal_first_testimony",
-            "label": "最初の証言を取る",
+            "id": "mini_goal_choose_first_inquiry_target",
+            "label": "聞き込み先を一件選ぶ",
             "status": "active",
         },
         "notes": [],
@@ -1543,13 +1544,12 @@ def test_operation_required_hud_action_execution_rechecks_operation_type():
     assert world.get("investigation_progress") in (None, 0)
 
 
-def test_choose_first_inquiry_target_executes_once_and_preserves_operation():
+def test_choose_first_inquiry_target_executes_once_and_advances_operation():
     pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
     cop_id = pack["roles"]["protagonist"]["name"]
     get_action_specs(pack)
     director.set_actor_mode(world, cop_id, "WITNESS")
     set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
-    operation_before = copy.deepcopy(get_active_operation(world, cop_id))
     progress_before = world.get("investigation_progress", 0)
     pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
     ctx.game_state["director_world"] = world
@@ -1567,7 +1567,14 @@ def test_choose_first_inquiry_target_executes_once_and_preserves_operation():
     assert first.reason is None
     assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
     assert world["investigation_progress"] == progress_before + 1
-    assert get_active_operation(world, cop_id) == operation_before
+    operation_after = get_active_operation(world, cop_id)
+    assert operation_after["phase"] == "target_selected"
+    assert operation_after["status"] == "active"
+    assert operation_after["mini_goal"] == {
+        "id": "mini_goal_take_first_testimony",
+        "label": "最初の証言を取る",
+        "status": "active",
+    }
 
     second = pipeline.request_action(
         "choose_first_inquiry_target",
@@ -1580,7 +1587,7 @@ def test_choose_first_inquiry_target_executes_once_and_preserves_operation():
     assert second.executed is False
     assert second.reason == "tpo_gate_failed"
     assert world["investigation_progress"] == progress_before + 1
-    assert get_active_operation(world, cop_id) == operation_before
+    assert get_active_operation(world, cop_id) == operation_after
 
 
 def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
@@ -1598,6 +1605,8 @@ def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
     ctx.game_state["world"] = world
 
     assert "choose_first_inquiry_target" in _refresh_action_ids(callbacks, ctx, hud)
+    assert "/ start" in hud.operation_summary
+    assert "MiniGoal: 聞き込み先を一件選ぶ" in hud.operation_summary
 
     outcome = pipeline.request_action(
         "choose_first_inquiry_target",
@@ -1610,7 +1619,133 @@ def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
 
     assert outcome.executed is True
     assert "choose_first_inquiry_target" not in action_ids_after
+    assert "/ target_selected" in hud.operation_summary
+    assert "MiniGoal: 最初の証言を取る" in hud.operation_summary
     assert hud.rc_advisory is None
+
+
+def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    calls = []
+
+    def record_progression(progress_world, actor_id, action_id):
+        calls.append((progress_world, actor_id, action_id))
+        return {"advanced": False, "reason": "test"}
+
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "advance_operation_after_action",
+        record_progression,
+    )
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    assert outcome.executed is True
+    assert calls == [(world, cop_id, "choose_first_inquiry_target")]
+
+
+def test_action_pipeline_rejection_does_not_call_progression(monkeypatch):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    calls = []
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "advance_operation_after_action",
+        lambda *args: calls.append(args),
+    )
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    assert outcome.executed is False
+    assert outcome.reason == "tpo_gate_failed"
+    assert calls == []
+
+
+def test_progression_exception_does_not_reject_applied_action(monkeypatch):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    operation_before = copy.deepcopy(get_active_operation(world, cop_id))
+    progress_before = world.get("investigation_progress", 0)
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "advance_operation_after_action",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("progression failed")),
+    )
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    assert outcome.executed is True
+    assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
+    assert world["investigation_progress"] == progress_before + 1
+    assert get_active_operation(world, cop_id) == operation_before
+
+
+def test_action_effect_failure_does_not_call_progression(monkeypatch):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    calls = []
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "advance_operation_after_action",
+        lambda *args: calls.append(args),
+    )
+    monkeypatch.setattr(
+        "src.ui.action_pipeline.action_registry.execute_action_core",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("effects failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="effects failed"):
+        pipeline.request_action(
+            "choose_first_inquiry_target",
+            actor_obj=ctx.game_state["party"][cop_id],
+            args=[],
+            source="HUD",
+            return_outcome=True,
+        )
+
+    assert calls == []
 
 
 def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
@@ -1623,7 +1758,6 @@ def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
     get_action_specs(pack)
     director.set_actor_mode(world, cop_id, "WITNESS")
     set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
-    operation_before = copy.deepcopy(get_active_operation(world, cop_id))
     progress_before = world.get("investigation_progress", 0)
     pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
     ctx.game_state["director_world"] = world
@@ -1650,7 +1784,9 @@ def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
     assert dispatch_calls[0][1]["return_outcome"] is True
     assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
     assert world["investigation_progress"] == progress_before + 1
-    assert get_active_operation(world, cop_id) == operation_before
+    operation_after = get_active_operation(world, cop_id)
+    assert operation_after["phase"] == "target_selected"
+    assert operation_after["mini_goal"]["id"] == "mini_goal_take_first_testimony"
     assert hud.rc_advisory is None
     assert hud.rc_execution_states[-1][0] is False
     assert hud.rc_execution_states[-1][1].startswith("実行しました:")
@@ -1659,7 +1795,7 @@ def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
 
     assert len(dispatch_calls) == 1
     assert world["investigation_progress"] == progress_before + 1
-    assert get_active_operation(world, cop_id) == operation_before
+    assert get_active_operation(world, cop_id) == operation_after
 
 
 def test_tpo_hud_action_rejects_non_hud_source_without_effects():
@@ -1703,7 +1839,11 @@ def test_hud_action_starts_operation_once():
     assert operation["phase"] == "start"
     assert operation["actor_id"] == cop_id
     assert operation["created_from"] == "HUD"
-    assert operation["mini_goal"]["label"] == "最初の証言を取る"
+    assert operation["mini_goal"] == {
+        "id": "mini_goal_choose_first_inquiry_target",
+        "label": "聞き込み先を一件選ぶ",
+        "status": "active",
+    }
     assert operation["notes"] == []
 
 
@@ -1796,7 +1936,54 @@ def test_save_load_preserves_hud_started_operation(monkeypatch):
     operation = get_active_operation(ctx.director_world, cop_id)
     assert operation["type"] == "inquiry"
     assert operation["label"] == "聞き込みを始める"
-    assert operation["mini_goal"]["label"] == "最初の証言を取る"
+    assert operation["mini_goal"] == {
+        "id": "mini_goal_choose_first_inquiry_target",
+        "label": "聞き込み先を一件選ぶ",
+        "status": "active",
+    }
+
+
+def test_save_load_preserves_progressed_operation(monkeypatch):
+    pack, director, world, callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    saved = {}
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    callbacks._save_director_world = lambda value: saved.update(copy.deepcopy(value))
+    callbacks._load_director_world = lambda _fallback: copy.deepcopy(saved)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+    callbacks.on_save()
+    world["actor_operations"][cop_id]["active_operation"] = None
+    callbacks.on_load()
+
+    assert outcome.executed is True
+    operation = get_active_operation(ctx.director_world, cop_id)
+    assert operation["status"] == "active"
+    assert operation["phase"] == "target_selected"
+    assert operation["mini_goal"] == {
+        "id": "mini_goal_take_first_testimony",
+        "label": "最初の証言を取る",
+        "status": "active",
+    }
 
 
 def test_actor_view_state_survives_yaml_roundtrip():

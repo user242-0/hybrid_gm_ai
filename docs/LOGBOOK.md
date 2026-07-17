@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-07-18（Session58-B: Operation phase / MiniGoal progression 実装）
+
+- 58-A確定HEAD `b49a521` から作成した `feature/session58b-operation-minigoal-progression` 上で実装した。既知の `config.yml` と未追跡 `AGENTS.md` は変更・stageしていない。
+- `src/operation_progression.py` にactor別の小さい進行関数を追加した。`ActionPipeline.request_action()`のeffects成功後だけ呼び、刑事のactive inquiry / phase=start / 初期MiniGoal / exact actor discovery `inquiry_target_chosen` が揃った時だけ `target_selected` / `mini_goal_take_first_testimony` へ更新する。進行resultはJSON-safeで、既存`ActionExecutionOutcome`には混ぜない。
+- cop_trickster packの新規Operationは `mini_goal_choose_first_inquiry_target`（聞き込み先を一件選ぶ）から始まる。既存RC_AI intent `advance_inquiry_first_testimony` と `choose_first_inquiry_target` は維持し、旧 `mini_goal_first_testimony` はread-time mutationなしのlegacy aliasとして受理する。
+- Operation更新はdeep copy後に行い、status、id、target、parent MicroGoal、created_from、notes等を保持する。二回目、別actor、別Operation、別phase、discovery未達、不完全stateはworld非変更のno-op。次MiniGoalには未実装advisoryを追加せず、既存refreshでRC_AI欄が空になる。
+- HUD widget/setter、58-A手動採用、水平ペイン、AFFECT、RO／External、geometry、event loopは変更していない。Operation history、Memory / Belief、Operation完了、中断・arbitration、具体的な聞き込み対象、GUI Action Compileも対象外。
+- テスト: `498 passed / 2 skipped`、`git diff --check`成功。単体の冪等性・legacy互換・actor分離・JSON/YAML roundtripと、Pipeline成功／gate拒否／effects失敗／progression例外、58-A実行、HUD before/after、進行後save/loadを固定した。
+- Windows手動確認で、「聞き込みを始める」後の初期MiniGoalから「採用して実行」し、`target_selected` / 「最初の証言を取る」への表示遷移とRC_AI欄消去を確認した。`investigation_progress +1`は手動での確認方法が不明だったため未確認だが、実Pipelineテストで1回だけ増え、二重実行で増えないことを保証している。
+- 次回の最初の一手: Session59のMemory / Beliefへ進む前に、Session58-A/Bをcheckpoint化し、Action結果とOperation transitionをどの粒度でMemory eventへ渡すか調査する。
+
 ## 2026-07-14（Session58-A: RC advisory手動採用・実行 実装）
 
 - Session57.5のHEAD `5ab44e3` を `staging/session57-5-hud-intelligence-panel` としてoriginへpushし、そこから `feature/session58a-rc-advisory-manual-execution` を作成した。

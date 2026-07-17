@@ -121,8 +121,8 @@ actions:
     operation_label: "聞き込みを始める"
     operation_phase: start
     operation_mini_goal:
-      id: mini_goal_first_testimony
-      label: "最初の証言を取る"
+      id: mini_goal_choose_first_inquiry_target
+      label: "聞き込み先を一件選ぶ"
       status: active
     heart:
       axis: blue

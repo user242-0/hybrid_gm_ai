@@ -12,7 +12,16 @@ RC_ADVISORY_SCHEMA_VERSION = "rc_advisory_v0.1"
 DETECTIVE_ID = "刑事"
 TRICKSTER_ID = "愉快犯"
 INQUIRY_OPERATION_TYPE = "inquiry"
-FIRST_TESTIMONY_MINI_GOAL_ID = "mini_goal_first_testimony"
+CHOOSE_FIRST_INQUIRY_TARGET_MINI_GOAL_ID = (
+    "mini_goal_choose_first_inquiry_target"
+)
+LEGACY_FIRST_TESTIMONY_MINI_GOAL_ID = "mini_goal_first_testimony"
+FIRST_INQUIRY_MINI_GOAL_IDS = frozenset(
+    {
+        CHOOSE_FIRST_INQUIRY_TARGET_MINI_GOAL_ID,
+        LEGACY_FIRST_TESTIMONY_MINI_GOAL_ID,
+    }
+)
 FIRST_INQUIRY_ACTION_ID = "choose_first_inquiry_target"
 FIRST_INQUIRY_INTENT_ID = "advance_inquiry_first_testimony"
 FLEE_MODE = "FLEE"
@@ -128,7 +137,7 @@ def _build_operation_intent(
         return None
     if operation.get("type") != INQUIRY_OPERATION_TYPE:
         return None
-    if operation.get("mini_goal_id") != FIRST_TESTIMONY_MINI_GOAL_ID:
+    if operation.get("mini_goal_id") not in FIRST_INQUIRY_MINI_GOAL_IDS:
         return None
 
     return {

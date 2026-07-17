@@ -80,6 +80,13 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session58-B: Operation phase / MiniGoal progression 実装
+
+- `src/operation_progression.py` を追加し、ActionPipelineのeffects成功直後にactor別world condition `inquiry_target_chosen`を評価するpost-success hookを接続した。条件成立時だけ `phase=start` / `mini_goal_choose_first_inquiry_target` から `phase=target_selected` / `mini_goal_take_first_testimony` へ一度だけ進み、他actor・不完全state・再評価は安全なno-opになる。
+- cop_trickster packの新規inquiry初期MiniGoalを「聞き込み先を一件選ぶ」へ修正した。RC_AIのschema、intent ID、preferred action、通常表示は維持し、旧 `mini_goal_first_testimony` は初期段階のlegacy aliasとしてRC_AIと進行判定の両方で受理する。次MiniGoal用ruleは追加していないため、進行後のRC advisoryは空になる。
+- `ActionExecutionOutcome`、HUDCallbacks、DirectorHUDは変更せず、既存HUD cache rev / refreshでOperation phase・MiniGoal更新とRC advisory消去を反映する。Operation statusと既存metadataは保持し、履歴schema、Memory / Belief、Operation完了、中断・切替、GUI Action Compileは対象外のまま。
+- 自動テストは `498 passed / 2 skipped`。Operation進行の冪等性・legacy互換・actor分離・JSON/YAML安全性、Pipeline成功／拒否／effects失敗／progression例外、58-A手動採用、実行前後HUD表示、進行後save/loadまで固定済み。Windows手動確認でも、初期MiniGoalから `target_selected` / 「最初の証言を取る」への遷移とRC advisory消去を確認した。`investigation_progress +1`は手動では未確認だが、実Pipeline自動テストで1回だけ増えることを固定している。
+
 ### Session58-A: RC advisory manual adoption / execution 実装
 
 - Session57.5の確定HEAD `5ab44e3` を `staging/session57-5-hud-intelligence-panel` としてoriginへcheckpoint化し、同HEADから `feature/session58a-rc-advisory-manual-execution` を作成した。

@@ -39,8 +39,8 @@ def _active_inquiry_operation():
         "phase": "start",
         "actor_id": "刑事",
         "mini_goal": {
-            "id": "mini_goal_first_testimony",
-            "label": "最初の証言を取る",
+            "id": "mini_goal_choose_first_inquiry_target",
+            "label": "聞き込み先を一件選ぶ",
             "status": "active",
         },
         "notes": [],
@@ -128,7 +128,7 @@ def test_perceived_world_includes_active_operation_summary():
     assert perceived["active_operation"]["label"] == "聞き込みを始める"
     assert perceived["active_operation"]["status"] == "active"
     assert perceived["active_operation"]["phase"] == "start"
-    assert perceived["active_operation"]["mini_goal"] == "最初の証言を取る"
+    assert perceived["active_operation"]["mini_goal"] == "聞き込み先を一件選ぶ"
     assert any("聞き込みを進め" in text for text in perceived["interpretations"])
 
 

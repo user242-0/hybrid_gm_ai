@@ -15,8 +15,8 @@ def _inquiry_bundle():
             "type": "inquiry",
             "status": "active",
             "phase": "start",
-            "mini_goal_id": "mini_goal_first_testimony",
-            "mini_goal": "最初の証言を取る",
+            "mini_goal_id": "mini_goal_choose_first_inquiry_target",
+            "mini_goal": "聞き込み先を一件選ぶ",
         },
         "available_actions": {
             "gui": [],
@@ -93,6 +93,28 @@ def test_generate_rc_advisory_selects_first_inquiry_target():
         "confidence": 1.0,
         "auto_execute": False,
     }
+
+
+def test_generate_rc_advisory_accepts_legacy_first_testimony_mini_goal_id():
+    bundle = _inquiry_bundle()
+    bundle["active_operation"]["mini_goal_id"] = "mini_goal_first_testimony"
+
+    advisory = generate_rc_advisory(bundle)
+
+    assert advisory["selected_intent"] == "advance_inquiry_first_testimony"
+    assert advisory["preferred_action_id"] == "choose_first_inquiry_target"
+
+
+def test_next_inquiry_mini_goal_has_no_unimplemented_advisory():
+    bundle = _inquiry_bundle()
+    bundle["active_operation"]["phase"] = "target_selected"
+    bundle["active_operation"]["mini_goal_id"] = "mini_goal_take_first_testimony"
+    bundle["active_operation"]["mini_goal"] = "最初の証言を取る"
+
+    advisory = generate_rc_advisory(bundle)
+
+    assert advisory["selected_intent"] == "no_safe_action"
+    assert advisory["preferred_action_id"] is None
 
 
 @pytest.mark.parametrize("status", ["completed", "suspended", None])

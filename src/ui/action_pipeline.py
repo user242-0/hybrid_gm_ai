@@ -7,6 +7,7 @@ from pathlib import Path
 from src import action_registry
 from src.action_definitions import actions as legacy_actions, get_action_spec
 from src.actor_operations import start_operation_once
+from src.operation_progression import advance_operation_after_action
 from src.location_graph import MOVE_ACTION_ID, move_to_location
 from src.requirements_checker import RequirementsChecker
 from src.simulation_utils import add_minutes, ensure_clock
@@ -495,6 +496,27 @@ class ActionPipeline:
                         executed=False,
                         reason="core_executor_missing",
                     )
+
+        if action_executed and world is not None and action_id != "switch_character":
+            actor_id = self._resolve_actor_id(actor_obj)
+            try:
+                progress_result = advance_operation_after_action(
+                    world,
+                    actor_id,
+                    action_id,
+                )
+                if progress_result.get("advanced") is True:
+                    print(
+                        "[Operation] advanced "
+                        f"actor={actor_id} "
+                        f"operation={progress_result.get('operation_id')} "
+                        f"phase={progress_result.get('from_phase')}"
+                        f"->{progress_result.get('to_phase')}"
+                    )
+            except Exception as exc:
+                # Effects have already succeeded. A progression failure must not
+                # turn that completed action into a rejected execution.
+                print(f"[Operation] progression failed: {exc}")
 
         if action_executed:
             self._start_operation_from_spec(

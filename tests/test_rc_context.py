@@ -103,8 +103,8 @@ def _active_inquiry_operation(actor_id):
         "phase": "start",
         "actor_id": actor_id,
         "mini_goal": {
-            "id": "mini_goal_first_testimony",
-            "label": "first testimony",
+            "id": "mini_goal_choose_first_inquiry_target",
+            "label": "choose first inquiry target",
             "status": "active",
         },
         "notes": [],
@@ -132,7 +132,9 @@ def test_build_rc_context_bundle_for_detective():
     assert bundle["actor_mode"] == "WITNESS"
     assert bundle["micro_goal"]["label"] == "existing detective micro"
     assert bundle["active_operation"]["type"] == "inquiry"
-    assert bundle["active_operation"]["mini_goal_id"] == "mini_goal_first_testimony"
+    assert bundle["active_operation"]["mini_goal_id"] == (
+        "mini_goal_choose_first_inquiry_target"
+    )
     assert bundle["perceived_world"]["actor_id"] == cop_id
     assert bundle["perceived_world"]["location"] == location
     assert "camera_skew_noticed" in bundle["perceived_world"]["discoveries"]
