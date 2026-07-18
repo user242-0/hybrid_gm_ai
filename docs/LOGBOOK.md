@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-07-18（Session59-A: Operation Transition Record v0.1 実装）
+
+- 気持ち／所感: Action結果、客観event、RC Memory、Beliefの境界を崩さず、Session58の縦切りへ小さい永続記録を足せた。次の認知ループへ渡す事実が、表示や主観表現から独立した形になったのがよい。
+- 技術メモ: progression成功resultから決定的な `operation_transition_v0.1` eventを構築し、director world rootの `operation_transition_history` へ遅延生成・冪等appendする。現在のactive Operation post-stateをactor/id/type/to_phase/next MiniGoalまで照合し、重複時は既存eventのdeepcopyを返す。不正入力や不正historyではworldを変更しない。
+- ActionPipelineではeffects成功後のprogression直後、Operation start / time advance前にrecordする。progression失敗とrecord失敗の例外境界を分け、recordだけ失敗した場合もeffectsとauthoritativeなOperation進行を巻き戻さない。v0.1でtransactionを導入すると既存のAction成功契約と副作用全体のrollback設計まで広がるため、専用ログを出す部分成功を選んだ。
+- simulation clockは保存しなかった。対象Actionが `time_min: 0` で、既存clock形式とpre/post time advance契約をこのSessionで固定する必要がなく、event順序はappend-only listで保持できるため。将来は時間契約を整理した上でoptional fieldとして追加できる。
+- 固定Operation IDのため同actor・同typeを再開始するとevent IDが衝突し得る。instance ID / sequence / migrationはOperation完了・再開始設計と合わせて扱い、59-Aには持ち込んでいない。Memory / Belief / RCContextBundle、汎用event bus、rollbackも未実装。
+- テスト: `586 passed / 2 skipped`、`git diff --check`成功。自動テスト完了、Windows手動確認待ち。
+- 次回の最初の一手: ChatGPTへSession59-Aデブリーフを持ち帰り、客観transition eventをactor別Memoryへ投影するSession59-Bのsource event契約を確認する。Session59-Bへは勝手に進まない。
+
 ## 2026-07-18（Session58-B: Operation phase / MiniGoal progression 実装）
 
 - 58-A確定HEAD `b49a521` から作成した `feature/session58b-operation-minigoal-progression` 上で実装した。既知の `config.yml` と未追跡 `AGENTS.md` は変更・stageしていない。

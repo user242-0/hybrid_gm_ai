@@ -8,6 +8,7 @@ from src import action_registry
 from src.action_definitions import actions as legacy_actions, get_action_spec
 from src.actor_operations import start_operation_once
 from src.operation_progression import advance_operation_after_action
+from src.operation_transition_history import record_operation_transition
 from src.location_graph import MOVE_ACTION_ID, move_to_location
 from src.requirements_checker import RequirementsChecker
 from src.simulation_utils import add_minutes, ensure_clock
@@ -505,7 +506,8 @@ class ActionPipeline:
                     actor_id,
                     action_id,
                 )
-                if progress_result.get("advanced") is True:
+                operation_advanced = progress_result.get("advanced") is True
+                if operation_advanced:
                     print(
                         "[Operation] advanced "
                         f"actor={actor_id} "
@@ -517,6 +519,14 @@ class ActionPipeline:
                 # Effects have already succeeded. A progression failure must not
                 # turn that completed action into a rejected execution.
                 print(f"[Operation] progression failed: {exc}")
+            else:
+                if operation_advanced:
+                    try:
+                        record_operation_transition(world, progress_result)
+                    except Exception as exc:
+                        # Operation progression is already authoritative. A record
+                        # failure must not roll back or reject the completed action.
+                        print(f"[Operation] transition record failed: {exc}")
 
         if action_executed:
             self._start_operation_from_spec(

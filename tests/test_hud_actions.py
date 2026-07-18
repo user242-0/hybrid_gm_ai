@@ -18,6 +18,8 @@ from src.actor_view_state import (
 )
 from src.affordance_bridge import inject_discovery
 from src.choice_definitions import choice_dispatch_args, get_available_choices
+from src.rc_ai import generate_rc_advisory
+from src.rc_context import build_rc_context_bundle
 from src.ui.action_pipeline import ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
 from src.world_defaults import apply_world_defaults
@@ -211,6 +213,26 @@ def _active_inquiry_operation(actor_id, *, status="active"):
             "status": "active",
         },
         "notes": [],
+    }
+
+
+def _expected_operation_transition_event(actor_id):
+    return {
+        "schema_version": "operation_transition_v0.1",
+        "kind": "operation_transition",
+        "event_id": (
+            f"operation_transition:{actor_id}:op_inquiry_{actor_id}:"
+            "start:target_selected:mini_goal_choose_first_inquiry_target"
+        ),
+        "actor_id": actor_id,
+        "operation_id": f"op_inquiry_{actor_id}",
+        "operation_type": "inquiry",
+        "from_phase": "start",
+        "to_phase": "target_selected",
+        "completed_mini_goal_id": "mini_goal_choose_first_inquiry_target",
+        "next_mini_goal_id": "mini_goal_take_first_testimony",
+        "trigger_action_id": "choose_first_inquiry_target",
+        "world_condition": "inquiry_target_chosen",
     }
 
 
@@ -1233,6 +1255,7 @@ def test_hud_executes_trickster_action_after_core_specs_are_enumerated(
     assert "spec=OK" in output
     assert "invalid action_id" not in output
     assert world["clock"] != clock_before
+    assert "operation_transition_history" not in world
     assert world["hideout_changes"] == hideouts_before + 1
 
 
@@ -1542,6 +1565,7 @@ def test_operation_required_hud_action_execution_rechecks_operation_type():
     assert result is None
     assert "inquiry_target_chosen" not in get_actor_discoveries(world, cop_id)
     assert world.get("investigation_progress") in (None, 0)
+    assert "operation_transition_history" not in world
 
 
 def test_choose_first_inquiry_target_executes_once_and_advances_operation():
@@ -1575,6 +1599,9 @@ def test_choose_first_inquiry_target_executes_once_and_advances_operation():
         "label": "最初の証言を取る",
         "status": "active",
     }
+    assert world["operation_transition_history"] == [
+        _expected_operation_transition_event(cop_id)
+    ]
 
     second = pipeline.request_action(
         "choose_first_inquiry_target",
@@ -1588,6 +1615,9 @@ def test_choose_first_inquiry_target_executes_once_and_advances_operation():
     assert second.reason == "tpo_gate_failed"
     assert world["investigation_progress"] == progress_before + 1
     assert get_active_operation(world, cop_id) == operation_after
+    assert world["operation_transition_history"] == [
+        _expected_operation_transition_event(cop_id)
+    ]
 
 
 def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
@@ -1622,6 +1652,13 @@ def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
     assert "/ target_selected" in hud.operation_summary
     assert "MiniGoal: 最初の証言を取る" in hud.operation_summary
     assert hud.rc_advisory is None
+    history_after_action = copy.deepcopy(world["operation_transition_history"])
+
+    bundle = build_rc_context_bundle(cop_id, ctx.game_state, director)
+    advisory = generate_rc_advisory(bundle)
+
+    assert advisory["preferred_action_id"] is None
+    assert world["operation_transition_history"] == history_after_action
 
 
 def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
@@ -1655,6 +1692,7 @@ def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
 
     assert outcome.executed is True
     assert calls == [(world, cop_id, "choose_first_inquiry_target")]
+    assert "operation_transition_history" not in world
 
 
 def test_action_pipeline_rejection_does_not_call_progression(monkeypatch):
@@ -1683,6 +1721,7 @@ def test_action_pipeline_rejection_does_not_call_progression(monkeypatch):
     assert outcome.executed is False
     assert outcome.reason == "tpo_gate_failed"
     assert calls == []
+    assert "operation_transition_history" not in world
 
 
 def test_progression_exception_does_not_reject_applied_action(monkeypatch):
@@ -1714,6 +1753,46 @@ def test_progression_exception_does_not_reject_applied_action(monkeypatch):
     assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
     assert world["investigation_progress"] == progress_before + 1
     assert get_active_operation(world, cop_id) == operation_before
+    assert "operation_transition_history" not in world
+
+
+def test_transition_record_exception_does_not_reject_progressed_action(
+    monkeypatch,
+    capsys,
+):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    progress_before = world.get("investigation_progress", 0)
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "record_operation_transition",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("record failed")),
+    )
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    output = capsys.readouterr().out
+    assert outcome.executed is True
+    assert outcome.reason is None
+    assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
+    assert world["investigation_progress"] == progress_before + 1
+    operation = get_active_operation(world, cop_id)
+    assert operation["phase"] == "target_selected"
+    assert operation["mini_goal"]["id"] == "mini_goal_take_first_testimony"
+    assert "operation_transition_history" not in world
+    assert "[Operation] transition record failed: record failed" in output
 
 
 def test_action_effect_failure_does_not_call_progression(monkeypatch):
@@ -1746,6 +1825,7 @@ def test_action_effect_failure_does_not_call_progression(monkeypatch):
         )
 
     assert calls == []
+    assert "operation_transition_history" not in world
 
 
 def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
@@ -1787,6 +1867,9 @@ def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
     operation_after = get_active_operation(world, cop_id)
     assert operation_after["phase"] == "target_selected"
     assert operation_after["mini_goal"]["id"] == "mini_goal_take_first_testimony"
+    assert world["operation_transition_history"] == [
+        _expected_operation_transition_event(cop_id)
+    ]
     assert hud.rc_advisory is None
     assert hud.rc_execution_states[-1][0] is False
     assert hud.rc_execution_states[-1][1].startswith("実行しました:")
@@ -1796,6 +1879,7 @@ def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
     assert len(dispatch_calls) == 1
     assert world["investigation_progress"] == progress_before + 1
     assert get_active_operation(world, cop_id) == operation_after
+    assert len(world["operation_transition_history"]) == 1
 
 
 def test_tpo_hud_action_rejects_non_hud_source_without_effects():
@@ -1984,6 +2068,30 @@ def test_save_load_preserves_progressed_operation(monkeypatch):
         "label": "最初の証言を取る",
         "status": "active",
     }
+    expected_history = [_expected_operation_transition_event(cop_id)]
+    assert ctx.director_world["operation_transition_history"] == expected_history
+    assert json.loads(
+        json.dumps(ctx.director_world["operation_transition_history"], ensure_ascii=False)
+    ) == expected_history
+    assert yaml.safe_load(
+        yaml.safe_dump(
+            ctx.director_world["operation_transition_history"],
+            allow_unicode=True,
+        )
+    ) == expected_history
+
+    callbacks.refresh_hud()
+    build_rc_context_bundle(cop_id, ctx.game_state, director)
+    second = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    assert second.executed is False
+    assert ctx.director_world["operation_transition_history"] == expected_history
 
 
 def test_actor_view_state_survives_yaml_roundtrip():
@@ -2206,13 +2314,19 @@ def test_switch_character_reflects_actor_location_after_move(monkeypatch):
 
 
 
-def test_gui_switch_character_choice_passes_target_name():
+def test_gui_switch_character_choice_passes_target_name(monkeypatch):
     _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
     ctx.game_state["active_char"] = ctx.game_state["party"]["刑事"]
     ctx.game_state["party"]["刑事"].is_active = True
     ctx.game_state["party"]["愉快犯"].is_active = False
     ctx.game_state["_switch_cooldown_disabled"] = True
     pipeline = _move_pipeline(director, world, ctx)
+    record_calls = []
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "record_operation_transition",
+        lambda *args: record_calls.append(args),
+    )
 
     switch_choice = next(
         choice
@@ -2232,6 +2346,8 @@ def test_gui_switch_character_choice_passes_target_name():
     assert result is ctx.game_state["party"]["刑事"]
     assert ctx.game_state["active_char"].name == "愉快犯"
     assert ctx.game_state["director_micro_goal_actor_id"] == "愉快犯"
+    assert record_calls == []
+    assert "operation_transition_history" not in world
 
 
 def test_gui_switch_character_after_move_still_works():

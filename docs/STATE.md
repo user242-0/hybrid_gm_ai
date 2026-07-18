@@ -80,6 +80,16 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session59-A: Operation Transition Record v0.1 実装
+
+- Operation progression成功resultを客観eventへ変換する `src/operation_transition_history.py` を追加した。eventはauthoritativeなdirector world rootの `operation_transition_history` へglobal append-only listとして遅延生成・保存し、Memory / Beliefの主観情報や人間向けsummaryは混ぜていない。
+- schemaは `operation_transition_v0.1` / `kind=operation_transition` と、actor / Operation / from-to phase / completed-next MiniGoal / trigger action / world conditionを持つ。`reason` は `world_condition` へ写し、IDは `operation_transition:{actor_id}:{operation_id}:{from_phase}:{to_phase}:{completed_mini_goal_id}` の決定的文字列とした。simulation clock、OS時刻、UUIDは保存していない。
+- `ActionPipeline.request_action()` のeffects成功 → Operation progression成功直後、Operation start / time advance前でrecordする。現在のactive Operation post-stateとactor/id/type/to_phase/next MiniGoalを照合し、history内のevent ID線形走査で冪等化する。重複時はworldを変更せず既存eventのdeepcopyを返し、不正historyは上書きしない。
+- record例外はprogression例外と分離してログに残し、Action effects、Operation進行、`ActionExecutionOutcome.executed`、UI refreshを巻き戻さない部分成功契約とした。v0.1ではtransaction / rollbackを導入していない。
+- event/history subtreeはJSON-safeかつYAML safe_dump/safe_load・deepcopy可能で、既存director world save/loadへ自然に含まれる。`world_defaults.py`、pack defaults、save/load本体、ActionExecutionOutcome、RCContextBundle、perceived_worldは変更していない。
+- 同actor・同typeのOperation再開始では現在の固定Operation IDによりevent IDが衝突し得る。Operation instance identityはv0.1既知制限として、Operation完了／clear／再開始を設計するSessionへ残す。RC Memory、Belief、Bundleの `recent_memory` / beliefs反映も未実装。
+- 自動テストは `586 passed / 2 skipped`、`git diff --check`成功。builder/recorder、actor・post-state照合、冪等性、serialization、Pipeline成功／拒否／effects・progression・record例外、手動advisory採用、HUD/Bundle/advisory read path、switch、save/loadを固定した。自動テスト完了、Windows手動確認待ち。次はChatGPTへSession59-Aデブリーフを持ち帰った後にSession59-Bを検討する。
+
 ### Session58-B: Operation phase / MiniGoal progression 実装
 
 - `src/operation_progression.py` を追加し、ActionPipelineのeffects成功直後にactor別world condition `inquiry_target_chosen`を評価するpost-success hookを接続した。条件成立時だけ `phase=start` / `mini_goal_choose_first_inquiry_target` から `phase=target_selected` / `mini_goal_take_first_testimony` へ一度だけ進み、他actor・不完全state・再評価は安全なno-opになる。
