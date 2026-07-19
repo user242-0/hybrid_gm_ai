@@ -110,11 +110,41 @@ def test_next_inquiry_mini_goal_has_no_unimplemented_advisory():
     bundle["active_operation"]["phase"] = "target_selected"
     bundle["active_operation"]["mini_goal_id"] = "mini_goal_take_first_testimony"
     bundle["active_operation"]["mini_goal"] = "最初の証言を取る"
+    source_event_id = (
+        "operation_transition:刑事:op_inquiry_刑事:start:target_selected:"
+        "mini_goal_choose_first_inquiry_target"
+    )
+    memory_id = f"memory:刑事:{source_event_id}"
+    bundle["recent_memory"] = [
+        {
+            "schema_version": "rc_memory_v0.1",
+            "memory_id": memory_id,
+            "kind": "operation_progress",
+            "memory_key": "first_inquiry_target_selected",
+            "actor_id": "刑事",
+            "summary": "最初の聞き込み先を選んだ",
+            "source_event_id": source_event_id,
+        }
+    ]
+    bundle["beliefs"] = {
+        "first_inquiry_target_selected": {
+            "schema_version": "rc_belief_v0.1",
+            "belief_id": "first_inquiry_target_selected",
+            "kind": "operation_state",
+            "actor_id": "刑事",
+            "proposition": "最初の聞き込み先は選定済みである",
+            "value": True,
+            "confidence": 1,
+            "source_memory_ids": [memory_id],
+        }
+    }
+    before = copy.deepcopy(bundle)
 
     advisory = generate_rc_advisory(bundle)
 
     assert advisory["selected_intent"] == "no_safe_action"
     assert advisory["preferred_action_id"] is None
+    assert bundle == before
 
 
 @pytest.mark.parametrize("status", ["completed", "suspended", None])

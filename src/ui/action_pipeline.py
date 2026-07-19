@@ -9,6 +9,7 @@ from src.action_definitions import actions as legacy_actions, get_action_spec
 from src.actor_operations import start_operation_once
 from src.operation_progression import advance_operation_after_action
 from src.operation_transition_history import record_operation_transition
+from src.rc_belief import project_memory_to_rc_belief
 from src.rc_memory import project_transition_to_rc_memory
 from src.location_graph import MOVE_ACTION_ID, move_to_location
 from src.requirements_checker import RequirementsChecker
@@ -533,8 +534,9 @@ class ActionPipeline:
                         # failure must not roll back or reject the completed action.
                         print(f"[Operation] transition record failed: {exc}")
                     if transition_event is not None:
+                        memory = None
                         try:
-                            project_transition_to_rc_memory(
+                            memory = project_transition_to_rc_memory(
                                 world,
                                 transition_event,
                             )
@@ -542,6 +544,13 @@ class ActionPipeline:
                             # Memory is a projection of the authoritative event.
                             # Its failure must not reject or roll back the action.
                             print(f"[RC Memory] live projection failed: {exc}")
+                        if memory is not None:
+                            try:
+                                project_memory_to_rc_belief(world, memory)
+                            except Exception as exc:
+                                # Belief is recoverable from the stored Memory.
+                                # Its failure must not reject or roll back action.
+                                print(f"[RC Belief] live projection failed: {exc}")
 
         if action_executed:
             self._start_operation_from_spec(

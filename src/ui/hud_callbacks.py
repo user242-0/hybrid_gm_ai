@@ -15,6 +15,7 @@ from src.actor_view_state import (
 )
 from src.perceived_world import build_perceived_world, format_perceived_world_summary
 from src.rc_ai import RC_ADVISORY_SCHEMA_VERSION, generate_rc_advisory
+from src.rc_belief import project_pending_rc_beliefs
 from src.rc_context import build_rc_context_bundle
 from src.rc_memory import project_pending_rc_memories
 from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
@@ -832,6 +833,12 @@ class HUDCallbacks:
             # The loaded world is already authoritative. Catch-up failure must
             # not reject the load or trigger an implicit save.
             print(f"[RC Memory] catch-up failed: {exc}")
+        try:
+            project_pending_rc_beliefs(ctx.director_world)
+        except Exception as exc:
+            # Existing Memories remain authoritative input for later retries.
+            # Belief catch-up must not reject the load or trigger a save.
+            print(f"[RC Belief] catch-up failed: {exc}")
         ctx.bump_hud_cache_rev(reason="world_load")
         if ctx.director_hud is not None:
             ctx.director_hud.set_clock(self._director_clock_string(ctx.director_world))

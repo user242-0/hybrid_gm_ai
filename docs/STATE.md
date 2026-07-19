@@ -80,6 +80,17 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session59-C: RC Belief Update / Context Feedback v0.1 実装
+
+- `src/rc_belief.py` を追加し、actor本人のRC Memoryだけを入力として現在認識snapshotを投影する縦切りを実装した。保存先はdirector world rootの `actor_beliefs[actor_id][belief_id]`。刑事の `rc_memory_v0.1 / operation_progress / first_inquiry_target_selected` だけをexact structured ruleで受理し、event本体、active Operation、MiniGoal、active actor fallbackは再参照しない。
+- Beliefは `rc_belief_v0.1 / kind=operation_state / belief_id=first_inquiry_target_selected`、命題「最初の聞き込み先は選定済みである」、厳密boolの `value=true`、persistent floatの `confidence=1.0`、`source_memory_ids` を持つ。Memory ID整合性を検証し、同一内容・同一sourceはworld非変更、同一内容・別sourceは順序を保って一度だけ追加、内容conflictや壊れた既存Beliefは上書きせず `None` とする。
+- live updateは `ActionPipeline.request_action()` のMemory projection成功直後に接続した。Belief例外はprogression／event／Memoryと別境界でログに残し、Action effects、Operation進行、event、Memory、`ActionExecutionOutcome`、後続UIを巻き戻さない。manual loadではworld正式採用後にMemory catch-up、その次にBelief catch-upを別tryで実行し、startup hookやcatch-up後の自動Saveは追加していない。
+- `RCContextBundle["beliefs"]` はactor別Belief record全体のdeepcopyを返すread-only snapshotになった。刑事と愉快犯を分離し、不正root／bucket／recordは空dictへ倒す。Bundle生成、HUD refresh、advisory生成はBeliefを作らず、BeliefをOperation、discovery、Action gate、available actions、perceived worldなどauthoritative truthへ逆流させない。現行RC_AI ruleは未変更で、Memory＋Belief入りの進行後Bundleも `no_safe_action` を維持する。
+- Belief subtreeはJSON-safe、deepcopy可能、YAML safe_dump/safe_load可能。コロンを含むMemory IDのlist scalarを正しくroundtripするため、repository内の軽量YAML parserは引用済みlist scalarをinline mapより先に認識する最小修正を行った。`_to_safe_value()` は変更せず、Bundle内confidenceは数値的に1.0と等価という契約に留めた。
+- 構造上の認知行動ループv0.1は閉じた。Action結果がMemoryとBeliefへ変換され、次のRC_AI判断contextへ戻る配線が成立した。Beliefを利用した行動分岐は未実装。
+- 自動テストは `747 passed / 2 skipped`。Session59-Cは自動テスト完了、Windows手動確認待ち。次はSession59-CデブリーフをChatGPTへ持ち帰り、Session 60へは勝手に進まない。
+- Session 60以降へ送る事項: Fresh／Continue world lifecycle、startup auto-load、world adoption共通境界、transition→Memory→Belief hook整理、ActionPipeline post-success hook増加、Belief revision／conflict resolution、Belief-driven RC_AI、Operation instance identity、transaction／rollback、schema／serialization boundary、`_to_safe_value()`の数値型契約、Unity／mobile連携。
+
 ### Session59-B: RC Memory Projection v0.1 実装
 
 - `src/rc_memory.py` を追加し、Session59-Aの客観 `operation_transition_v0.1` eventをactor別の主観Memoryへ決定的に投影する縦切りを実装した。保存先はauthoritativeなdirector world rootの `actor_memories[actor_id]` で、root／actor bucketはvalid Memoryの保存直前だけ遅延生成する。
@@ -89,7 +100,7 @@ current_target と narrative_targetの違い：
 - catch-upはmanual loadでloaded worldを正式採用し、`game_state`のworld参照を差し替えた直後だけ実行する。startup、HUD refresh、Bundle生成、advisory生成では実行しない。catch-up後の自動Saveも行わず、次の明示Saveでdiskへ永続化する。
 - `RCContextBundle["recent_memory"]` はactor bucketから直近5件のMemory record全体を古い順→新しい順でdeepcopyして返すread-only派生viewになった。長期store側の古いMemoryは削除せず、刑事Memoryを愉快犯へ混ぜない。Memory追加後も現行RC_AIへ新ruleは加えていないため、進行後advisoryは従来どおり `no_safe_action` になる。
 - Memory subtreeはJSON-safeかつYAML safe_dump/safe_load・deepcopy可能で、既存save/loadとworld defaultsに自然に保持される。pack defaults、save/load本体、world defaults、perceived_world、ActionExecutionOutcomeは変更していない。simulation clock、OS時刻、confidence／salience／emotion、observer Memory、検索／忘却、Beliefは対象外。
-- 自動テストは `641 passed / 2 skipped`、`git diff --check`成功。自動テスト完了、Windows手動確認待ち。専用Memory UIは追加していないため、手動確認ではAction後に明示Saveし、`director_world.yml` の `actor_memories.刑事` と `source_event_id` を確認する。次はChatGPTへSession59-Bデブリーフを持ち帰り、Session59-Cへは勝手に進まない。
+- 自動テストは `641 passed / 2 skipped`、`git diff --check`成功。Windows手動確認も完了し、Action後の明示Saveで `director_world.yml` の `actor_memories.刑事` に `rc_memory_v0.1` recordが保存されることを確認済み。
 
 ### Session59-A: Operation Transition Record v0.1 実装
 

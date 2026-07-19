@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-07-19（Session59-C: RC Belief Update / Context Feedback v0.1 実装）
+
+- 気持ち／所感: 客観event→主観Memory→現在Belief→次の判断Bundleまでを一方向に接続し、三層を混ぜずに構造上の認知行動ループv0.1を閉じられた。Beliefを作ることと、Beliefで行動を変えることを分離できたのもよい。
+- 技術メモ: `src/rc_belief.py` にpure builder、current snapshot updater、live coordinator、manual-load catch-up、actor別readerを分離した。刑事のexact Memory一件だけから `actor_beliefs[actor_id][belief_id]` を生成し、同じsourceはno-op、同一内容の別sourceは末尾追加、conflict／malformed既存recordは非上書きとした。eventやOperationは再参照しない。
+- live失敗ではrollbackしない。eventとMemoryまでが残ればBeliefは後で決定的に再投影でき、Action effectsやauthoritative Operation進行を戻す方が既存成功契約を壊すためである。manual loadではMemory catch-upとBelief catch-upを別境界にし、loadとHUD refreshを継続する。catch-up後の自動Saveは行わない。
+- `RCContextBundle.beliefs` はfull recordのdeepcopyで、BeliefをAction gate、Operation、discovery、perceived worldへ逆流させない。RC_AI ruleは変えず、進行後はMemory＋Beliefがあっても `no_safe_action`。`_to_safe_value()`のfloat正規化契約はSession 60へ残した。
+- YAMLメモ: `source_memory_ids` のようなコロン入りIDのlistは、repository内軽量parserが引用済みscalarをinline mapと誤認していた。引用済みlist scalarの判定順だけを直し、新規Belief subtreeのsafe roundtripと既存YAML回帰を固定した。
+- Session59-BのWindows手動確認は完了済み。`director_world.yml` の `actor_memories.刑事` に `rc_memory_v0.1` recordが保存されることを確認した。
+- テスト: `747 passed / 2 skipped`。Session59-Cは自動テスト完了、Windows手動確認待ち。
+- 次回の最初の一手: Session59-CデブリーフをChatGPTへ持ち帰る。Session 60へ勝手に進まず、Fresh／Continue lifecycle、共通world adoption、hook整理、Belief revision／Belief-driven RC_AI、Operation instance identity、serialization boundaryを次設計で扱う。
+
 ## 2026-07-19（Session59-B: RC Memory Projection v0.1 実装）
 
 - 気持ち／所感: 客観transition eventを直接Beliefへせず、まずactor本人の主観Memoryへ一方向に投影できた。客観事実・経験・信念の三層を保ったまま、Session59の認知ループをもう一段閉じられたのがよい。
@@ -16,7 +27,7 @@
 - live projection失敗時はrollbackしない。Action effects、authoritativeなOperation進行、客観eventはすでに成立しており、Memoryは再構築可能なprojectionだからである。専用ログを出してAction成功を維持し、残ったeventをmanual load時などのcatch-upで回復できるようにした。
 - catch-upはmanual loadでworldを正式採用した直後だけ実行し、startupやread pathには入れていない。catch-up直後の自動Saveも行わず、既存の明示Save契約へ任せる。RCContextBundleはactor別Memory record全体の直近5件を古い順→新しい順でdeepcopyするだけで、worldを変更しない。
 - simulation clock、Belief、observer Memory、汎用projector registry、Memory UI、検索／忘却は追加していない。現行RC_AI ruleも変えず、Memoryを受け取った進行後Bundleは引き続き `no_safe_action` になる。
-- テスト: `641 passed / 2 skipped`、`git diff --check`成功。自動テスト完了、Windows手動確認待ち。手動では実行と明示Save後の `director_world.yml` に `actor_memories.刑事` が一件あり、eventと同じ `source_event_id` を持つことを確認する。
+- テスト: `641 passed / 2 skipped`、`git diff --check`成功。Windows手動確認も完了し、実行と明示Save後の `director_world.yml` に `actor_memories.刑事` の `rc_memory_v0.1` recordが保存されることを確認した。
 - 次回の最初の一手: ChatGPTへSession59-Bデブリーフを持ち帰り、Memoryからactor別Beliefへ更新するSession59-Cのruleと保存境界を設計する。Session59-Cへは勝手に進まない。
 
 ## 2026-07-18（Session59-A: Operation Transition Record v0.1 実装）

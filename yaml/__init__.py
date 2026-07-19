@@ -87,7 +87,12 @@ def _parse_block(lines: list[str], idx: int, indent: int) -> tuple[Any, int]:
             if not item_token:
                 value, idx = _parse_block(lines, idx, current_indent + 2)
             else:
-                if ":" in item_token:
+                is_quoted_scalar = (
+                    len(item_token) >= 2
+                    and item_token[0] in {"'", '"'}
+                    and item_token[-1] == item_token[0]
+                )
+                if ":" in item_token and not is_quoted_scalar:
                     key, rest = item_token.split(":", 1)
                     key = key.strip()
                     rest = rest.strip()

@@ -10,6 +10,7 @@ from director.registry import extract_goals_from_pack, load_pack
 from src.actor_operations import set_active_operation
 from src.actor_view_state import inject_actor_discovery, set_actor_location
 from src.rc_ai import generate_rc_advisory
+from src.rc_belief import update_actor_belief
 from src.rc_context import build_rc_context_bundle
 from src.rc_memory import record_actor_memory
 from src.world_defaults import apply_world_defaults
@@ -129,6 +130,20 @@ def _memory(actor_id, index):
     }
 
 
+def _belief(actor_id):
+    memory_id = _memory(actor_id, 0)["memory_id"]
+    return {
+        "schema_version": "rc_belief_v0.1",
+        "belief_id": "first_inquiry_target_selected",
+        "kind": "operation_state",
+        "actor_id": actor_id,
+        "proposition": "最初の聞き込み先は選定済みである",
+        "value": True,
+        "confidence": 1.0,
+        "source_memory_ids": [memory_id],
+    }
+
+
 def test_build_rc_context_bundle_for_detective():
     _pack, director, world, game_state, cop_id, _trickster_id = _setup()
     location, _destination = _first_destination_for_actor(world, cop_id)
@@ -153,6 +168,7 @@ def test_build_rc_context_bundle_for_detective():
     assert bundle["perceived_world"]["location"] == location
     assert "camera_skew_noticed" in bundle["perceived_world"]["discoveries"]
     assert bundle["recent_memory"] == []
+    assert bundle["beliefs"] == {}
     assert set(bundle["available_actions"]) == {"gui", "hud", "meta"}
 
 
@@ -192,6 +208,68 @@ def test_rc_context_bundle_does_not_create_missing_memory_bucket():
 
     assert bundle["recent_memory"] == []
     assert "actor_memories" not in world
+
+
+def test_rc_context_bundle_returns_full_actor_beliefs_read_only():
+    _pack, director, world, game_state, cop_id, trickster_id = _setup()
+    belief = _belief(cop_id)
+    update_actor_belief(world, belief)
+    world_before = copy.deepcopy(world)
+
+    detective = build_rc_context_bundle(cop_id, game_state, director)
+    trickster = build_rc_context_bundle(trickster_id, game_state, director)
+
+    assert detective["beliefs"] == {
+        "first_inquiry_target_selected": belief
+    }
+    assert detective["beliefs"]["first_inquiry_target_selected"]["confidence"] == 1.0
+    assert trickster["beliefs"] == {}
+    detective["beliefs"]["first_inquiry_target_selected"]["value"] = False
+    assert world == world_before
+
+
+def test_rc_context_bundle_filters_malformed_beliefs_without_mutation():
+    _pack, director, world, game_state, cop_id, _trickster_id = _setup()
+    world["actor_beliefs"] = {
+        cop_id: {
+            "wrong_key": _belief(cop_id),
+            "first_inquiry_target_selected": {"malformed": True},
+        }
+    }
+    before = copy.deepcopy(world)
+
+    bundle = build_rc_context_bundle(cop_id, game_state, director)
+
+    assert bundle["beliefs"] == {}
+    assert world == before
+
+
+def test_belief_snapshot_does_not_feed_authoritative_truth_or_action_gate():
+    _pack, director, world, game_state, cop_id, _trickster_id = _setup()
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    before = build_rc_context_bundle(cop_id, game_state, director)
+    belief = _belief(cop_id)
+    belief["value"] = False
+    update_actor_belief(world, belief)
+    authoritative_before = {
+        key: copy.deepcopy(world.get(key))
+        for key in (
+            "actor_discoveries",
+            "actor_operations",
+            "investigation_progress",
+            "flags",
+        )
+    }
+
+    after = build_rc_context_bundle(cop_id, game_state, director)
+
+    assert after["active_operation"] == before["active_operation"]
+    assert after["available_actions"] == before["available_actions"]
+    assert after["perceived_world"] == before["perceived_world"]
+    assert {
+        key: world.get(key) for key in authoritative_before
+    } == authoritative_before
 
 
 def test_rc_context_bundle_includes_actor_scoped_emotion():
