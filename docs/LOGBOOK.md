@@ -16,7 +16,8 @@
 - `RCContextBundle.beliefs` はfull recordのdeepcopyで、BeliefをAction gate、Operation、discovery、perceived worldへ逆流させない。RC_AI ruleは変えず、進行後はMemory＋Beliefがあっても `no_safe_action`。`_to_safe_value()`のfloat正規化契約はSession 60へ残した。
 - YAMLメモ: `source_memory_ids` のようなコロン入りIDのlistは、repository内軽量parserが引用済みscalarをinline mapと誤認していた。引用済みlist scalarの判定順だけを直し、新規Belief subtreeのsafe roundtripと既存YAML回帰を固定した。
 - Session59-BのWindows手動確認は完了済み。`director_world.yml` の `actor_memories.刑事` に `rc_memory_v0.1` recordが保存されることを確認した。
-- テスト: `747 passed / 2 skipped`。Session59-Cは自動テスト完了、Windows手動確認待ち。
+- テスト: `747 passed / 2 skipped`。Session59-CのWindows手動確認も完了した。`choose_first_inquiry_target` 実行後の `director_world.yml` で、`operation_transition_history`、`actor_memories.刑事`、`actor_beliefs.刑事` を確認し、Beliefの `value=true`、`confidence=1.0`、`source_memory_ids` に刑事Memory IDが一件保存されること、愉快犯bucketへ刑事Beliefが混入していないことを確認した。
+- Session59総括: 構造上の認知行動ループv0.1は閉じた。Action結果がOperation transition event、RC Memory、RC Beliefへ変換され、次のRCContextBundleおよびRC_AI判断入力へ戻る配線が成立した。Beliefを利用した行動分岐は未実装。
 - 次回の最初の一手: Session59-CデブリーフをChatGPTへ持ち帰る。Session 60へ勝手に進まず、Fresh／Continue lifecycle、共通world adoption、hook整理、Belief revision／Belief-driven RC_AI、Operation instance identity、serialization boundaryを次設計で扱う。
 
 ## 2026-07-19（Session59-B: RC Memory Projection v0.1 実装）

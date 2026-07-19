@@ -87,8 +87,8 @@ current_target と narrative_targetの違い：
 - live updateは `ActionPipeline.request_action()` のMemory projection成功直後に接続した。Belief例外はprogression／event／Memoryと別境界でログに残し、Action effects、Operation進行、event、Memory、`ActionExecutionOutcome`、後続UIを巻き戻さない。manual loadではworld正式採用後にMemory catch-up、その次にBelief catch-upを別tryで実行し、startup hookやcatch-up後の自動Saveは追加していない。
 - `RCContextBundle["beliefs"]` はactor別Belief record全体のdeepcopyを返すread-only snapshotになった。刑事と愉快犯を分離し、不正root／bucket／recordは空dictへ倒す。Bundle生成、HUD refresh、advisory生成はBeliefを作らず、BeliefをOperation、discovery、Action gate、available actions、perceived worldなどauthoritative truthへ逆流させない。現行RC_AI ruleは未変更で、Memory＋Belief入りの進行後Bundleも `no_safe_action` を維持する。
 - Belief subtreeはJSON-safe、deepcopy可能、YAML safe_dump/safe_load可能。コロンを含むMemory IDのlist scalarを正しくroundtripするため、repository内の軽量YAML parserは引用済みlist scalarをinline mapより先に認識する最小修正を行った。`_to_safe_value()` は変更せず、Bundle内confidenceは数値的に1.0と等価という契約に留めた。
-- 構造上の認知行動ループv0.1は閉じた。Action結果がMemoryとBeliefへ変換され、次のRC_AI判断contextへ戻る配線が成立した。Beliefを利用した行動分岐は未実装。
-- 自動テストは `747 passed / 2 skipped`。Session59-Cは自動テスト完了、Windows手動確認待ち。次はSession59-CデブリーフをChatGPTへ持ち帰り、Session 60へは勝手に進まない。
+- 構造上の認知行動ループv0.1は閉じた。Action結果がOperation transition event、RC Memory、RC Beliefへ変換され、次のRCContextBundleおよびRC_AI判断入力へ戻る配線が成立した。Beliefを利用した行動分岐は未実装。
+- 自動テストは `747 passed / 2 skipped`。Session59-CのWindows手動確認も完了した。`choose_first_inquiry_target` 実行後の `director_world.yml` で、`operation_transition_history`、`actor_memories.刑事`、`actor_beliefs.刑事` が保存され、`first_inquiry_target_selected` の `value=true`、`confidence=1.0`、`source_memory_ids` に刑事Memory IDが一件あること、愉快犯bucketへ刑事Beliefが混入していないことを確認済み。次はSession59-CデブリーフをChatGPTへ持ち帰り、Session 60へは勝手に進まない。
 - Session 60以降へ送る事項: Fresh／Continue world lifecycle、startup auto-load、world adoption共通境界、transition→Memory→Belief hook整理、ActionPipeline post-success hook増加、Belief revision／conflict resolution、Belief-driven RC_AI、Operation instance identity、transaction／rollback、schema／serialization boundary、`_to_safe_value()`の数値型契約、Unity／mobile連携。
 
 ### Session59-B: RC Memory Projection v0.1 実装
