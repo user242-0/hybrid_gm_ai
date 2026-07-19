@@ -11,6 +11,7 @@ from src.actor_operations import set_active_operation
 from src.actor_view_state import inject_actor_discovery, set_actor_location
 from src.rc_ai import generate_rc_advisory
 from src.rc_context import build_rc_context_bundle
+from src.rc_memory import record_actor_memory
 from src.world_defaults import apply_world_defaults
 
 
@@ -115,6 +116,19 @@ def _action_ids(actions):
     return {item["action_id"] for item in actions}
 
 
+def _memory(actor_id, index):
+    source_event_id = f"operation_transition:{actor_id}:event_{index}"
+    return {
+        "schema_version": "rc_memory_v0.1",
+        "memory_id": f"memory:{actor_id}:{source_event_id}",
+        "kind": "operation_progress",
+        "memory_key": "first_inquiry_target_selected",
+        "actor_id": actor_id,
+        "summary": f"memory {index}",
+        "source_event_id": source_event_id,
+    }
+
+
 def test_build_rc_context_bundle_for_detective():
     _pack, director, world, game_state, cop_id, _trickster_id = _setup()
     location, _destination = _first_destination_for_actor(world, cop_id)
@@ -140,6 +154,44 @@ def test_build_rc_context_bundle_for_detective():
     assert "camera_skew_noticed" in bundle["perceived_world"]["discoveries"]
     assert bundle["recent_memory"] == []
     assert set(bundle["available_actions"]) == {"gui", "hud", "meta"}
+
+
+def test_rc_context_bundle_returns_last_five_full_actor_memories_read_only():
+    _pack, director, world, game_state, cop_id, trickster_id = _setup()
+    detective_memories = [_memory(cop_id, index) for index in range(7)]
+    for memory in detective_memories:
+        record_actor_memory(world, memory)
+    record_actor_memory(world, _memory(trickster_id, 0))
+    before = copy.deepcopy(world["actor_memories"])
+
+    bundle = build_rc_context_bundle(cop_id, game_state, director)
+
+    assert bundle["recent_memory"] == detective_memories[2:]
+    assert all(
+        set(memory)
+        == {
+            "schema_version",
+            "memory_id",
+            "kind",
+            "memory_key",
+            "actor_id",
+            "summary",
+            "source_event_id",
+        }
+        for memory in bundle["recent_memory"]
+    )
+    bundle["recent_memory"][0]["summary"] = "changed"
+    assert world["actor_memories"] == before
+
+
+def test_rc_context_bundle_does_not_create_missing_memory_bucket():
+    _pack, director, world, game_state, cop_id, _trickster_id = _setup()
+    world.pop("actor_memories", None)
+
+    bundle = build_rc_context_bundle(cop_id, game_state, director)
+
+    assert bundle["recent_memory"] == []
+    assert "actor_memories" not in world
 
 
 def test_rc_context_bundle_includes_actor_scoped_emotion():

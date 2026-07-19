@@ -80,6 +80,17 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+### Session59-B: RC Memory Projection v0.1 実装
+
+- `src/rc_memory.py` を追加し、Session59-Aの客観 `operation_transition_v0.1` eventをactor別の主観Memoryへ決定的に投影する縦切りを実装した。保存先はauthoritativeなdirector world rootの `actor_memories[actor_id]` で、root／actor bucketはvalid Memoryの保存直前だけ遅延生成する。
+- 対応ruleは、刑事の inquiry Operationが `start → target_selected` へ進み、最初の聞き込み先選択MiniGoalを完了したstructured fieldsの完全一致だけを扱う。event ID文字列自体はrule selectorにせず、構造との整合性確認と `source_event_id` に使う。Memoryは `rc_memory_v0.1`、`kind=operation_progress`、`memory_key=first_inquiry_target_selected`、決定的summary「最初の聞き込み先を選んだ」を持つ。
+- Memory IDは `memory:{memory_actor_id}:{source_event_id}`。v0.1は一source event・一actor・一Memoryとし、memory IDとactor＋source eventの線形照合で冪等化する。重複時はworldを変更せず既存Memoryのdeepcopyを返し、不正root／bucketは上書きしない。
+- live projectionは `ActionPipeline.request_action()` でtransition recordがeventを返した直後に行う。Memory projection例外は専用ログに分離し、Action effects、Operation進行、客観transition event、`ActionExecutionOutcome`、後続UIを巻き戻さない。残ったeventは後のcatch-upで再投影でき、transaction／rollbackは導入していない。
+- catch-upはmanual loadでloaded worldを正式採用し、`game_state`のworld参照を差し替えた直後だけ実行する。startup、HUD refresh、Bundle生成、advisory生成では実行しない。catch-up後の自動Saveも行わず、次の明示Saveでdiskへ永続化する。
+- `RCContextBundle["recent_memory"]` はactor bucketから直近5件のMemory record全体を古い順→新しい順でdeepcopyして返すread-only派生viewになった。長期store側の古いMemoryは削除せず、刑事Memoryを愉快犯へ混ぜない。Memory追加後も現行RC_AIへ新ruleは加えていないため、進行後advisoryは従来どおり `no_safe_action` になる。
+- Memory subtreeはJSON-safeかつYAML safe_dump/safe_load・deepcopy可能で、既存save/loadとworld defaultsに自然に保持される。pack defaults、save/load本体、world defaults、perceived_world、ActionExecutionOutcomeは変更していない。simulation clock、OS時刻、confidence／salience／emotion、observer Memory、検索／忘却、Beliefは対象外。
+- 自動テストは `641 passed / 2 skipped`、`git diff --check`成功。自動テスト完了、Windows手動確認待ち。専用Memory UIは追加していないため、手動確認ではAction後に明示Saveし、`director_world.yml` の `actor_memories.刑事` と `source_event_id` を確認する。次はChatGPTへSession59-Bデブリーフを持ち帰り、Session59-Cへは勝手に進まない。
+
 ### Session59-A: Operation Transition Record v0.1 実装
 
 - Operation progression成功resultを客観eventへ変換する `src/operation_transition_history.py` を追加した。eventはauthoritativeなdirector world rootの `operation_transition_history` へglobal append-only listとして遅延生成・保存し、Memory / Beliefの主観情報や人間向けsummaryは混ぜていない。

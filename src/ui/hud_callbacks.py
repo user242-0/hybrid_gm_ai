@@ -16,6 +16,7 @@ from src.actor_view_state import (
 from src.perceived_world import build_perceived_world, format_perceived_world_summary
 from src.rc_ai import RC_ADVISORY_SCHEMA_VERSION, generate_rc_advisory
 from src.rc_context import build_rc_context_bundle
+from src.rc_memory import project_pending_rc_memories
 from src.utility.config_loader import is_hud_debug_enabled, is_hud_demo_enabled
 
 if TYPE_CHECKING:
@@ -825,6 +826,12 @@ class HUDCallbacks:
             ctx.director_world["reload_epoch"] = ctx.director_world.get("reload_epoch", 0) + 1
         ctx.game_state["director_world"] = ctx.director_world
         ctx.game_state["world"] = ctx.director_world
+        try:
+            project_pending_rc_memories(ctx.director_world)
+        except Exception as exc:
+            # The loaded world is already authoritative. Catch-up failure must
+            # not reject the load or trigger an implicit save.
+            print(f"[RC Memory] catch-up failed: {exc}")
         ctx.bump_hud_cache_rev(reason="world_load")
         if ctx.director_hud is not None:
             ctx.director_hud.set_clock(self._director_clock_string(ctx.director_world))

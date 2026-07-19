@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-07-19（Session59-B: RC Memory Projection v0.1 実装）
+
+- 気持ち／所感: 客観transition eventを直接Beliefへせず、まずactor本人の主観Memoryへ一方向に投影できた。客観事実・経験・信念の三層を保ったまま、Session59の認知ループをもう一段閉じられたのがよい。
+- 技術メモ: `src/rc_memory.py` にpure builder、actor別recorder、history catch-up、recent readerを分離した。刑事の最初の聞き込み先選択eventだけをstructured fields完全一致で決定的Memoryへ変換し、`actor_memories[actor_id]` へappendする。IDは `memory:{actor_id}:{source_event_id}`、v0.1は一source event・一actor・一Memoryで、live／catch-up／reloadを跨いで冪等にした。
+- event IDはrule selectorにせず、event構造との整合性確認とsource参照に限定した。これにより、将来Operation instance identityを拡張してもruleの意味条件をID文字列の解析へ閉じ込めずに済む。
+- live projection失敗時はrollbackしない。Action effects、authoritativeなOperation進行、客観eventはすでに成立しており、Memoryは再構築可能なprojectionだからである。専用ログを出してAction成功を維持し、残ったeventをmanual load時などのcatch-upで回復できるようにした。
+- catch-upはmanual loadでworldを正式採用した直後だけ実行し、startupやread pathには入れていない。catch-up直後の自動Saveも行わず、既存の明示Save契約へ任せる。RCContextBundleはactor別Memory record全体の直近5件を古い順→新しい順でdeepcopyするだけで、worldを変更しない。
+- simulation clock、Belief、observer Memory、汎用projector registry、Memory UI、検索／忘却は追加していない。現行RC_AI ruleも変えず、Memoryを受け取った進行後Bundleは引き続き `no_safe_action` になる。
+- テスト: `641 passed / 2 skipped`、`git diff --check`成功。自動テスト完了、Windows手動確認待ち。手動では実行と明示Save後の `director_world.yml` に `actor_memories.刑事` が一件あり、eventと同じ `source_event_id` を持つことを確認する。
+- 次回の最初の一手: ChatGPTへSession59-Bデブリーフを持ち帰り、Memoryからactor別Beliefへ更新するSession59-Cのruleと保存境界を設計する。Session59-Cへは勝手に進まない。
+
 ## 2026-07-18（Session59-A: Operation Transition Record v0.1 実装）
 
 - 気持ち／所感: Action結果、客観event、RC Memory、Beliefの境界を崩さず、Session58の縦切りへ小さい永続記録を足せた。次の認知ループへ渡す事実が、表示や主観表現から独立した形になったのがよい。

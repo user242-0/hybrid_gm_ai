@@ -20,6 +20,7 @@ from src.affordance_bridge import inject_discovery
 from src.choice_definitions import choice_dispatch_args, get_available_choices
 from src.rc_ai import generate_rc_advisory
 from src.rc_context import build_rc_context_bundle
+from src.rc_memory import project_pending_rc_memories
 from src.ui.action_pipeline import ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
 from src.world_defaults import apply_world_defaults
@@ -233,6 +234,19 @@ def _expected_operation_transition_event(actor_id):
         "next_mini_goal_id": "mini_goal_take_first_testimony",
         "trigger_action_id": "choose_first_inquiry_target",
         "world_condition": "inquiry_target_chosen",
+    }
+
+
+def _expected_rc_memory(actor_id):
+    source_event_id = _expected_operation_transition_event(actor_id)["event_id"]
+    return {
+        "schema_version": "rc_memory_v0.1",
+        "memory_id": f"memory:{actor_id}:{source_event_id}",
+        "kind": "operation_progress",
+        "memory_key": "first_inquiry_target_selected",
+        "actor_id": actor_id,
+        "summary": "最初の聞き込み先を選んだ",
+        "source_event_id": source_event_id,
     }
 
 
@@ -1602,6 +1616,7 @@ def test_choose_first_inquiry_target_executes_once_and_advances_operation():
     assert world["operation_transition_history"] == [
         _expected_operation_transition_event(cop_id)
     ]
+    assert world["actor_memories"] == {cop_id: [_expected_rc_memory(cop_id)]}
 
     second = pipeline.request_action(
         "choose_first_inquiry_target",
@@ -1618,6 +1633,7 @@ def test_choose_first_inquiry_target_executes_once_and_advances_operation():
     assert world["operation_transition_history"] == [
         _expected_operation_transition_event(cop_id)
     ]
+    assert world["actor_memories"] == {cop_id: [_expected_rc_memory(cop_id)]}
 
 
 def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
@@ -1658,7 +1674,9 @@ def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
     advisory = generate_rc_advisory(bundle)
 
     assert advisory["preferred_action_id"] is None
+    assert advisory["selected_intent"] == "no_safe_action"
     assert world["operation_transition_history"] == history_after_action
+    assert bundle["recent_memory"] == [_expected_rc_memory(cop_id)]
 
 
 def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
@@ -1693,6 +1711,7 @@ def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
     assert outcome.executed is True
     assert calls == [(world, cop_id, "choose_first_inquiry_target")]
     assert "operation_transition_history" not in world
+    assert "actor_memories" not in world
 
 
 def test_action_pipeline_rejection_does_not_call_progression(monkeypatch):
@@ -1792,7 +1811,54 @@ def test_transition_record_exception_does_not_reject_progressed_action(
     assert operation["phase"] == "target_selected"
     assert operation["mini_goal"]["id"] == "mini_goal_take_first_testimony"
     assert "operation_transition_history" not in world
+    assert "actor_memories" not in world
     assert "[Operation] transition record failed: record failed" in output
+
+
+def test_rc_memory_projection_exception_does_not_reject_recorded_action(
+    monkeypatch,
+    capsys,
+):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    progress_before = world.get("investigation_progress", 0)
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "project_transition_to_rc_memory",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("memory failed")),
+    )
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    output = capsys.readouterr().out
+    assert outcome.executed is True
+    assert outcome.reason is None
+    assert "inquiry_target_chosen" in get_actor_discoveries(world, cop_id)
+    assert world["investigation_progress"] == progress_before + 1
+    operation = get_active_operation(world, cop_id)
+    assert operation["phase"] == "target_selected"
+    assert operation["mini_goal"]["id"] == "mini_goal_take_first_testimony"
+    assert world["operation_transition_history"] == [
+        _expected_operation_transition_event(cop_id)
+    ]
+    assert "actor_memories" not in world
+    assert "[RC Memory] live projection failed: memory failed" in output
+
+    recovered = project_pending_rc_memories(world)
+    assert recovered == [_expected_rc_memory(cop_id)]
+    assert world["actor_memories"] == {cop_id: [_expected_rc_memory(cop_id)]}
 
 
 def test_action_effect_failure_does_not_call_progression(monkeypatch):
@@ -1880,6 +1946,7 @@ def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
     assert world["investigation_progress"] == progress_before + 1
     assert get_active_operation(world, cop_id) == operation_after
     assert len(world["operation_transition_history"]) == 1
+    assert world["actor_memories"] == {cop_id: [_expected_rc_memory(cop_id)]}
 
 
 def test_tpo_hud_action_rejects_non_hud_source_without_effects():
@@ -2069,7 +2136,9 @@ def test_save_load_preserves_progressed_operation(monkeypatch):
         "status": "active",
     }
     expected_history = [_expected_operation_transition_event(cop_id)]
+    expected_memories = {cop_id: [_expected_rc_memory(cop_id)]}
     assert ctx.director_world["operation_transition_history"] == expected_history
+    assert ctx.director_world["actor_memories"] == expected_memories
     assert json.loads(
         json.dumps(ctx.director_world["operation_transition_history"], ensure_ascii=False)
     ) == expected_history
@@ -2092,6 +2161,93 @@ def test_save_load_preserves_progressed_operation(monkeypatch):
 
     assert second.executed is False
     assert ctx.director_world["operation_transition_history"] == expected_history
+    assert ctx.director_world["actor_memories"] == expected_memories
+
+
+def test_manual_load_catches_up_event_only_save_without_auto_save(monkeypatch):
+    pack, director, world, callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    loaded = copy.deepcopy(world)
+    loaded["operation_transition_history"] = [
+        _expected_operation_transition_event(cop_id)
+    ]
+    loaded.pop("actor_memories", None)
+    save_calls = []
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    callbacks._load_director_world = lambda _fallback: copy.deepcopy(loaded)
+    callbacks._save_director_world = lambda value: save_calls.append(value)
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.on_load()
+
+    assert ctx.game_state["director_world"] is ctx.director_world
+    assert ctx.game_state["world"] is ctx.director_world
+    assert ctx.director_world["actor_memories"] == {
+        cop_id: [_expected_rc_memory(cop_id)]
+    }
+    assert save_calls == []
+
+    memories_before_refresh = copy.deepcopy(ctx.director_world["actor_memories"])
+    callbacks.refresh_hud()
+    build_rc_context_bundle(cop_id, ctx.game_state, director)
+    assert ctx.director_world["actor_memories"] == memories_before_refresh
+
+
+def test_rc_memory_catch_up_runs_only_on_manual_load(monkeypatch):
+    pack, director, world, callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    world["operation_transition_history"] = [
+        _expected_operation_transition_event(cop_id)
+    ]
+    world.pop("actor_memories", None)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+
+    callbacks.refresh_hud()
+    build_rc_context_bundle(cop_id, ctx.game_state, director)
+
+    assert "actor_memories" not in world
+
+
+def test_manual_load_catch_up_exception_does_not_reject_load(
+    monkeypatch,
+    capsys,
+):
+    pack, director, world, callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    loaded = copy.deepcopy(world)
+    loaded["loaded_marker"] = True
+    ctx.bump_hud_cache_rev = lambda reason=None: ctx.game_state.__setitem__(
+        "hud_cache_rev",
+        ctx.game_state.get("hud_cache_rev", 0) + 1,
+    )
+    callbacks._load_director_world = lambda _fallback: loaded
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    monkeypatch.setitem(
+        HUDCallbacks.on_load.__globals__,
+        "project_pending_rc_memories",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("catch-up failed")),
+    )
+
+    callbacks.on_load()
+
+    output = capsys.readouterr().out
+    assert ctx.director_world is loaded
+    assert ctx.game_state["world"] is loaded
+    assert loaded["loaded_marker"] is True
+    assert "[RC Memory] catch-up failed: catch-up failed" in output
 
 
 def test_actor_view_state_survives_yaml_roundtrip():

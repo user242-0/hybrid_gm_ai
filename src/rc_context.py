@@ -12,6 +12,7 @@ from typing import Any
 from src.actor_operations import get_active_operation
 from src.choice_definitions import get_available_choices
 from src.perceived_world import build_perceived_world
+from src.rc_memory import get_recent_actor_memories
 
 
 META_ACTION_IDS = {"switch_character", "set_emotion"}
@@ -43,7 +44,7 @@ def build_rc_context_bundle(actor_id: str, game_state: dict, director) -> dict:
                 director,
                 actor_mode,
             ),
-            "recent_memory": [],
+            "recent_memory": get_recent_actor_memories(world, actor_id),
             "notes": [],
         }
     )
