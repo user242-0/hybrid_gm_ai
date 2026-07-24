@@ -1,0 +1,5 @@
+director_world：世界の真実を保持
+perceived_world：RCごとの認識を保持
+memory：RCが経験した出来事を保持
+belief：RCが現在信じている内容を保持
+Operation progress：進行中の行動状態を保持
