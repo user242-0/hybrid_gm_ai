@@ -1,4 +1,16 @@
 決定：
+ActionPipelineからOperationの意味・進行・記録責務を外し、ActionOutcomeをOperationRuntimeへ渡す形へ整える。
+
+理由：
+pipelineの責務分離。ActionPipelineは、
+このActionは実行可能だったか
+何がworldに適用されたか
+までを返すべき。
+
+-------------------------------------------------
+
+
+決定：
 intentをOperationより先に置く
 
 理由：

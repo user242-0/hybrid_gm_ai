@@ -3,3 +3,10 @@ perceived_world：RCごとの認識を保持
 memory：RCが経験した出来事を保持
 belief：RCが現在信じている内容を保持
 Operation progress：進行中の行動状態を保持
+
+(director_)world["actor_operations"]：
+をOperationの永続化上の唯一の正本として維持する
+
+OperationInstance：正本のdomain表現
+OperationStore：正本への唯一の窓口
+OperationRuntime：書き込みを命令できる者

@@ -80,6 +80,53 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+## Temporary Pause Snapshot — 2026-08-02
+
+### Pause reason
+ゲーム会社就職用ポートフォリオの主力となる、
+非AI高品質キャラクター制作へ着手するため、
+GM-AIの進行を現段階で一時的に緩める可能性がある。
+
+GM-AIの優先度や長期的な位置づけを下げるものではない。
+GM-AIは引き続きライフワークとして継続する。
+
+### Current position
+Session 60-1開始直前。
+
+直近目標：
+ActionPipelineからOperationの意味・進行・記録責務を外し、
+ActionOutcomeをOperationRuntimeへ渡す形へ整理する。
+
+ミニゴール：
+既存のOperation開始・進行・transition記録を
+OperationRuntimeへまとめ、ActionPipelineから一度呼ぶ形にする。
+
+### Exact stopping point
+Chat(Work)へOperationRuntime抽出に必要な調査プロンプトを
+送信する直前。
+
+送信予定プロンプト：
+study_notes/NEXT_PROMPT_OperationRuntime_260802.md
+
+### Next single action
+保存済みプロンプトをChat(Work)へ送信し、
+既存コード上のOperation責務、呼び出し経路、
+移動候補、維持すべきテストを調査してもらう。
+
+### Do not change yet
+- Session 59で閉じた認知行動ループの振る舞い
+- Transition → Memory → Belief → fresh Bundle の順序
+- RC間でMemory／Beliefが混線しないこと
+- 既存黄金経路
+- 外部挙動を保証する既存テスト
+
+### Restart checklist
+1. STATE.mdを読む
+2. DECISION_LOG_toSession60-1_260726.mdを読む
+3. NEXT_PROMPT_OperationRuntime_260802.mdを読む
+4. Session 59の黄金経路を再確認する
+5. Chat(Work)へ調査プロンプトを送る
+
 ### Session59-C: RC Belief Update / Context Feedback v0.1 実装
 
 - `src/rc_belief.py` を追加し、actor本人のRC Memoryだけを入力として現在認識snapshotを投影する縦切りを実装した。保存先はdirector world rootの `actor_beliefs[actor_id][belief_id]`。刑事の `rc_memory_v0.1 / operation_progress / first_inquiry_target_selected` だけをexact structured ruleで受理し、event本体、active Operation、MiniGoal、active actor fallbackは再参照しない。

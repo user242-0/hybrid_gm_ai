@@ -13,3 +13,32 @@ progress record
 memory / belief
 ↓ 経験・認識を更新
 次回のRC_AI判断
+
+
+
+---------------------------------
+将来目標（Session60）
+Human / RC_AI / GUI
+        ↓
+GameCommand
+        ↓
+GameCommandService
+        │
+        ├─ ActionPipeline
+        │      └─ ActionOutcome
+        │
+        ├─ OperationRuntime
+        │      ├─ OperationStore
+        │      ├─ OperationInstance
+        │      └─ OperationTransition[]
+        │
+        ├─ MemoryProjection
+        │      └─ MemoryRecord[]
+        │
+        ├─ BeliefProjection
+        │      └─ BeliefUpdate[]
+        │
+        └─ fresh RCContextBundle
+
+Control & Legibility Layer
+        └─ 各stageのresultを観察・表示

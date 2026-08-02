@@ -8,6 +8,21 @@
 
 ---
 
+## 2026-08-02 — Portfolio production and temporary pacing change
+
+ゲーム会社の障害者採用3D職への応募を見据え、
+非AI高品質キャラクター「冥砂の女戦士」の制作へ着手した。
+
+GM-AIを中止・縮小する判断ではない。
+GM-AIは引き続きライフワークとして従来に近い比重で扱うが、
+ポートフォリオ上では3D職として読みやすい配分に編集する。
+
+Session 60-1は、Chat(Work)へOperationRuntime調査プロンプトを
+送る直前で一度安全に停止可能な状態とした。
+
+再開時の最初の作業は、
+保存済みの調査プロンプトをChat(Work)へ送ることである。
+
 ## 2026-07-19（Session59-C: RC Belief Update / Context Feedback v0.1 実装）
 
 - 気持ち／所感: 客観event→主観Memory→現在Belief→次の判断Bundleまでを一方向に接続し、三層を混ぜずに構造上の認知行動ループv0.1を閉じられた。Beliefを作ることと、Beliefで行動を変えることを分離できたのもよい。

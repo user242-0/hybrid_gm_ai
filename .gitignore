@@ -5,6 +5,8 @@ __pycache__/
 .env
 data/logs/
 general_documents/Sharedocs_forAIs
+general_documents/study_notes/local_scratch/
+*.local.md
 backups/
 *.patch
 *.rej
