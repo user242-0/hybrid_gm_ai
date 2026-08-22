@@ -81,25 +81,39 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
-### Session 60-1完了 — 2026-08-22
+### Session 60-2完了 — 2026-08-22
 
-Operation lifecycleの統括責務を
-ActionPipelineからOperationRuntimeへ抽出。
+1回のGameCommandを最後まで通すApplication境界として
+GameCommandServiceを導入。
 
-現在の責務境界:
+現在の黄金経路:
 
 ```text
-ActionPipeline
-→ OperationRuntimeInput
-→ OperationRuntime.apply_action_outcome()
-→ committed OperationTransition[]
-→ RC Memory
-→ RC Belief
+GameCommand
+→ GameCommandService
+→ ActionPipeline.execute_action()
+→ ActionOutcome
+→ OperationRuntime
+→ OperationTransition[]
+→ Memory
+→ Belief
+→ post-action lifecycle
+→ fresh RCContextBundle
+→ GameCommandResult
 ```
 
+重要な設計決定:
+
+GameCommandServiceは正本を所有・直接更新せず、
+1回のGameCommandについて正規Writerを正しい順序で呼ぶ
+Application Serviceである。
+
+ActionPipelineはAction executionと既存post-action compatibility処理の
+二段境界になった。Session 60-1で抽出したOperationRuntimeは、
+progression、transition record、Operation startの統括を引き続き所有する。
+
 次:
-Session 60-2
-GameCommandService導入。
+Chat（設計）でSession 60-2の結果を確認し、後続Sessionを設計する。
 
 ## Temporary Pause Snapshot — 2026-08-02
 

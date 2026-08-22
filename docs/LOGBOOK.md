@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-08-22（Session 60-2: GameCommandService導入）
+
+- 気持ち／所感: Session 60-1のOperationRuntime境界を壊さず、その一段上に1回のCommand全体を通すApplication境界を置けた。Python HUD、将来のUnity／Mobile等が同じ入口へ接続するための土台になった。
+- 技術メモ: `GameCommand`、正式な`ActionOutcome`、内部`ActionExecutionResult`、detachedな`GameCommandResult`、`StageFailure`を追加した。`ActionPipeline`をeffects確定までの`execute_action()`と、time／emotion／Director／MicroGoal／affordance／log／RO／sceneを現行順で行う`finalize_post_action()`へ分割した。
+- Application flow: `GameCommandService`がAction execution、既存`OperationRuntime`、committed transitionからのMemory／Belief投影、post-action lifecycle、終了後active actorのfresh RCContextBundle生成を順に一回ずつ呼ぶ。GCS自身は正本を所有・直接更新せず、domain ruleやHUD／Tkinterを持たない。
+- 互換性: productionの`simulation.dispatch_action()`をGCS入口へ変更し、legacy raw valueと`ActionExecutionOutcome`を維持した。`ActionPipeline.request_action()`はLegacyGUI／既存test向けの一時的full-lifecycle入口として残した。`switch_character`後のBundleは新active actorを対象とし、`move_to_location`の特殊経路、RC_AI advisoryのHuman adoption、actor分離、Session 59黄金経路を維持した。
+- 部分成功: OperationRuntime内部failureは従来どおり`[]`との区別を推測しない。Memory／Belief／Bundle failureはrollbackせず、GCSが直接観測したprojection／Bundle failureだけを`StageFailure`へ記録する。Result内のtransition、Memory、Belief、Bundleは正本から切り離したsnapshotとした。
+- テスト: 変更前baseline `764 passed / 2 skipped / 0 failed`。GCS単体・integration 15件、指定関連384件、full suite `781 passed / 2 skipped / 0 failed`。simulationは既知の`PYTHONPATH=.;.\src`で起動入口まで到達し、Codex環境のTcl/Tk `init.tcl`不足でGUI生成のみ未完了。legacy simulation import-path依存は別課題のまま残す。
+- 次回の最初の一手: Chat（設計）でSession 60-2の実コードと境界を確認し、legacy `request_action()`、post-action subsystem分離、Bundle二重read-only build等をどのSessionで扱うか決める。
+
 ## 2026-08-22（Session 60-1: OperationRuntime抽出）
 
 - 気持ち／所感: Session 59で閉じた認知行動ループの意味を変えず、ActionPipelineが抱えていたOperation lifecycle統括を明示的な境界へ切り出せた。今後GameCommandServiceへ上位統括を移すための最初の足場ができた。
