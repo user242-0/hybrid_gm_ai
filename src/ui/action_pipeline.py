@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src import action_registry
 from src.action_definitions import actions as legacy_actions, get_action_spec
+from src.game_command import ActionExecutionResult, ActionOutcome
 from src.operation_runtime import (
     OperationRuntimeInput,
     OperationStartDirective,
@@ -34,6 +35,23 @@ class ActionExecutionOutcome:
     executed: bool
     reason: str | None = None
     value: Any | None = None
+
+
+@dataclass(frozen=True)
+class _PostActionContext:
+    """Opaque execution details consumed only by the compatibility finalizer."""
+
+    action_id: str
+    actor_id: str | None
+    actor_obj: Any | None
+    args: tuple[Any, ...]
+    spec: Any
+    world: dict | None
+    source: str
+    time_min_override: int | None
+    clock_before: dict | None
+    emotion_before: dict | None
+    is_move: bool = False
 
 
 def _action_result(
@@ -334,64 +352,257 @@ class ActionPipeline:
             # エラーが発生してもアクション実行は続行
             print(f"[ActionPipeline] scene_graph emit failed: {e}")
 
-    def request_action(
+    def execute_action(
         self,
         action_id: str,
         actor_obj: Any | None = None,
+        actor_id: str | None = None,
         args: Iterable[Any] | None = None,
         time_min_override: int | None = None,
         source: str = "UI",
-        return_outcome: bool = False,
-    ) -> Any | ActionExecutionOutcome | None:
+    ) -> ActionExecutionResult:
+        """Execute only the Action stage and return its follow-up envelope."""
+
+        resolved_actor_id = (
+            actor_id
+            if isinstance(actor_id, str) and actor_id
+            else self._resolve_actor_id(actor_obj)
+        )
         if not action_id:
-            return _action_result(
-                "",
-                return_outcome=return_outcome,
-                executed=False,
-                reason="missing_action_id",
+            return ActionExecutionResult(
+                outcome=ActionOutcome(
+                    action_id="",
+                    actor_id=resolved_actor_id,
+                    executed=False,
+                    effects_committed=False,
+                    source=source,
+                    reason="missing_action_id",
+                )
             )
 
         world = self._resolve_world()
         spec = get_action_spec(action_id)
         if spec is None:
-            return _action_result(
-                action_id,
-                return_outcome=return_outcome,
-                executed=False,
-                reason="missing_action_spec",
+            return ActionExecutionResult(
+                outcome=ActionOutcome(
+                    action_id=action_id,
+                    actor_id=resolved_actor_id,
+                    executed=False,
+                    effects_committed=False,
+                    source=source,
+                    reason="missing_action_spec",
+                )
             )
+
         arg_list = list(args) if args else []
         result: Any | None = None
-        action_executed = False
-
-        # ログ用：実行前の状態を保存
         clock_before = None
         emotion_before = None
         if world is not None:
             clock_before = self._normalize_clock(world.get("clock"))
-            # actor別emotionを優先、なければworld.emotionにfallback
-            actor_name = actor_obj.name if actor_obj is not None and hasattr(actor_obj, "name") else None
             emotions_by_actor = self.game_state.get("emotions_by_actor", {})
-            if actor_name and actor_name in emotions_by_actor:
-                emotion_before = emotions_by_actor[actor_name].copy()
+            if resolved_actor_id and resolved_actor_id in emotions_by_actor:
+                emotion_before = emotions_by_actor[resolved_actor_id].copy()
             else:
-                emotion_before = world.get("emotion", {}).copy() if isinstance(world.get("emotion"), dict) else {}
+                emotion_before = (
+                    world.get("emotion", {}).copy()
+                    if isinstance(world.get("emotion"), dict)
+                    else {}
+                )
 
         if action_id == MOVE_ACTION_ID:
-            actor_id = self._resolve_actor_id(actor_obj)
-            destination = arg_list[0] if arg_list and isinstance(arg_list[0], str) else None
-            ok, move_result = move_to_location(world, self.game_state, actor_id, destination)
+            destination = (
+                arg_list[0]
+                if arg_list and isinstance(arg_list[0], str)
+                else None
+            )
+            ok, move_result = move_to_location(
+                world,
+                self.game_state,
+                resolved_actor_id,
+                destination,
+            )
             if not ok:
-                print(f"[ActionPipeline] move_to_location rejected: {move_result.get('error')}")
-                return _action_result(
-                    action_id,
-                    return_outcome=return_outcome,
-                    executed=False,
-                    reason="move_rejected",
+                print(
+                    "[ActionPipeline] move_to_location rejected: "
+                    f"{move_result.get('error')}"
+                )
+                return ActionExecutionResult(
+                    outcome=ActionOutcome(
+                        action_id=action_id,
+                        actor_id=resolved_actor_id,
+                        executed=False,
+                        effects_committed=False,
+                        source=source,
+                        reason="move_rejected",
+                    )
                 )
             if actor_obj is not None and hasattr(actor_obj, "location"):
                 actor_obj.location = destination
-            self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
+            return ActionExecutionResult(
+                outcome=ActionOutcome(
+                    action_id=action_id,
+                    actor_id=resolved_actor_id,
+                    executed=True,
+                    effects_committed=True,
+                    source=source,
+                    value=move_result,
+                ),
+                operation_input=None,
+                post_action_context=_PostActionContext(
+                    action_id=action_id,
+                    actor_id=resolved_actor_id,
+                    actor_obj=actor_obj,
+                    args=tuple(arg_list),
+                    spec=spec,
+                    world=world,
+                    source=source,
+                    time_min_override=time_min_override,
+                    clock_before=clock_before,
+                    emotion_before=emotion_before,
+                    is_move=True,
+                ),
+            )
+
+        if action_id in legacy_actions and actor_obj is not None:
+            if spec.requirements:
+                checker = RequirementsChecker(self.game_state, actor_obj)
+                if not checker.check_all(spec.requirements, args=arg_list):
+                    return ActionExecutionResult(
+                        outcome=ActionOutcome(
+                            action_id=action_id,
+                            actor_id=resolved_actor_id,
+                            executed=False,
+                            effects_committed=False,
+                            source=source,
+                            reason="requirements_failed",
+                        )
+                    )
+            if spec.function:
+                result = spec.function(actor_obj, self.game_state, *arg_list)
+        else:
+            if world is None:
+                return ActionExecutionResult(
+                    outcome=ActionOutcome(
+                        action_id=action_id,
+                        actor_id=resolved_actor_id,
+                        executed=False,
+                        effects_committed=False,
+                        source=source,
+                        reason="not_executed",
+                    )
+                )
+            if world is not None:
+                if self.director is not None:
+                    can_execute_tpo = getattr(
+                        self.director,
+                        "can_execute_tpo_hud_action",
+                        None,
+                    )
+                    if callable(can_execute_tpo) and not can_execute_tpo(
+                        world,
+                        self.game_state,
+                        resolved_actor_id,
+                        action_id,
+                        source=source,
+                        action_layer=getattr(spec, "action_layer", None),
+                    ):
+                        print(
+                            "[ActionPipeline] TPO HUD action rejected at execution gate: "
+                            f"actor={resolved_actor_id} action={action_id}"
+                        )
+                        return ActionExecutionResult(
+                            outcome=ActionOutcome(
+                                action_id=action_id,
+                                actor_id=resolved_actor_id,
+                                executed=False,
+                                effects_committed=False,
+                                source=source,
+                                reason="tpo_gate_failed",
+                            )
+                        )
+                if hasattr(action_registry, "execute_action_core"):
+                    if action_registry.execute_action_core(world, action_id) is not True:
+                        return ActionExecutionResult(
+                            outcome=ActionOutcome(
+                                action_id=action_id,
+                                actor_id=resolved_actor_id,
+                                executed=False,
+                                effects_committed=False,
+                                source=source,
+                                reason="core_requirements_failed",
+                            )
+                        )
+                else:  # TODO: implement execute_action_core in src.action_registry
+                    return ActionExecutionResult(
+                        outcome=ActionOutcome(
+                            action_id=action_id,
+                            actor_id=resolved_actor_id,
+                            executed=False,
+                            effects_committed=False,
+                            source=source,
+                            reason="core_executor_missing",
+                        )
+                    )
+
+        operation_input = OperationRuntimeInput(
+            action_id=action_id,
+            actor_id=resolved_actor_id,
+            executed=True,
+            effects_committed=True,
+            source=source,
+            operation_start_directive=self._operation_start_directive_from_spec(spec),
+        )
+        return ActionExecutionResult(
+            outcome=ActionOutcome(
+                action_id=action_id,
+                actor_id=resolved_actor_id,
+                executed=True,
+                effects_committed=True,
+                source=source,
+                value=result,
+            ),
+            operation_input=operation_input,
+            post_action_context=_PostActionContext(
+                action_id=action_id,
+                actor_id=resolved_actor_id,
+                actor_obj=actor_obj,
+                args=tuple(arg_list),
+                spec=spec,
+                world=world,
+                source=source,
+                time_min_override=time_min_override,
+                clock_before=clock_before,
+                emotion_before=emotion_before,
+            ),
+        )
+
+    def finalize_post_action(self, execution_result: ActionExecutionResult) -> None:
+        """Run the existing post-Action lifecycle once, without presentation."""
+
+        outcome = execution_result.outcome
+        context = execution_result.post_action_context
+        if (
+            not outcome.executed
+            or not outcome.effects_committed
+            or not isinstance(context, _PostActionContext)
+        ):
+            return
+
+        action_id = context.action_id
+        actor_id = context.actor_id
+        actor_obj = context.actor_obj
+        arg_list = list(context.args)
+        spec = context.spec
+        world = context.world
+        source = context.source
+        clock_before = context.clock_before
+        emotion_before = context.emotion_before
+
+        if context.is_move:
+            self.game_state["hud_cache_rev"] = (
+                self.game_state.get("hud_cache_rev", 0) + 1
+            )
             self._record_action_log(
                 source=source,
                 actor_id=actor_id,
@@ -402,112 +613,18 @@ class ActionPipeline:
                 emotion_before=emotion_before,
                 microgoal=self.game_state.get("director_micro_goal"),
             )
-            if self.ui_refresh is not None:
-                self.ui_refresh()
-            return _action_result(
-                action_id,
-                return_outcome=return_outcome,
-                executed=True,
-                value=move_result,
-            )
-        if action_id in legacy_actions and actor_obj is not None:
-            if spec and spec.requirements:
-                checker = RequirementsChecker(self.game_state, actor_obj)
-                if not checker.check_all(spec.requirements, args=arg_list):
-                    return _action_result(
-                        action_id,
-                        return_outcome=return_outcome,
-                        executed=False,
-                        reason="requirements_failed",
-                    )
-            if spec and spec.function:
-                result = spec.function(actor_obj, self.game_state, *arg_list)
-            # アクションが認識された時点で action_executed = True（function が None でも時間進行する）
-            action_executed = True
-        else:
-            if world is not None:
-                if self.director is not None:
-                    can_execute_tpo = getattr(self.director, "can_execute_tpo_hud_action", None)
-                    if callable(can_execute_tpo):
-                        actor_id = self._resolve_actor_id(actor_obj)
-                        if not can_execute_tpo(
-                            world,
-                            self.game_state,
-                            actor_id,
-                            action_id,
-                            source=source,
-                            action_layer=getattr(spec, "action_layer", None),
-                        ):
-                            print(
-                                "[ActionPipeline] TPO HUD action rejected at execution gate: "
-                                f"actor={actor_id} action={action_id}"
-                            )
-                            return _action_result(
-                                action_id,
-                                return_outcome=return_outcome,
-                                executed=False,
-                                reason="tpo_gate_failed",
-                            )
-                if hasattr(action_registry, "execute_action_core"):
-                    core_executed = action_registry.execute_action_core(world, action_id)
-                    if core_executed is not True:
-                        return _action_result(
-                            action_id,
-                            return_outcome=return_outcome,
-                            executed=False,
-                            reason="core_requirements_failed",
-                        )
-                    action_executed = True
-                else:  # TODO: implement execute_action_core in src.action_registry
-                    return _action_result(
-                        action_id,
-                        return_outcome=return_outcome,
-                        executed=False,
-                        reason="core_executor_missing",
-                    )
+            return
 
-        committed_transitions = []
-        if action_executed:
-            actor_id = self._resolve_actor_id(actor_obj)
-            committed_transitions = apply_action_outcome(
-                world,
-                self.game_state,
-                OperationRuntimeInput(
-                    action_id=action_id,
-                    actor_id=actor_id,
-                    executed=True,
-                    effects_committed=True,
-                    source=source,
-                    operation_start_directive=(
-                        self._operation_start_directive_from_spec(spec)
-                    ),
-                ),
-            )
-
-        for transition_event in committed_transitions:
-            memory = None
-            try:
-                memory = project_transition_to_rc_memory(
-                    world,
-                    transition_event,
-                )
-            except Exception as exc:
-                # Memory is a projection of the authoritative event. Its failure
-                # must not reject or roll back the completed action.
-                print(f"[RC Memory] live projection failed: {exc}")
-            if memory is not None:
-                try:
-                    project_memory_to_rc_belief(world, memory)
-                except Exception as exc:
-                    # Belief is recoverable from the stored Memory.
-                    print(f"[RC Belief] live projection failed: {exc}")
-
-        dt = time_min_override if time_min_override is not None else (spec.time_min if spec else 0)
+        dt = (
+            context.time_min_override
+            if context.time_min_override is not None
+            else spec.time_min
+        )
         try:
             dt_value = int(dt)
         except (TypeError, ValueError):
             dt_value = 0
-        if world is not None and dt_value > 0 and action_executed:
+        if world is not None and dt_value > 0:
             self._advance_time(world, dt_value)
             # レバーB: RC実行時に入力待ち中なら累積時間を記録
             if source == "RC_AI" and self.game_state.get("input_pending"):
@@ -517,7 +634,7 @@ class ActionPipeline:
             if source in ("GUI", "CLI", "HUD"):
                 self.game_state["_rc_minutes_advanced_while_pending"] = 0
 
-        if action_executed and action_id != "switch_character":
+        if action_id != "switch_character":
             self.game_state["hud_cache_rev"] = self.game_state.get("hud_cache_rev", 0) + 1
 
         if world is not None:
@@ -597,7 +714,7 @@ class ActionPipeline:
             self.game_state["director_micro_goal_actor_id"] = micro_actor_id
 
         # Affordance discovery evaluation + opportunity spent tracking
-        if action_executed and self.director is not None and world is not None:
+        if self.director is not None and world is not None:
             from src.affordance_bridge import evaluate_discoveries, mark_opportunity_spent
             aff_rules = self.director.affordance_rules()
             disc_rules = aff_rules.get("discovery_rules", [])
@@ -615,8 +732,7 @@ class ActionPipeline:
             mark_opportunity_spent(world, action_id)
 
         # ログ出力（director update の後、UI refresh の前）
-        if action_executed and world is not None:
-            actor_id = actor_obj.name if actor_obj is not None and hasattr(actor_obj, "name") else None
+        if world is not None:
             self._record_action_log(
                 source=source,
                 actor_id=actor_id,
@@ -650,6 +766,17 @@ class ActionPipeline:
             if emit_enabled and actor_obj is not None and hasattr(actor_obj, "name"):
                 self._emit_scene_graph(actor_obj, action_id, arg_list, world, micro_goal, source)
 
+    def refresh_presentation(self, outcome: ActionOutcome) -> None:
+        """Refresh legacy Python presentation after command orchestration."""
+
+        if not outcome.executed:
+            return
+        if outcome.action_id == MOVE_ACTION_ID:
+            if self.ui_refresh is not None:
+                self.ui_refresh()
+            return
+
+        world = self._resolve_world()
         if world is not None and self.hud_set_clock is not None:
             clock_label = world.get("clock")
             if isinstance(clock_label, dict):
@@ -686,10 +813,61 @@ class ActionPipeline:
         if self.ui_refresh is not None:
             self.ui_refresh()
 
-        return _action_result(
+    def request_action(
+        self,
+        action_id: str,
+        actor_obj: Any | None = None,
+        args: Iterable[Any] | None = None,
+        time_min_override: int | None = None,
+        source: str = "UI",
+        return_outcome: bool = False,
+    ) -> Any | ActionExecutionOutcome | None:
+        """Legacy full-lifecycle entry point retained for existing callers."""
+
+        execution_result = self.execute_action(
             action_id,
+            actor_obj=actor_obj,
+            args=args,
+            time_min_override=time_min_override,
+            source=source,
+        )
+        outcome = execution_result.outcome
+        if not outcome.executed or not outcome.effects_committed:
+            return _action_result(
+                outcome.action_id,
+                return_outcome=return_outcome,
+                executed=False,
+                reason=outcome.reason,
+                value=outcome.value,
+            )
+
+        world = self._resolve_world()
+        committed_transitions = []
+        if execution_result.operation_input is not None:
+            committed_transitions = apply_action_outcome(
+                world,
+                self.game_state,
+                execution_result.operation_input,
+            )
+
+        for transition_event in committed_transitions:
+            memory = None
+            try:
+                memory = project_transition_to_rc_memory(world, transition_event)
+            except Exception as exc:
+                print(f"[RC Memory] live projection failed: {exc}")
+            if memory is not None:
+                try:
+                    project_memory_to_rc_belief(world, memory)
+                except Exception as exc:
+                    print(f"[RC Belief] live projection failed: {exc}")
+
+        self.finalize_post_action(execution_result)
+        self.refresh_presentation(outcome)
+        return _action_result(
+            outcome.action_id,
             return_outcome=return_outcome,
-            executed=action_executed,
-            reason=None if action_executed else "not_executed",
-            value=result,
+            executed=outcome.executed,
+            reason=outcome.reason,
+            value=outcome.value,
         )
