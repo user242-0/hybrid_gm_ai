@@ -932,9 +932,18 @@ class HUDCallbacks:
                 return_outcome=True,
             )
             if getattr(outcome, "executed", False):
-                # The runtime pipeline refreshes on success. Calling refresh again
-                # is cheap and keeps injected/test dispatchers on the same contract.
-                self.refresh_hud()
+                state = self.ctx.game_state
+                active_actor = state.get("active_char")
+                active_actor_id = getattr(active_actor, "name", None)
+                presentation_is_current = (
+                    state.get("hud_last_rendered_rev", -1)
+                    == state.get("hud_cache_rev", 0)
+                    and state.get("hud_cached_actor_id") == active_actor_id
+                )
+                if not presentation_is_current:
+                    # Compatibility for injected/legacy dispatchers that do not
+                    # own the presentation refresh contract.
+                    self.refresh_hud()
                 spec = self._get_action_spec(action_id)
                 action_label = getattr(spec, "label", None) or action_id
                 final_status = f"実行しました: {action_label}"

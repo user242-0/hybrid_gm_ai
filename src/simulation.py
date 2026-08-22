@@ -51,13 +51,15 @@ from src.simulation_utils import (
     ensure_clock,
 )
 from src.choice_ui import present_choices
-from src.ui.action_pipeline import ActionPipeline
+from src.ui.action_pipeline import ActionExecutionOutcome, ActionPipeline
 
 # 安全に終了したい
 from src.quit_helper import handle_quit
 
 # コンテキスト管理
 from src.game_context import GameContext
+from src.game_command import GameCommand
+from src.game_command_service import GameCommandService
 from src.ui.hud_callbacks import HUDCallbacks
 
 # 中略...
@@ -340,6 +342,11 @@ ctx.pipeline = ActionPipeline(
     hud_set_microgoal=(ctx.director_hud.set_microgoal if ctx.director_hud else None),
     # advance_time uses ActionPipeline's built-in _advance_time
 )
+ctx.command_service = GameCommandService(
+    game_state=ctx.game_state,
+    pipeline=ctx.pipeline,
+    director=ctx.director,
+)
 
 def dispatch_action(
     action_id: str,
@@ -349,16 +356,36 @@ def dispatch_action(
     source: str = "UI",
     return_outcome: bool = False,
 ):
-    if ctx.pipeline is None:
+    if ctx.pipeline is None or ctx.command_service is None:
         return None
-    return ctx.pipeline.request_action(
-        action_id,
-        actor_obj=actor_obj,
-        args=args or [],
-        time_min_override=time_min_override,
-        source=source,
-        return_outcome=return_outcome,
+    actor_id = getattr(actor_obj, "name", None)
+    if not isinstance(actor_id, str) or not actor_id:
+        active_actor = ctx.game_state.get("active_char")
+        active_actor_id = getattr(active_actor, "name", None)
+        actor_id = (
+            active_actor_id
+            if isinstance(active_actor_id, str) and active_actor_id
+            else None
+        )
+    command_result = ctx.command_service.execute(
+        GameCommand(
+            action_id=action_id,
+            actor_id=actor_id,
+            args=tuple(args or []),
+            source=source,
+            time_min_override=time_min_override,
+        )
     )
+    outcome = command_result.action_outcome
+    ctx.pipeline.refresh_presentation(outcome)
+    if return_outcome:
+        return ActionExecutionOutcome(
+            action_id=outcome.action_id,
+            executed=outcome.executed,
+            reason=outcome.reason,
+            value=outcome.value,
+        )
+    return outcome.value
 
 
 # HUD コールバックを初期化（dispatch_action 定義後）

@@ -18,11 +18,13 @@ from src.actor_view_state import (
 )
 from src.affordance_bridge import inject_discovery
 from src.choice_definitions import choice_dispatch_args, get_available_choices
+from src.game_command import GameCommand
+from src.game_command_service import GameCommandService
 from src.rc_ai import generate_rc_advisory
 from src.rc_belief import project_pending_rc_beliefs
 from src.rc_context import build_rc_context_bundle
 from src.rc_memory import project_pending_rc_memories
-from src.ui.action_pipeline import ActionPipeline
+from src.ui.action_pipeline import ActionExecutionOutcome, ActionPipeline
 from src.ui.hud_callbacks import HUDCallbacks
 from src.world_defaults import apply_world_defaults
 
@@ -196,6 +198,56 @@ def _request_start_inquiry_operation(director, world, ctx, actor_id):
         args=[],
         source="HUD",
     )
+
+
+def _install_gcs_dispatch(director, ctx, callbacks, *, refresh_calls, dispatch_calls):
+    def refresh_presentation():
+        refresh_calls.append("refresh")
+        callbacks.refresh_hud()
+
+    pipeline = ActionPipeline(
+        game_state=ctx.game_state,
+        director=director,
+        ui_refresh=refresh_presentation,
+    )
+    service = GameCommandService(
+        game_state=ctx.game_state,
+        pipeline=pipeline,
+        director=director,
+    )
+
+    def dispatch(
+        action_id,
+        *,
+        actor_obj=None,
+        args=None,
+        time_min_override=None,
+        source="UI",
+        return_outcome=False,
+    ):
+        dispatch_calls.append(action_id)
+        actor_id = getattr(actor_obj, "name", None)
+        result = service.execute(
+            GameCommand(
+                action_id=action_id,
+                actor_id=actor_id,
+                args=tuple(args or []),
+                source=source,
+                time_min_override=time_min_override,
+            )
+        )
+        pipeline.refresh_presentation(result.action_outcome)
+        if return_outcome:
+            return ActionExecutionOutcome(
+                action_id=result.action_outcome.action_id,
+                executed=result.action_outcome.executed,
+                reason=result.action_outcome.reason,
+                value=result.action_outcome.value,
+            )
+        return result.action_outcome.value
+
+    callbacks._dispatch_action = dispatch
+    return service
 
 
 def _active_inquiry_operation(actor_id, *, status="active"):
@@ -2103,6 +2155,90 @@ def test_rc_advisory_manual_adoption_runs_real_pipeline_once(monkeypatch):
     assert get_active_operation(world, cop_id) == operation_after
     assert len(world["operation_transition_history"]) == 1
     assert world["actor_memories"] == {cop_id: [_expected_rc_memory(cop_id)]}
+
+
+def test_rc_advisory_manual_adoption_runs_gcs_and_refreshes_once(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    refresh_calls = []
+    dispatch_calls = []
+    service = _install_gcs_dispatch(
+        director,
+        ctx,
+        callbacks,
+        refresh_calls=refresh_calls,
+        dispatch_calls=dispatch_calls,
+    )
+    runtime_calls = []
+    real_runtime = service.operation_runtime
+    service.operation_runtime = (
+        lambda *args: runtime_calls.append(args) or real_runtime(*args)
+    )
+    callbacks.refresh_hud()
+    refresh_calls.clear()
+
+    callbacks.on_rc_advisory_execute()
+
+    assert dispatch_calls == ["choose_first_inquiry_target"]
+    assert len(runtime_calls) == 1
+    assert refresh_calls == ["refresh"]
+    assert len(world["operation_transition_history"]) == 1
+    assert len(world["actor_memories"][cop_id]) == 1
+    assert len(world["actor_beliefs"][cop_id]) == 1
+    assert hud.rc_advisory is None
+
+
+def test_hud_action_dispatches_through_gcs_once(monkeypatch):
+    pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    monkeypatch.setattr(
+        "src.ui.hud_callbacks.get_advisory_display_items",
+        lambda *, actor_id, limit: [],
+    )
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    refresh_calls = []
+    dispatch_calls = []
+    service = _install_gcs_dispatch(
+        director,
+        ctx,
+        callbacks,
+        refresh_calls=refresh_calls,
+        dispatch_calls=dispatch_calls,
+    )
+    runtime_calls = []
+    real_runtime = service.operation_runtime
+    service.operation_runtime = (
+        lambda *args: runtime_calls.append(args) or real_runtime(*args)
+    )
+    callbacks.refresh_hud()
+    refresh_calls.clear()
+    action_index = next(
+        index
+        for index, (action_id, _label, _minutes) in enumerate(ctx.current_actions)
+        if action_id == "choose_first_inquiry_target"
+    )
+
+    callbacks.on_action_select(action_index)
+
+    assert dispatch_calls == ["choose_first_inquiry_target"]
+    assert len(runtime_calls) == 1
+    assert refresh_calls == ["refresh"]
+    assert len(world["operation_transition_history"]) == 1
+    assert len(world["actor_memories"][cop_id]) == 1
+    assert len(world["actor_beliefs"][cop_id]) == 1
 
 
 def test_tpo_hud_action_rejects_non_hud_source_without_effects():

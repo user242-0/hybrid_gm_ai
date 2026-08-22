@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from src.utility.config_loader import is_hud_debug_enabled
 
 if TYPE_CHECKING:
+    from src.game_command_service import GameCommandService
     from src.scheduler import Scheduler
     from src.ui.action_pipeline import ActionPipeline
     from director.director import Director
@@ -32,6 +33,7 @@ class GameContext:
     director_world: dict | None = None
     director_hud: Any | None = None  # DirectorHUD (optional import)
     pipeline: ActionPipeline | None = None
+    command_service: GameCommandService | None = None
 
     # 状態フラグ
     auto_enabled: bool = False
