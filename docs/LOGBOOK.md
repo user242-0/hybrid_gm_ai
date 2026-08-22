@@ -8,6 +8,14 @@
 
 ---
 
+## 2026-08-22（Session 60-1: OperationRuntime抽出）
+
+- 気持ち／所感: Session 59で閉じた認知行動ループの意味を変えず、ActionPipelineが抱えていたOperation lifecycle統括を明示的な境界へ切り出せた。今後GameCommandServiceへ上位統括を移すための最初の足場ができた。
+- 技術メモ: `src/operation_runtime.py`を追加し、ActionPipelineから`OperationRuntimeInput`を一成功Actionにつき一度渡す。Runtimeはprogression、commit済みtransition記録、Operation startを現行順序・部分成功境界のまま統括し、保存済み`OperationTransition[]`だけを返す。Memory／Belief投影はActionPipeline側に残した。
+- 維持事項: `start_inquiry_operation`のprogression→`no_active_operation`→start、`choose_first_inquiry_target`のtransition→Memory→Belief、`switch_character`のprogression除外、actor分離、冪等性、save/load、既存`ActionExecutionOutcome` contractを維持した。OperationStarted eventやOperationStore等は導入していない。
+- テスト: OperationRuntime単体14件、必須関連233件、full suite `764 passed / 2 skipped / 0 failed`。simulationは既知の`PYTHONPATH=.;.\src`でimport／Director初期化まで到達し、同梱PythonのTcl/Tk不足でGUI生成は未完了。legacy simulation import-path依存は別課題のまま残す。
+- 次回の最初の一手: Session 60-2でGameCommandService導入を設計し、ActionPipeline、OperationRuntime、Memory／Belief projection、fresh ContextBundleの上位統括境界を検討する。
+
 ## 2026-08-02 — Portfolio production and temporary pacing change
 
 ゲーム会社の障害者採用3D職への応募を見据え、

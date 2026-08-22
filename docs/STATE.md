@@ -80,6 +80,27 @@ current_target と narrative_targetの違い：
   - 現状のRC起動方法: TODO（確定したらここに1行で）
 
 ## 2. いまの状態（3行で）
+
+### Session 60-1完了 — 2026-08-22
+
+Operation lifecycleの統括責務を
+ActionPipelineからOperationRuntimeへ抽出。
+
+現在の責務境界:
+
+```text
+ActionPipeline
+→ OperationRuntimeInput
+→ OperationRuntime.apply_action_outcome()
+→ committed OperationTransition[]
+→ RC Memory
+→ RC Belief
+```
+
+次:
+Session 60-2
+GameCommandService導入。
+
 ## Temporary Pause Snapshot — 2026-08-02
 
 ### Pause reason
@@ -126,6 +147,10 @@ study_notes/NEXT_PROMPT_OperationRuntime_260802.md
 3. NEXT_PROMPT_OperationRuntime_260802.mdを読む
 4. Session 59の黄金経路を再確認する
 5. Chat(Work)へ調査プロンプトを送る
+
+### legacy import-path依存
+既存simulationにはlegacy import-path依存がある。Session 60-1とは別課題として記録
+
 
 ### Session59-C: RC Belief Update / Context Feedback v0.1 実装
 
