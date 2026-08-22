@@ -1490,6 +1490,34 @@ def test_start_inquiry_operation_still_appears_and_starts_operation(monkeypatch)
     assert get_active_operation(world, cop_id)["type"] == "inquiry"
 
 
+def test_action_pipeline_projects_only_operation_metadata_to_runtime(monkeypatch):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    director.set_actor_mode(world, cop_id, "PURSUE")
+    inject_actor_discovery(world, cop_id, "camera_skew_noticed")
+    calls = []
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "apply_action_outcome",
+        lambda *args: calls.append(args) or [],
+    )
+
+    _request_start_inquiry_operation(director, world, ctx, cop_id)
+
+    assert len(calls) == 1
+    runtime_input = calls[0][2]
+    directive = runtime_input.operation_start_directive
+    assert directive.operation_type == "inquiry"
+    assert directive.operation_label == "聞き込みを始める"
+    assert directive.operation_phase == "start"
+    assert directive.operation_mini_goal == {
+        "id": "mini_goal_choose_first_inquiry_target",
+        "label": "聞き込み先を一件選ぶ",
+        "status": "active",
+    }
+    assert not hasattr(runtime_input, "action_spec")
+
+
 def test_operation_required_candidate_hidden_without_operation(monkeypatch):
     pack, director, world, callbacks, ctx, hud = _setup_cop_trickster_hud("刑事")
     cop_id = pack["roles"]["protagonist"]["name"]
@@ -1703,7 +1731,7 @@ def test_choose_first_inquiry_target_disappears_after_success(monkeypatch):
     }
 
 
-def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
+def test_action_pipeline_calls_operation_runtime_once_only_after_success(monkeypatch):
     pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
     cop_id = pack["roles"]["protagonist"]["name"]
     get_action_specs(pack)
@@ -1714,14 +1742,14 @@ def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
     ctx.game_state["world"] = world
     calls = []
 
-    def record_progression(progress_world, actor_id, action_id):
-        calls.append((progress_world, actor_id, action_id))
-        return {"advanced": False, "reason": "test"}
+    def record_runtime_call(runtime_world, game_state, outcome):
+        calls.append((runtime_world, game_state, outcome))
+        return []
 
     monkeypatch.setitem(
         ActionPipeline.request_action.__globals__,
-        "advance_operation_after_action",
-        record_progression,
+        "apply_action_outcome",
+        record_runtime_call,
     )
 
     outcome = pipeline.request_action(
@@ -1733,13 +1761,74 @@ def test_action_pipeline_calls_progression_once_only_after_success(monkeypatch):
     )
 
     assert outcome.executed is True
-    assert calls == [(world, cop_id, "choose_first_inquiry_target")]
+    assert len(calls) == 1
+    runtime_world, runtime_game_state, runtime_input = calls[0]
+    assert runtime_world is world
+    assert runtime_game_state is ctx.game_state
+    assert runtime_input.action_id == "choose_first_inquiry_target"
+    assert runtime_input.actor_id == cop_id
+    assert runtime_input.executed is True
+    assert runtime_input.effects_committed is True
+    assert runtime_input.source == "HUD"
+    assert runtime_input.operation_start_directive is None
     assert "operation_transition_history" not in world
     assert "actor_memories" not in world
     assert "actor_beliefs" not in world
 
 
-def test_action_pipeline_rejection_does_not_call_progression(monkeypatch):
+def test_action_pipeline_projects_runtime_transition_to_memory_and_belief_once(
+    monkeypatch,
+):
+    pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    cop_id = pack["roles"]["protagonist"]["name"]
+    get_action_specs(pack)
+    director.set_actor_mode(world, cop_id, "WITNESS")
+    set_active_operation(world, cop_id, _active_inquiry_operation(cop_id))
+    pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
+    ctx.game_state["director_world"] = world
+    ctx.game_state["world"] = world
+    transition = {"kind": "operation_transition", "event_id": "event-1"}
+    memory = {"memory_id": "memory-1"}
+    runtime_calls = []
+    memory_calls = []
+    belief_calls = []
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "apply_action_outcome",
+        lambda *args: runtime_calls.append(args) or [transition],
+    )
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "project_transition_to_rc_memory",
+        lambda *args: memory_calls.append(args) or memory,
+    )
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "project_memory_to_rc_belief",
+        lambda *args: belief_calls.append(args),
+    )
+
+    outcome = pipeline.request_action(
+        "choose_first_inquiry_target",
+        actor_obj=ctx.game_state["party"][cop_id],
+        args=[],
+        source="HUD",
+        return_outcome=True,
+    )
+
+    assert outcome.executed is True
+    assert vars(outcome) == {
+        "action_id": "choose_first_inquiry_target",
+        "executed": True,
+        "reason": None,
+        "value": None,
+    }
+    assert len(runtime_calls) == 1
+    assert memory_calls == [(world, transition)]
+    assert belief_calls == [(world, memory)]
+
+
+def test_action_pipeline_rejection_does_not_call_operation_runtime(monkeypatch):
     pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
     cop_id = pack["roles"]["protagonist"]["name"]
     get_action_specs(pack)
@@ -1750,7 +1839,7 @@ def test_action_pipeline_rejection_does_not_call_progression(monkeypatch):
     calls = []
     monkeypatch.setitem(
         ActionPipeline.request_action.__globals__,
-        "advance_operation_after_action",
+        "apply_action_outcome",
         lambda *args: calls.append(args),
     )
 
@@ -1779,9 +1868,8 @@ def test_progression_exception_does_not_reject_applied_action(monkeypatch):
     pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
     ctx.game_state["director_world"] = world
     ctx.game_state["world"] = world
-    monkeypatch.setitem(
-        ActionPipeline.request_action.__globals__,
-        "advance_operation_after_action",
+    monkeypatch.setattr(
+        "src.operation_runtime.advance_operation_after_action",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("progression failed")),
     )
 
@@ -1813,9 +1901,8 @@ def test_transition_record_exception_does_not_reject_progressed_action(
     pipeline = ActionPipeline(game_state=ctx.game_state, director=director)
     ctx.game_state["director_world"] = world
     ctx.game_state["world"] = world
-    monkeypatch.setitem(
-        ActionPipeline.request_action.__globals__,
-        "record_operation_transition",
+    monkeypatch.setattr(
+        "src.operation_runtime.record_operation_transition",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("record failed")),
     )
 
@@ -1930,7 +2017,7 @@ def test_rc_belief_projection_exception_does_not_reject_recorded_action(
     assert project_pending_rc_beliefs(world) == [_expected_rc_belief(cop_id)]
 
 
-def test_action_effect_failure_does_not_call_progression(monkeypatch):
+def test_action_effect_failure_does_not_call_operation_runtime(monkeypatch):
     pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
     cop_id = pack["roles"]["protagonist"]["name"]
     get_action_specs(pack)
@@ -1942,7 +2029,7 @@ def test_action_effect_failure_does_not_call_progression(monkeypatch):
     calls = []
     monkeypatch.setitem(
         ActionPipeline.request_action.__globals__,
-        "advance_operation_after_action",
+        "apply_action_outcome",
         lambda *args: calls.append(args),
     )
     monkeypatch.setattr(
@@ -2634,9 +2721,8 @@ def test_gui_switch_character_choice_passes_target_name(monkeypatch):
     ctx.game_state["_switch_cooldown_disabled"] = True
     pipeline = _move_pipeline(director, world, ctx)
     record_calls = []
-    monkeypatch.setitem(
-        ActionPipeline.request_action.__globals__,
-        "record_operation_transition",
+    monkeypatch.setattr(
+        "src.operation_runtime.record_operation_transition",
         lambda *args: record_calls.append(args),
     )
 
@@ -2795,6 +2881,27 @@ def test_move_action_does_not_advance_operation_or_microgoal():
 
     assert get_active_operation(world, "刑事") == operation_before
     assert world["actor_micro_goals"] == micro_before
+
+
+def test_move_action_early_return_does_not_call_operation_runtime(monkeypatch):
+    _pack, director, world, _callbacks, ctx, _hud = _setup_cop_trickster_hud("刑事")
+    set_actor_location(world, "刑事", "警察署_控室")
+    pipeline = _move_pipeline(director, world, ctx)
+    calls = []
+    monkeypatch.setitem(
+        ActionPipeline.request_action.__globals__,
+        "apply_action_outcome",
+        lambda *args: calls.append(args),
+    )
+
+    pipeline.request_action(
+        "move_to_location",
+        actor_obj=ctx.game_state["party"]["刑事"],
+        args=["酒場"],
+        source="GUI",
+    )
+
+    assert calls == []
 
 
 def test_move_action_does_not_advance_time_yet():

@@ -6,9 +6,11 @@ from pathlib import Path
 
 from src import action_registry
 from src.action_definitions import actions as legacy_actions, get_action_spec
-from src.actor_operations import start_operation_once
-from src.operation_progression import advance_operation_after_action
-from src.operation_transition_history import record_operation_transition
+from src.operation_runtime import (
+    OperationRuntimeInput,
+    OperationStartDirective,
+    apply_action_outcome,
+)
 from src.rc_belief import project_memory_to_rc_belief
 from src.rc_memory import project_transition_to_rc_memory
 from src.location_graph import MOVE_ACTION_ID, move_to_location
@@ -81,57 +83,21 @@ class ActionPipeline:
             return active_name
         return None
 
-    def _resolve_parent_microgoal_id(self, world: dict | None, actor_id: str | None) -> str | None:
-        if not isinstance(world, dict) or not actor_id:
-            return None
-        actor_goals = world.get("actor_micro_goals")
-        state = actor_goals.get(actor_id) if isinstance(actor_goals, dict) else None
-        if not isinstance(state, dict):
-            return None
-        micro_id = state.get("id")
-        return micro_id if isinstance(micro_id, str) and micro_id else None
-
-    def _start_operation_from_spec(
+    def _operation_start_directive_from_spec(
         self,
-        world: dict | None,
         spec: Any | None,
-        actor_id: str | None,
-        *,
-        source: str,
-    ) -> None:
-        if source != "HUD" or not isinstance(world, dict) or spec is None:
-            return
-        if not getattr(spec, "starts_operation", False):
-            return
-        operation_type = getattr(spec, "operation_type", None)
-        if not isinstance(operation_type, str) or not operation_type:
-            return
-        label = getattr(spec, "operation_label", None) or getattr(spec, "label", None) or operation_type
-        target_id = self.game_state.get("current_target")
-        if not isinstance(target_id, str) or not target_id:
-            actor_targets = world.get("actor_targets")
-            target_id = (
-                actor_targets.get(actor_id)
-                if isinstance(actor_targets, dict) and actor_id
-                else None
-            )
-        if not isinstance(target_id, str) or not target_id:
-            target_id = None
-        operation = start_operation_once(
-            world,
-            actor_id or "",
-            operation_type=operation_type,
-            label=str(label),
-            phase=getattr(spec, "operation_phase", None),
-            target_id=target_id,
-            parent_microgoal_id=self._resolve_parent_microgoal_id(world, actor_id),
-            created_from="HUD",
-            mini_goal=getattr(spec, "operation_mini_goal", None),
+    ) -> OperationStartDirective | None:
+        if spec is None or not getattr(spec, "starts_operation", False):
+            return None
+        return OperationStartDirective(
+            operation_type=getattr(spec, "operation_type", None),
+            operation_label=(
+                getattr(spec, "operation_label", None)
+                or getattr(spec, "label", None)
+            ),
+            operation_phase=getattr(spec, "operation_phase", None),
+            operation_mini_goal=getattr(spec, "operation_mini_goal", None),
         )
-        if operation is None:
-            print(f"[Operation] active operation already exists for actor={actor_id}")
-        elif operation.get("type") == operation_type:
-            print(f"[Operation] active actor={actor_id} operation={operation.get('id')}")
 
     def _advance_time(self, world: dict | None, minutes: int) -> None:
         if minutes <= 0:
@@ -500,65 +466,41 @@ class ActionPipeline:
                         reason="core_executor_missing",
                     )
 
-        if action_executed and world is not None and action_id != "switch_character":
-            actor_id = self._resolve_actor_id(actor_obj)
-            try:
-                progress_result = advance_operation_after_action(
-                    world,
-                    actor_id,
-                    action_id,
-                )
-                operation_advanced = progress_result.get("advanced") is True
-                if operation_advanced:
-                    print(
-                        "[Operation] advanced "
-                        f"actor={actor_id} "
-                        f"operation={progress_result.get('operation_id')} "
-                        f"phase={progress_result.get('from_phase')}"
-                        f"->{progress_result.get('to_phase')}"
-                    )
-            except Exception as exc:
-                # Effects have already succeeded. A progression failure must not
-                # turn that completed action into a rejected execution.
-                print(f"[Operation] progression failed: {exc}")
-            else:
-                if operation_advanced:
-                    transition_event = None
-                    try:
-                        transition_event = record_operation_transition(
-                            world,
-                            progress_result,
-                        )
-                    except Exception as exc:
-                        # Operation progression is already authoritative. A record
-                        # failure must not roll back or reject the completed action.
-                        print(f"[Operation] transition record failed: {exc}")
-                    if transition_event is not None:
-                        memory = None
-                        try:
-                            memory = project_transition_to_rc_memory(
-                                world,
-                                transition_event,
-                            )
-                        except Exception as exc:
-                            # Memory is a projection of the authoritative event.
-                            # Its failure must not reject or roll back the action.
-                            print(f"[RC Memory] live projection failed: {exc}")
-                        if memory is not None:
-                            try:
-                                project_memory_to_rc_belief(world, memory)
-                            except Exception as exc:
-                                # Belief is recoverable from the stored Memory.
-                                # Its failure must not reject or roll back action.
-                                print(f"[RC Belief] live projection failed: {exc}")
-
+        committed_transitions = []
         if action_executed:
-            self._start_operation_from_spec(
+            actor_id = self._resolve_actor_id(actor_obj)
+            committed_transitions = apply_action_outcome(
                 world,
-                spec,
-                self._resolve_actor_id(actor_obj),
-                source=source,
+                self.game_state,
+                OperationRuntimeInput(
+                    action_id=action_id,
+                    actor_id=actor_id,
+                    executed=True,
+                    effects_committed=True,
+                    source=source,
+                    operation_start_directive=(
+                        self._operation_start_directive_from_spec(spec)
+                    ),
+                ),
             )
+
+        for transition_event in committed_transitions:
+            memory = None
+            try:
+                memory = project_transition_to_rc_memory(
+                    world,
+                    transition_event,
+                )
+            except Exception as exc:
+                # Memory is a projection of the authoritative event. Its failure
+                # must not reject or roll back the completed action.
+                print(f"[RC Memory] live projection failed: {exc}")
+            if memory is not None:
+                try:
+                    project_memory_to_rc_belief(world, memory)
+                except Exception as exc:
+                    # Belief is recoverable from the stored Memory.
+                    print(f"[RC Belief] live projection failed: {exc}")
 
         dt = time_min_override if time_min_override is not None else (spec.time_min if spec else 0)
         try:
