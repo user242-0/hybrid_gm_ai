@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from src.actor_operations import get_active_operation
+from src.operation_reader import get_active_operation
 
 
 OPERATION_TRANSITION_SCHEMA_VERSION = "operation_transition_v0.1"

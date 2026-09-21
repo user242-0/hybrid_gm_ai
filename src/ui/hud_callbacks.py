@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable
 
 from src.action_proposal.advisory_provider import get_advisory_display_items
-from src.actor_operations import format_operation_summary, get_active_operation
+from src.operation_reader import format_operation_summary, get_active_operation
 from src.actor_view_state import (
     inject_actor_discovery,
     set_actor_location,

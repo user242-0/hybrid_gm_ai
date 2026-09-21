@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.actor_operations import get_active_operation
+from src.operation_reader import get_active_operation
 from src.actor_view_state import get_actor_discoveries, get_actor_location
 from src.location_graph import resolve_location_graph
 

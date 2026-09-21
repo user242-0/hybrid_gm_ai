@@ -8,6 +8,15 @@
 
 ---
 
+## 2026-09-21（Session 60-3: OperationStore導入・読取/更新経路分離）
+
+- 所感: 正本の置き場所を保ったまま、取得結果を編集してもゲーム状態が変わらない境界を作れた。
+- 段階①: OperationStoreに正本アクセスと初期化を集約し、取得・保存入力・開始の新規/既存両戻り値をdeepcopy。world defaultsのOperationマージもStoreへ移し、既存優先と参照分離を固定した。既存dict/YAML形式を維持し、OperationInstance独立クラスは今回追加していない。
+- 段階②: 読取利用者はoperation_reader、Runtime統括下の開始・進行はStoreへ明示保存。進行条件・transition履歴・Memory/Belief・GCS順序・部分成功契約は維持。旧公開ensureを内部化し、旧get/format/set/clearは互換経路を残した。正本キーとwriter依存の再発を検知する静的検査を追加した。
+- 文書: ユーザー編集中のDATA_OWNERSHIP.mdの既存内容を保ってルールを追記し、AGENTS.md末尾に参照を追加。config.yml / GLOSSARY.mdは未変更。汎用world保存復元は維持し、共有dictやPython動的機能まで書込を封鎖するものではない旨も明記。
+- 検証: 段階①関連142件、段階②関連285件成功。初期化マージhelperへ渡す入力の参照分離も検証し、最終全体810 passed / 2 skipped（既存Tkinter display依存）、git diff --check成功。GUI手動確認は未実施。コミット・pushは未実施。
+- 次回の最初の一手: WindowsでOperation開始・進行・save/load・actor切替を確認し、Store/reader境界をレビューする。OperationInstanceの独立型導入は次回の検討候補。
+
 ## 2026-08-22（Session 60-2: GameCommandService導入）
 
 - 気持ち／所感: Session 60-1のOperationRuntime境界を壊さず、その一段上に1回のCommand全体を通すApplication境界を置けた。Python HUD、将来のUnity／Mobile等が同じ入口へ接続するための土台になった。

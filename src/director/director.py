@@ -8,7 +8,7 @@ import pathlib
 
 from logic.cond_eval import eval_cond, parse_cond, _get_path as get_path
 from logic.emotion_traits import derived_traits
-from src.actor_operations import get_active_operation
+from src.operation_reader import get_active_operation
 from src.location_graph import list_move_actions
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from src.location_graph import install_location_graph_default
+from src.operation_store import OperationStore
 
 
 _PRESERVE_BASE_DICT_KEYS = {
@@ -12,7 +13,6 @@ _PRESERVE_BASE_DICT_KEYS = {
     "actor_locations",
     "actor_micro_goals",
     "actor_modes",
-    "actor_operations",
 }
 
 
@@ -44,4 +44,4 @@ def apply_world_defaults(world: Dict[str, Any], pack: Dict[str, Any] | None) -> 
     defaults = pack.get("world_defaults")
     if not isinstance(defaults, dict):
         return world
-    return deep_merge(world, defaults)
+    return OperationStore.merge_world_defaults(world, defaults, deep_merge)

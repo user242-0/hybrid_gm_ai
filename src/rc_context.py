@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.actor_operations import get_active_operation
+from src.operation_reader import get_active_operation
 from src.choice_definitions import get_available_choices
 from src.perceived_world import build_perceived_world
 from src.rc_belief import get_actor_beliefs

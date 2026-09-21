@@ -10,7 +10,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from src.actor_operations import get_active_operation, set_active_operation
+from src.operation_store import OperationStore
 
 
 DETECTIVE_ID = "刑事"
@@ -90,7 +90,8 @@ def advance_operation_after_action(
             trigger_action_id=executed_action_id,
         )
 
-    operation = get_active_operation(world, actor_id)
+    store = OperationStore(world)
+    operation = store.get_active_operation(actor_id)
     if operation is None:
         return _result(
             advanced=False,
@@ -182,7 +183,7 @@ def advance_operation_after_action(
         "label": TAKE_FIRST_TESTIMONY_MINI_GOAL_LABEL,
         "status": "active",
     }
-    set_active_operation(world, actor_id, updated_operation)
+    store.set_active_operation(actor_id, updated_operation)
 
     return _result(
         advanced=True,

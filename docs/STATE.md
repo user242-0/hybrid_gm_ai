@@ -81,6 +81,16 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session 60-3: OperationStore ①②完了 — 2026-09-21
+
+- ① `OperationStore` にOperation正本のget/set/clear/内部初期化とworld defaults適用を集約。保存先は従来の `world["actor_operations"]`。取得結果・保存入力・開始の新規/既存両戻り値をネストまでdeepcopyする。独立したOperationInstanceクラスは追加せずdict互換を維持した。
+- ② HUD/Director/認知情報/transition照合は `operation_reader` の読取APIへ移行。開始・進行はRuntime統括下でStoreへ明示保存し、条件判定は既存domain関数に残す。旧actor_operations公開get/format/set/clearは互換経路、ensureはStore内部化。GCS/Runtime順序・partial success・Memory/Beliefは変更していない。
+- 検証: 変更前全件成功、段階①関連142件成功、段階②関連285件成功、最終 `810 passed / 2 skipped`、`git diff --check`成功。skipはTkinter display依存の既存2件。GUI手動確認は未実施。取得/保存/初期化の参照分離（マージhelperへ渡す入力も含む）と直接アクセス・writer import再発検査を追加した。
+
+所有ルール: [DATA_OWNERSHIP.md](../general_documents/study_notes/DATA_OWNERSHIP.md#operationアクセス境界2026-09-21実装)。AGENTS.mdにはこのルールへの参照だけを追記。共有worldはdictのままであり、動的import等を含む絶対的な書込禁止ではない。
+
+次: WindowsでOperation開始→MiniGoal進行→save/load→actor切替の表示を手動確認し、今回の境界をレビューする。OperationInstanceの独立型導入は次回の検討候補。コミット・pushは未実施。
+
 ### Session 60-2完了 — 2026-08-22
 
 1回のGameCommandを最後まで通すApplication境界として
