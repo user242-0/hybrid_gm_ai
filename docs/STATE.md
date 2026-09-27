@@ -81,6 +81,20 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session 60-4: チェックポイント1完了（型と相互変換） — 2026-09-27
+
+- Session 60-3の成果は `c3b981f` としてcommit/push済み。fetch後にローカルとoriginの60-3ブランチが一致することを確認した（下記60-3終了時の「未実施」は当時の記録）。
+- `refactor/session60-4-operation-instance-v01` を同コミットから作成し、originへpush・upstream設定済み。チェックポイント1は `feat: add detached OperationInstance conversion` コミットとして保存する。リモートとの同期状態はGitで確認する。
+- 今回から、調査・設計確定・実装のまとまり・検証完了など適切な区切りで、完了事項／未検証事項／次の一手を記録し、利用制限に関係なく中断・再開できるようにする。音声・文章を適宜併用する。
+- 開始時からのローカル変更: `config.yml`、`general_documents/study_notes/GLOSSARY.md`、未追跡 `AGENTS.md`。既存変更を保持した。
+- ユーザー確認（2026-09-27）: 前回最後にローカルでsimulationを動作確認し、問題なし。個別のsave/load・actor切替等の確認範囲までは今回の報告から断定しない。
+- 合意済み範囲: 既存の保存形式・ID・進行挙動を保ってOperationInstance型を導入する。worldはdict正本、Storeで型変換、readerはdetached dictを維持。変更後Instanceを作って明示保存し、既存の部分成功契約を維持する。固有instance IDとRuntime失敗情報の構造化は今回対象外。
+- 実装区切り: 型と変換 → 更新経路への接続 → 回帰検証。各区切りで完了事項・未検証事項・次の一手を記録する。
+- 将来の必須チェックポイント: Contents Probで同じOperationを繰り返す内容を試す前に、固有instance IDを導入する。再開始時のtransition ID衝突・Memory重複判定を避けるため、採番・保存復元・履歴/Memoryとの関連・旧save互換をまとめて設計する。今回の型導入ではIDを変えない。
+- 完了: `src/operation_instance.py` にOperationInstanceを追加。`from_dict` / `to_dict`で内容を保持してdeepcopyし、`get`もコピーを返す。`with_changes`は指定した最上位項目を置き換えた別Instanceを返す（ネストのマージはしない）。入力dict以外はTypeError、dict内部の欠落/None/不正値/未知項目は補正せず保持する。公開APIから内部の可変データを渡さず、属性の再代入も禁止する。private領域の直接操作を防ぐセキュリティ機構ではない。
+- 検証: `.venv/Scripts/python.exe -m pytest tests/test_operation_instance.py tests/test_operation_store.py tests/test_operation_access_boundary.py tests/test_actor_operations.py` → 51 passed。新規19件で往復・入力/出力/変更前後の参照分離・JSON/YAML・既存開始recordとの互換を確認。全体テストとGUI再確認はこの段階では未実施。
+- 次の一手（チェックポイント2）: Store境界へInstance変換を接続し、Runtime配下の開始・進行処理を変更後Instanceの明示保存へ移す。reader/旧dict API・保存形式・ID・進行判定・部分成功契約を維持する。現在はStore/Runtimeへ未接続のため、本番経路は従来どおり。
+
 ### Session 60-3: OperationStore ①②完了 — 2026-09-21
 
 - ① `OperationStore` にOperation正本のget/set/clear/内部初期化とworld defaults適用を集約。保存先は従来の `world["actor_operations"]`。取得結果・保存入力・開始の新規/既存両戻り値をネストまでdeepcopyする。独立したOperationInstanceクラスは追加せずdict互換を維持した。

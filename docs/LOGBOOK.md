@@ -8,6 +8,23 @@
 
 ---
 
+## 2026-09-27（Session 60-4: チェックポイント1・型と相互変換）
+
+- 所感: まず本番経路から独立した変換部品を作り、旧データを変えないことを確認できた。
+- OperationInstanceを追加。入力・出力・フィールド取得はdeepcopy、変更はwith_changesで別Instanceを作る。dict内部の不正値も勝手に修復せず、欠落とNone、未知metadataを含めて保持する。進行可否の判断や保存は持たない。
+- 新規19件とStore/所有境界/既存Operationの関連32件、計51件成功。全体テスト・GUI再確認は未実施。本番Store/Runtimeには未接続。ユーザー指示により実装・テスト・STATE・LOGBOOKを `feat: add detached OperationInstance conversion` としてcommit/pushする。他のローカル編集は含めない。
+- Contents Probで同種Operationを反復する前に固有instance IDを導入するチェックポイントをSTATEへ明記した。
+- 次の最初の一手: Storeの型変換と開始・進行処理へ接続し、既存readerと保存形式を維持する。
+
+## 2026-09-27（Session 60-4: 開始・ブランチ作成）
+
+- 所感／進め方: 利用制限に工程を合わせず、意味のある区切りに再開可能なチェックポイントを残す。音声と文章を適宜併用する。
+- STATE・LOGBOOK・Operation所有境界・Store/reader実装を確認。fetch後、60-3のローカル／originが `c3b981f` で一致し、前回成果がcommit/push済みであることを確認した。
+- `refactor/session60-4-operation-instance-v01` を作成しoriginへpush、upstream設定済み。開始時の既存ローカル変更は保持。実装・テスト再実行は未着手。
+- ユーザーから、前回最後のローカルsimulation動作確認は問題なしとの報告を受けた（2026-09-27）。
+- 60-4は既存保存形式・ID・進行挙動を保つOperationInstance型導入と合意。Store境界の変換、readerのdetached dict、変更後Instanceの明示保存、既存部分成功契約を維持する。型と変換／更新接続／回帰検証で区切る。固有instance IDは将来のContents Probで同種Operationを反復する要件に合わせて検討する。
+- 次の最初の一手: OperationInstanceの型導入と保存／読取境界の仕様を確認する。
+
 ## 2026-09-21（Session 60-3: OperationStore導入・読取/更新経路分離）
 
 - 所感: 正本の置き場所を保ったまま、取得結果を編集してもゲーム状態が変わらない境界を作れた。
