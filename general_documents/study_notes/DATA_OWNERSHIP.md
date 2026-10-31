@@ -30,6 +30,16 @@ Memory
 Belief
 → world["actor_beliefs"]
 
+## OperationInstanceの責務境界（2026-09-27追記）
+
+| 観点 | 担当・境界 |
+|---|---|
+| **1. Owner** | 永続化上の正本は引き続き `world["actor_operations"]`。OperationInstanceは、そこから切り離して扱う一件のOperationのdomain表現。独立した第二の正本にはしない。 |
+| **2. Writer** | 正本を直接更新するのはStoreだけ。更新の指揮はRuntimeが担当し、その配下の開始・進行処理がStoreへ保存する。Instance自身はworldへ書き込まない。 |
+| **3. Coordinator** | Operation内の統括はRuntime。Actionのeffects確定を契機として進行判定→保存→transition記録→開始処理を呼ぶ。Command全体の順序は上位のGameCommandServiceが統括する。 |
+| **4. Observer** | 呼び出し側が結果・失敗情報から「どこまで確定したか」を把握する境界。Instance単体では担当できず、Runtimeの結果とGameCommandResult、ログで扱う。 |
+
+
 ## Operationアクセス境界（2026-09-21実装）
 
 - 実行時にOperation正本 `world["actor_operations"]` を直接読み書きするのは `src/operation_store.py` の `OperationStore` 内部だけ。保存先・actor bucket・既存dict/YAML形式は維持する。
@@ -44,10 +54,16 @@ Belief
 | --- | --- | --- |
 | HUD / Director / Perceived World / RCContext | operation_reader | しない |
 | Operation transition recorder | operation_readerでpost-state照合 | Operationは更新しない。履歴への記録は従来どおり |
-| Runtime配下の開始・進行処理 | OperationStore.get / set | 明示保存時だけ |
+| Runtime配下の開始・進行処理 | OperationStore.get_active_instance / set_active_instance | 明示保存時だけ |
 | world defaults適用 | OperationStore.merge_world_defaults | 新規world採用時の初期化 |
 
-OperationInstanceは一件のOperationを表す概念として維持する。今回の実装では独立クラスを追加せず、既存dictのdetached snapshotを使う。独立クラス・schema変更・transactionは導入していない。
+2026-10-31（Session60-4チェックポイント2）: 独立クラス `OperationInstance` をStore境界と開始・進行へ接続した。永続化上の正本は引き続きdictであり、Instanceは正本から切り離された一件のデータ表現。保存・開始条件・進行条件は持たない。
+
+- `OperationStore.get_active_instance(actor_id)` は既存dict取得経路からInstanceへ変換する。読み取りで初期化・修復をしない。欠落項目・None・未知項目・不正なフィールド値を補正せず保持する。
+- `set_active_instance(actor_id, instance)` は有効なworld/actorに対してInstance型を確認し、`to_dict()`の変換を完了してから既存dict保存経路へ渡す。変換失敗では正本やbucketを変更しない。型以外のdomain適格性は判定しない。None等はTypeErrorで、clearは従来の明示APIを使う。world/actorが無効なら既存writer同様no-op。
+- 旧 `get_active_operation` / `set_active_operation` / clearは従来の互換性を維持する。readerは引き続きdetached dict/Noneを返し、Instanceやwriterを公開しない。
+- 開始は新規Instanceを構築してStoreへ保存する。新規・既存同一IDとも公開戻り値はdetached dict。進行は取得Instanceを判定し、`with_changes`でphaseとmini_goalを置き換えた別Instanceを保存する。
+- 入出力と変更前後のネスト参照を分離する。保存済みdictとInstanceの二重正本は作らない。既存ID・保存schema・部分成功契約は維持し、transaction/rollbackは追加していない。Operation更新後にtransition記録が失敗しても更新は残る。Runtimeの失敗通知構造化は対象外。
 
 ### world採用・保存復元
 

@@ -5,7 +5,7 @@ Runtime invokes start_operation_once. Read-only consumers use operation_reader.
 
 from __future__ import annotations
 
-from copy import deepcopy
+from src.operation_instance import OperationInstance
 
 from src.operation_reader import (
     format_operation_summary,
@@ -42,13 +42,13 @@ def start_operation_once(
 
     operation_id = f"op_{operation_type}_{actor_id}"
     store = OperationStore(world)
-    current = store.get_active_operation(actor_id)
-    if isinstance(current, dict):
+    current = store.get_active_instance(actor_id)
+    if current is not None:
         if current.get("id") == operation_id:
-            return current
+            return current.to_dict()
         return None
 
-    operation = {
+    operation = OperationInstance.from_dict({
         "id": operation_id,
         "type": operation_type,
         "label": label,
@@ -58,8 +58,8 @@ def start_operation_once(
         "target_id": target_id,
         "parent_microgoal_id": parent_microgoal_id,
         "created_from": created_from,
-        "mini_goal": deepcopy(mini_goal) if isinstance(mini_goal, dict) else None,
+        "mini_goal": mini_goal if isinstance(mini_goal, dict) else None,
         "notes": [],
-    }
-    store.set_active_operation(actor_id, operation)
+    })
+    store.set_active_instance(actor_id, operation)
     return store.get_active_operation(actor_id)

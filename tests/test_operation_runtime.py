@@ -6,6 +6,8 @@ import pytest
 
 import src.operation_runtime as operation_runtime
 from src.actor_operations import get_active_operation, set_active_operation
+from src.operation_instance import OperationInstance
+from src.operation_store import OperationStore
 from src.operation_runtime import (
     OperationRuntimeInput,
     OperationStartDirective,
@@ -357,3 +359,44 @@ def test_start_metadata_falls_back_to_actor_target():
     operation = copy.deepcopy(get_active_operation(world, DETECTIVE_ID))
     assert operation["target_id"] == "目撃者A"
     assert operation["parent_microgoal_id"] == "micro_witness"
+
+
+def test_instance_save_failure_leaves_operation_and_effects_intact(monkeypatch, capsys):
+    world = {"actor_discoveries": {DETECTIVE_ID: ["inquiry_target_chosen"]}}
+    set_active_operation(world, DETECTIVE_ID, _active_inquiry_operation())
+    before = copy.deepcopy(world)
+
+    def fail_export(self):
+        raise RuntimeError("instance export failed")
+
+    monkeypatch.setattr(OperationInstance, "to_dict", fail_export)
+    assert apply_action_outcome(world, {}, _input()) == []
+    assert world == before
+    assert "progression failed: instance export failed" in capsys.readouterr().out
+
+
+def test_record_failure_keeps_real_instance_progression_committed(monkeypatch, capsys):
+    world = {"actor_discoveries": {DETECTIVE_ID: ["inquiry_target_chosen"]}}
+    set_active_operation(world, DETECTIVE_ID, _active_inquiry_operation())
+
+    def fail_record(*args):
+        raise RuntimeError("record failed")
+
+    monkeypatch.setattr(operation_runtime, "record_operation_transition", fail_record)
+    assert apply_action_outcome(world, {}, _input()) == []
+    assert OperationStore(world).get_active_instance(DETECTIVE_ID).get("phase") == "target_selected"
+    assert world["actor_discoveries"][DETECTIVE_ID] == ["inquiry_target_chosen"]
+    assert "operation_transition_history" not in world
+    assert "transition record failed: record failed" in capsys.readouterr().out
+
+
+def test_new_instance_start_save_failure_propagates_without_initialization(monkeypatch):
+    world = {}
+
+    def fail_export(self):
+        raise RuntimeError("start export failed")
+
+    monkeypatch.setattr(OperationInstance, "to_dict", fail_export)
+    with pytest.raises(RuntimeError, match="start export failed"):
+        apply_action_outcome(world, {}, _input("start_inquiry_operation", directive=_start_directive()))
+    assert world == {}

@@ -81,6 +81,13 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session 60-4: チェックポイント2完了（Store・開始・進行への接続） — 2026-10-31
+
+- 再開基準: 対象ブランチ `refactor/session60-4-operation-instance-v01` のHEADは `e7f91f7`。fetch後のoriginと一致し、後続コミットなし。既存のconfig.yml / GLOSSARY.md / 未追跡AGENTS.mdとDATA_OWNERSHIPの責務表追記を保持する。
+- 完了: Storeに `get_active_instance` / `set_active_instance` を追加。dict正本・旧dict API・readerを維持し、開始はInstance構築後の明示保存、進行はInstance取得→条件判定→with_changes→明示保存へ接続。開始の戻り値は従来のdict/None。Runtimeの順序・例外境界は変更しない。
+- 検証: 変更前の全体831件成功（初回はsandboxの一時ファイル権限制限で失敗、許可された制限外実行で成功）。実装後の関連8ファイルは201 passed、全体は847 passed / 0 skipped / 0 failed（新規16件）。保存直前の正本非変更、コピー分離、旧データ/reader互換、実際の型変換失敗と履歴記録失敗の部分成功を検証した。`git diff --check`成功。config.yml / GLOSSARY.md / AGENTS.mdのSHA256が開始時と一致し、既存編集を保持した。
+- GUI手動確認済み（2026-10-31、ユーザー報告）: Operation開始・進行・save/load・actor切替を確認。チェックポイント2の実装・自動検証・手動確認が完了し、ユーザー指示によりcommit/pushする。次の一手: Contents Probの内容・範囲を検討する。固有instance IDは従来どおり同種Operationを反復する前の必須チェックポイント。
+
 ### Session 60-4: チェックポイント1完了（型と相互変換） — 2026-09-27
 
 - Session 60-3の成果は `c3b981f` としてcommit/push済み。fetch後にローカルとoriginの60-3ブランチが一致することを確認した（下記60-3終了時の「未実施」は当時の記録）。

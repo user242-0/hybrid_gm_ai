@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Callable
 
+from src.operation_instance import OperationInstance
+
 
 class OperationStore:
     """Keep the world as canonical storage and detach every public state value.
@@ -51,6 +53,24 @@ class OperationStore:
 
     def clear_active_operation(self, actor_id: str) -> None:
         self.set_active_operation(actor_id, None)
+
+    def get_active_instance(self, actor_id: str) -> OperationInstance | None:
+        """Read a detached domain value without initializing or repairing state."""
+        operation = self.get_active_operation(actor_id)
+        return OperationInstance.from_dict(operation) if operation is not None else None
+
+    def set_active_instance(self, actor_id: str, operation: OperationInstance) -> None:
+        """Convert before writing; clearing remains an explicit separate API.
+
+        This validates the representation, not start/progression eligibility.
+        The legacy dict writer retains its existing compatibility behavior.
+        """
+        if not actor_id or not isinstance(self._world, dict):
+            return
+        if not isinstance(operation, OperationInstance):
+            raise TypeError("set_active_instance requires an OperationInstance")
+        record = operation.to_dict()
+        self.set_active_operation(actor_id, record)
 
     @classmethod
     def merge_world_defaults(

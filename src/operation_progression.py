@@ -7,7 +7,6 @@ which successful action triggered the evaluation.
 
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from src.operation_store import OperationStore
@@ -91,7 +90,7 @@ def advance_operation_after_action(
         )
 
     store = OperationStore(world)
-    operation = store.get_active_operation(actor_id)
+    operation = store.get_active_instance(actor_id)
     if operation is None:
         return _result(
             advanced=False,
@@ -176,14 +175,15 @@ def advance_operation_after_action(
             trigger_action_id=executed_action_id,
         )
 
-    updated_operation = deepcopy(operation)
-    updated_operation["phase"] = INQUIRY_TARGET_SELECTED_PHASE
-    updated_operation["mini_goal"] = {
-        "id": TAKE_FIRST_TESTIMONY_MINI_GOAL_ID,
-        "label": TAKE_FIRST_TESTIMONY_MINI_GOAL_LABEL,
-        "status": "active",
-    }
-    store.set_active_operation(actor_id, updated_operation)
+    updated_operation = operation.with_changes(
+        phase=INQUIRY_TARGET_SELECTED_PHASE,
+        mini_goal={
+            "id": TAKE_FIRST_TESTIMONY_MINI_GOAL_ID,
+            "label": TAKE_FIRST_TESTIMONY_MINI_GOAL_LABEL,
+            "status": "active",
+        },
+    )
+    store.set_active_instance(actor_id, updated_operation)
 
     return _result(
         advanced=True,

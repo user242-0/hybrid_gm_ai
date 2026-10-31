@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from src.actor_operations import get_active_operation, start_operation_once
+from src.operation_instance import OperationInstance
 from src.operation_progression import advance_operation_after_action
 from src.operation_store import OperationStore
 from src.world_defaults import apply_world_defaults
@@ -73,6 +74,7 @@ def test_start_returns_detached_state_for_both_success_paths(already_started):
 def test_read_invalid_or_missing_state_never_initializes_or_repairs(world):
     before = deepcopy(world)
     assert OperationStore(world).get_active_operation("刑事") is None
+    assert OperationStore(world).get_active_instance("刑事") is None
     assert world == before
 
 
@@ -159,3 +161,134 @@ def test_store_uses_newly_loaded_world_and_preserves_serialization():
     OperationStore(loaded).clear_active_operation("刑事")
     assert get_active_operation(loaded, "刑事") is None
     assert get_active_operation(old_world, "刑事") == _operation()
+
+
+@pytest.mark.parametrize("record", [
+    _operation(), {}, {"phase": None}, {"notes": ["legacy"]},
+    {"id": 7, "mini_goal": False, "extra": {"nested": []}},
+])
+def test_instance_and_dict_apis_preserve_records_without_normalizing(record):
+    world = {}
+    store = OperationStore(world)
+    store.set_active_operation("刑事", record)
+    before = deepcopy(world)
+    instance = store.get_active_instance("刑事")
+    assert isinstance(instance, OperationInstance)
+    assert instance.to_dict() == record
+    assert world == before
+    store.set_active_instance("刑事", instance)
+    assert world == before
+    result = get_active_operation(world, "刑事")
+    assert type(result) is dict
+    assert result == record
+
+
+def test_instance_changes_require_save_and_remain_detached_across_load():
+    world = {}
+    store = OperationStore(world)
+    source = _operation()
+    instance = OperationInstance.from_dict(source)
+    store.set_active_instance("刑事", instance)
+    store.set_active_instance("愉快犯", OperationInstance.from_dict({"notes": []}))
+    before = deepcopy(world)
+    source["notes"].clear()
+    snapshot = store.get_active_instance("刑事")
+    snapshot.get("metadata")["nested"].append(2)
+    replacement = {"id": "next", "extra": []}
+    updated = snapshot.with_changes(phase="next", mini_goal=replacement)
+    replacement["extra"].append(1)
+    assert world == before
+    store.set_active_instance("刑事", updated)
+    updated.to_dict()["notes"].clear()
+    assert snapshot.to_dict() == instance.to_dict() == _operation()
+    assert store.get_active_operation("刑事")["mini_goal"] == {"id": "next", "extra": []}
+    assert store.get_active_operation("愉快犯") == {"notes": []}
+    loaded = yaml.safe_load(yaml.safe_dump(world, allow_unicode=True))
+    loaded_store = OperationStore(loaded)
+    loaded_instance = loaded_store.get_active_instance("刑事")
+    assert loaded_instance.to_dict() == updated.to_dict()
+    # Mutating either canonical world must not alter earlier instance snapshots.
+    loaded["actor_operations"]["刑事"]["active_operation"]["notes"].clear()
+    world["actor_operations"]["刑事"]["active_operation"]["metadata"]["nested"].clear()
+    assert loaded_instance.to_dict() == updated.to_dict()
+    loaded_store.clear_active_operation("刑事")
+    assert loaded_store.get_active_instance("刑事") is None
+    assert store.get_active_instance("刑事") is not None
+
+
+@pytest.mark.parametrize("bad_input", [None, {}, []])
+def test_instance_writer_rejects_wrong_type_without_initializing(bad_input):
+    world = {}
+    with pytest.raises(TypeError, match="OperationInstance"):
+        OperationStore(world).set_active_instance("刑事", bad_input)
+    assert world == {}
+
+
+@pytest.mark.parametrize("world", [{}, {"actor_operations": []}])
+def test_instance_export_failure_precedes_any_world_write(monkeypatch, world):
+    before = deepcopy(world)
+    instance = OperationInstance.from_dict(_operation())
+
+    def fail_export(self):
+        raise RuntimeError("export failed")
+
+    monkeypatch.setattr(OperationInstance, "to_dict", fail_export)
+    with pytest.raises(RuntimeError, match="export failed"):
+        OperationStore(world).set_active_instance("刑事", instance)
+    assert world == before
+
+
+def test_start_saves_instance_once_and_keeps_public_dict_return(monkeypatch):
+    world = {}
+    saved = []
+    original_save = OperationStore.set_active_instance
+
+    def save(store, actor_id, instance):
+        assert isinstance(instance, OperationInstance)
+        assert world == {}
+        saved.append(instance)
+        original_save(store, actor_id, instance)
+
+    monkeypatch.setattr(OperationStore, "set_active_instance", save)
+    args = dict(operation_type="inquiry", label="Inquiry", mini_goal={"extra": []})
+    first = start_operation_once(world, "刑事", **args)
+    second = start_operation_once(world, "刑事", **args)
+    assert type(first) is type(second) is dict
+    assert first == second == saved[0].to_dict()
+    assert len(saved) == 1
+    first["mini_goal"]["extra"].append(1)
+    second["notes"].append(2)
+    assert get_active_operation(world, "刑事") == saved[0].to_dict()
+    assert start_operation_once(world, "刑事", operation_type="escape", label="Escape") is None
+    assert len(saved) == 1
+
+
+def test_progression_builds_new_instance_before_explicit_save(monkeypatch):
+    world = {"actor_discoveries": {"刑事": ["inquiry_target_chosen"]}}
+    store = OperationStore(world)
+    record = _operation()
+    record["target_id"] = None
+    store.set_active_operation("刑事", record)
+    before = deepcopy(world)
+    old_instance = store.get_active_instance("刑事")
+    original_save = OperationStore.set_active_instance
+    saved = []
+
+    def save(store, actor_id, instance):
+        assert isinstance(instance, OperationInstance)
+        assert world == before
+        assert instance.get("phase") == "target_selected"
+        saved.append(instance)
+        original_save(store, actor_id, instance)
+
+    monkeypatch.setattr(OperationStore, "set_active_instance", save)
+    assert advance_operation_after_action(world, "刑事", "choose_first_inquiry_target")["advanced"]
+    assert len(saved) == 1
+    assert old_instance.to_dict() == record
+    expected = deepcopy(record)
+    expected.update(phase="target_selected", mini_goal={
+        "id": "mini_goal_take_first_testimony", "label": "最初の証言を取る", "status": "active",
+    })
+    assert get_active_operation(world, "刑事") == expected
+    assert not advance_operation_after_action(world, "刑事", "choose_first_inquiry_target")["advanced"]
+    assert len(saved) == 1
