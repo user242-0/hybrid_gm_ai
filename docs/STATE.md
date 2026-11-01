@@ -81,6 +81,17 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session 61: 遊べる事件1本の設計開始 — 2026-11-01
+
+- ユーザー採用方針: 事件1本の選択・結果を決める → 最小実装で遊ぶ → 同じ事件でAPI版RCを試す。次工程は追加リファクタの継続ではなく、選択による展開の違いを体感できる遊びの設計。リファクタはその体験に必要な範囲で行う。
+- Session60-4完了コミット `afcb51d` を基点に `feature/session61-playable-case-v01` をGitHub上で作成。本記録は文書更新のみで、ゲームコード実装・API接続・ローカルのブランチ切替は未実施。
+- 体験の目安: 5〜10分で結末まで遊べる聞き込み事件1本。証人の訪問順・聞き方が情報、時間、警戒や結末へ影響し、愉快犯側にも痕跡隠し／挑発・誘導などの選択がある案を叩き台とする。具体的な人物・選択・結果・分岐条件は未確定。完成条件は、プレイヤーが選択による展開の違いと結果を理解できること。
+- 外部AI実験方針: RC本人の認識・Memory・Beliefと実行可能候補を入力に、選びたい行動と理由を提案させる。人間が採用し、既存の実行経路・実行時gateを通す。同じ事件で従来ルールと比較する。provider/model、費用・待ち時間、失敗時fallback等はAPI実験の設計時に決める。
+- 状態情報の調査結果: CharacterStatusにはHP/max_hp・stamina/max_staminaがあるが、現行RCContextBundleはそれらを明示的に渡していない。actor_profileはid/label、emotionは別項目。perceived_worldはlocation・actor_mode・discoveries・Operation要約・visible_routes・interpretationsで、天気や空腹の項目はない。ゲーム全体の天気・食事関連の既存実装の有無は別途調査する。
+- ユーザーの検討例: 「聞き込みが一区切りし空腹。テイクアウトしたいが悪天候なので近所の店に入る」。Operationと身体状態・環境の相互作用を設計課題として扱う。情報をAIへ渡すだけでなく、食事／入店／捜査継続などの候補、実行条件、時間や回復等の効果が必要。空腹とスタミナは同一と仮定しない。本人の状態と、本人が観測・把握している環境を区別し、未知の天気や他actorの秘密を勝手に補わない。
+- 設計候補（未確定）: 本人の身体状態をBundleのself_state等、観測した天気等をperceived_worldの環境情報として渡す。Operation中でも休息等を選べるか、目標保持・中断・再開をどう扱うか、既存RC_AIのactive Operation優先方針と併せて検討する。大規模な空腹／天候シミュレーションの先行実装は決めていない。
+- 次の一手: 事件の導入・プレイヤーの目的・意味の異なる選択・可視の結果・結末を一枚に整理し、その体験で必要な状態情報と最小実装範囲を決める。同じworldで同種Operationを再開始する場合は、既存合意どおり固有instance IDを先に設計・導入する。
+
 ### Session 60-4: チェックポイント2完了（Store・開始・進行への接続） — 2026-10-31
 
 - 再開基準: 対象ブランチ `refactor/session60-4-operation-instance-v01` のHEADは `e7f91f7`。fetch後のoriginと一致し、後続コミットなし。既存のconfig.yml / GLOSSARY.md / 未追跡AGENTS.mdとDATA_OWNERSHIPの責務表追記を保持する。
