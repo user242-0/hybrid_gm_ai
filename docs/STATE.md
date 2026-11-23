@@ -81,6 +81,16 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session62-A: GUIレイアウトとDialogue表示の器 — 2026-11-23
+
+- 共通ブランチ `feature/session62-dialogue` 上で実装。準備3文書はユーザーが手動commit/push済み。開始時HEADとローカル追跡originは `f496f82` で一致（今回のfetchは未実施）。以下の準備時点の「未実施」は解消済み。
+- `src/gui.py` の既存Textを左約1/3へ配置し、右上にScene Viewのplaceholder、右下にスクロール可能なDialogue Text、最下部に既存Entryを配置。初期1100×700、左右/上下のPanedWindowで比率調整可能。固定サイズ・最大化の強制なし。
+- `log_q` の `{"mode": "dialogue", "speaker": "証人", "text": "本文"}` をGUIスレッドで追記し、発言者を色分け。`{"mode": "dialogue_clear"}` はDialogueだけを消す。Text内の一時表示履歴であり、world/saveの正本ではない。通常のturn/note更新・既存clearでは会話を消さない。未知mode/レガシーメッセージは従来どおり無視。
+- 保護: `on_enter()`、event_q送信、Action実行経路、Operation/Memory/Belief、talk/NPC、Director HUD、save/loadは未変更。左側の色タグ・最新表示・スクロール抑制を維持。Dialogue Service、LLM接続、会話入力切替は未実装。
+- 検証: 変更前847件成功。実Tk/Queueによる新規6件（追記/タグ、turn/noteとの独立、消去/順序、厳格mode、スクロール、Entry送信）を追加し、全体853 passed / 0 skipped / 0 failed。GUI起動、Action番号4による刑事→愉快犯切替、表示更新、Scene表示、左右/上下の境界ドラッグ、q終了を実画面でも確認。
+- 起動環境の制約: 素の `python -m src.simulation` は既存の `from gui import start_gui` でModuleNotFoundError。過去の記録と同様、確認時だけ `PYTHONPATH=.;.\src` を設定して起動した。APIスタブ `GM_USE_STUB=1` で確認し、config.yml自体は未変更。既存import経路の修正は今回対象外。
+- 次の一手: ユーザー環境でレイアウト・Action操作を確認。問題なければgui.py・新規テスト・STATE/LOGBOOKのみ手動commit/pushし、Session62-Bで会話モード/Dialogue Service接続を検討する。config.ymlと未追跡AGENTS.mdは保持。今回のcommit/pushは未実施。
+
 ### Session62 準備 — 2026-11-23
 
 - 共通ブランチ名は `feature/session62-dialogue` に決定（ユーザー承認済み）。62-Aを含むサブセッションをこの1本で進める。62-AはGUI小規模改修、62全体はGUIへのDialogue機能追加を予定する。

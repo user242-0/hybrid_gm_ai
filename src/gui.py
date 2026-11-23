@@ -9,9 +9,53 @@ def start_gui(gs):
     def ui_loop():
         root = tk.Tk()
         root.title("Hybrid GM – Console")
+        root.geometry("1100x700")
+        root.rowconfigure(0, weight=1)
+        root.columnconfigure(0, weight=1)
+
+        # 左は既存の操作表示、右はScene / Dialogue。境界はドラッグで調整可能。
+        panes = tk.PanedWindow(root, orient=tk.HORIZONTAL, sashwidth=6)
+        panes.grid(row=0, column=0, sticky="nsew")
+        actions_view = tk.LabelFrame(panes, text="Actions / Status")
+        right_panes = tk.PanedWindow(panes, orient=tk.VERTICAL, sashwidth=6)
+        panes.add(actions_view, width=360, minsize=240, stretch="always")
+        panes.add(right_panes, width=730, minsize=320, stretch="always")
+
+        # Sceneの子ウィジェットを将来の描画コンポーネントへ置換する。
+        scene_view = tk.LabelFrame(right_panes, text="Scene View")
+        tk.Label(
+            scene_view, text="ここにシーンを表示します", bg="#191d24", fg="#AAA"
+        ).pack(fill="both", expand=True)
+        right_panes.add(scene_view, height=310, minsize=120, stretch="always")
+
+        dialogue_view = tk.LabelFrame(right_panes, text="Dialogue View")
+        dialogue_scroll = tk.Scrollbar(dialogue_view, orient=tk.VERTICAL)
+        dialogue_scroll.pack(side="right", fill="y")
+        dialogue_txt = tk.Text(
+            dialogue_view, name="dialogue_text", width=1, height=1,
+            state="disabled", bg="#222", fg="#DDD", wrap="word",
+            yscrollcommand=dialogue_scroll.set,
+        )
+        dialogue_txt.pack(side="left", fill="both", expand=True)
+        dialogue_scroll.config(command=dialogue_txt.yview)
+        dialogue_txt.tag_config("speaker", foreground="#fadb14")
+        right_panes.add(dialogue_view, height=340, minsize=120, stretch="always")
+
+        def _append_dialogue(speaker: str, text: str):
+            # GUI表示だけの一時履歴。turn/noteの再描画とは独立させる。
+            dialogue_txt.config(state="normal")
+            dialogue_txt.insert(tk.END, speaker + "\n", "speaker")
+            dialogue_txt.insert(tk.END, text + "\n\n")
+            dialogue_txt.see(tk.END)
+            dialogue_txt.config(state="disabled")
+
+        def _clear_dialogue():
+            dialogue_txt.config(state="normal")
+            dialogue_txt.delete("1.0", tk.END)
+            dialogue_txt.config(state="disabled")
 
         # 表示エリア：常に「最新の手番＋補足」しか置かない
-        txt = tk.Text(root, width=80, height=24, state="disabled", bg="#222", fg="#DDD", wrap="word")
+        txt = tk.Text(actions_view, name="turn_text", width=1, height=1, state="disabled", bg="#222", fg="#DDD", wrap="word")
         txt.pack(fill="both", expand=True)
 
         # マウスホイールでの過去スクロールを無効化（過去自体ありませんが視覚的にも固定）
@@ -95,7 +139,7 @@ def start_gui(gs):
 
         # 入力欄
         entry = tk.Entry(root, width=80)
-        entry.pack()
+        entry.grid(row=1, column=0, sticky="ew", padx=6, pady=6)
         def on_enter(event=None):
             cmd = entry.get().strip()
             if not cmd:
@@ -142,6 +186,13 @@ def start_gui(gs):
                             changed = True
                         elif mode == "render":
                             changed = True  # 明示リフレッシュ
+                        elif mode == "dialogue":
+                            text = item.get("text")
+                            if isinstance(text, str):
+                                speaker = str(item.get("speaker") or "?")
+                                _append_dialogue(speaker, text)
+                        elif mode == "dialogue_clear":
+                            _clear_dialogue()
                         # 不明 mode は無視（厳格モード）
                     else:
                         # レガシー（str / (msg, tag)）は完全に無視

@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-11-23（Session62-A: GUIレイアウト・Dialogue表示）
+
+- 所感/方針: 「物語の窓」の器を最小変更で追加。Session62共通ブランチを継続し、動作確認→問題なければユーザーがPowerShellでcommit/pushする進め方とした。
+- 準備完了確認: ユーザーの手動実行後、`feature/session62-dialogue` のHEAD/ローカル追跡originが `f496f82` で一致。STATE/LOGBOOK/GLOSSARYの準備commitを確認した。下記準備ログの未実施事項は解消済み（今回のfetchは未実施）。
+- 実装: `src/gui.py` の既存Textを左、Scene placeholderを右上、発言者タグ付きDialogue TextとScrollbarを右下、既存Entryを最下部へ配置。初期1100×700でサイズ変更自由、PanedWindowの左右/上下境界をドラッグ可能。
+- 受信: `dialogue` はspeaker/textの追記、`dialogue_clear` はDialogueだけ消去。GUI poll内で更新し、履歴はText内の一時表示だけ。turn/note、通常clear、未知modeの厳格処理を維持。on_enter/Action経路、HUD、認知系、保存仕様、configは未変更。
+- 自動検証: 変更前847件、新規実Tk/Queueテスト6件成功。最終 `.venv/Scripts/python.exe -m pytest -q -o addopts=` は853 passed / 0 skipped / 0 failed。`git diff --check`成功。
+- 実画面確認: 起動、左Action/MicroGoalとScene表示、Entry番号4から刑事→愉快犯切替と表示更新、左右幅/上下高さのドラッグ調整、qでの終了を確認。起動時のみ既知のimport経路補助 `PYTHONPATH=.;.\src` とAPIスタブ `GM_USE_STUB=1` を使用した。素のmodule起動は既存ModuleNotFoundErrorで未達のため、今回の変更で解消したとは扱わない。
+- 次回の最初の一手: ユーザー環境で表示/操作を確認し、問題なければgui.py・新規テスト・STATE/LOGBOOKを手動commit/push。config.yml/AGENTS.mdは対象外。62-Bの指示を受けるまで会話生成や入力切替へ進まない。
+
 ## 2026-11-23（Session62: 共通ブランチ準備）
 
 - 方針: GUI小規模改修の62-AからDialogue導入まで、Session62全体を `feature/session62-dialogue` で進める。ブランチ名とcommit対象はユーザーがyで承認済み。
