@@ -81,8 +81,30 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session62 準備 — 2026-11-23
+
+- 共通ブランチ名は `feature/session62-dialogue` に決定（ユーザー承認済み）。62-Aを含むサブセッションをこの1本で進める。62-AはGUI小規模改修、62全体はGUIへのDialogue機能追加を予定する。
+- 作成元のローカルは `feature/session61-playable-case-v01` / `4f7a049`。現環境では `.git` が読み取り専用でfetch不可、リモート照会も通信エラー。新ブランチ作成・切替・commit・pushは未実施で、リモート最新状態との一致も未確認。
+- commit/push対象は `docs/STATE.md`、`docs/LOGBOOK.md`、GCS学習メモ追記済みの `general_documents/study_notes/GLOSSARY.md`。`config.yml` と未追跡 `AGENTS.md` はローカルのまま保持する。
+- 次の一手: Git操作が可能な環境でfetch後に共通ブランチを作成・切替し、上記3文書のみcommit/pushする。完了を確認してからSession62-Aの指示プロンプトを受け取り、実装へ進む。
+
+### Session62: Dialogue MVP / GUI入出力経路調査 — 2026-11-21〜22（進行中）
+
+- **開発方針**：リファクタリング優先から「遊べる体験」優先へ転換。最初は刑事として証人1人と自由会話し、証言によって刑事のMemory・Beliefが変化する体験を目指す。
+- **MVP目標**：3〜5往復のLLM会話。証人の人格・知識・警戒心・会話履歴を反映し、重要証言を1件獲得した際に認識を更新する。
+- **UI方針**：「GUIは物語の窓、Director HUDは世界の制御盤」。GUI単体でも遊べる構成を長期目標とする。GUIアクションは基本動詞、HUDアクションは文脈を伴う高レベル行動という既存の区別を維持する。
+- **GUI入力経路確認済み**：`gui.py` の `on_enter()` → `event_q.put(cmd)` → `simulation.py` の `player_loop()` → `dispatch_action()` → `GameCommandService`。
+- **GUI出力経路確認済み**：`log_q` → `gui.py` の `pump_logs()` → `_render()` → `txt`。現行は `turn_lines` / `note_lines` を全消去・再描画する方式。既存の `talk()` は主にCLIへ出力する。
+- **旧会話実装**：`conversation_manager.py` は会話回数・間隔の管理。`npc_interactions.py` はテンプレート会話と旧オムニ用API実験を含む。両者は今回は原則維持し、新規Dialogue Serviceを検討する。
+- **Operation接続点**：`choose_first_inquiry_target` 後の `mini_goal_take_first_testimony` は存在するが、実際の証人選択・証言取得Actionは未実装。
+- **Dialogue構想**：GUIの既存「話す」を会話開始の入口とし、会話中はEntry入力を自由発言として処理。会話履歴は独立管理し、LLMの発言を直接世界の真実にしない。
+- **GUIレイアウト案（未実装）**：左側をアクション選択、右下をスクロール可能なDialogue表示領域とする。ウィンドウ増設は避ける。
+- **未実施**：新規コード、LLM API接続、Dialogue Session、証言イベント、Memory・Belief更新、プレイテスト。
+- **次の一手**：`gui.py` の `start_gui()` 内で、`txt`・アクション選択UI・`entry` の生成と配置を調査し、Dialogue表示領域の最小追加方法を決める。既存の動作を維持する。
+
 ### Session 61: 遊べる事件1本の設計開始 — 2026-11-01
 
+- ローカル反映確認（2026-11-01）: originをfetchし、追跡ローカルブランチへ切替済み。HEADは `4f7a049` でoriginと一致。config.yml / GLOSSARY.md / 未追跡AGENTS.mdは切替前後のハッシュ一致を確認し保持。ゲームコード実装は未着手。以下の「ローカル切替未実施」はGitHubで方針を記録した時点の状況。
 - ユーザー採用方針: 事件1本の選択・結果を決める → 最小実装で遊ぶ → 同じ事件でAPI版RCを試す。次工程は追加リファクタの継続ではなく、選択による展開の違いを体感できる遊びの設計。リファクタはその体験に必要な範囲で行う。
 - Session60-4完了コミット `afcb51d` を基点に `feature/session61-playable-case-v01` をGitHub上で作成。本記録は文書更新のみで、ゲームコード実装・API接続・ローカルのブランチ切替は未実施。
 - 体験の目安: 5〜10分で結末まで遊べる聞き込み事件1本。証人の訪問順・聞き方が情報、時間、警戒や結末へ影響し、愉快犯側にも痕跡隠し／挑発・誘導などの選択がある案を叩き台とする。具体的な人物・選択・結果・分岐条件は未確定。完成条件は、プレイヤーが選択による展開の違いと結果を理解できること。
