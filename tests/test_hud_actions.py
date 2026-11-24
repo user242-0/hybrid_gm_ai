@@ -250,6 +250,42 @@ def _install_gcs_dispatch(director, ctx, callbacks, *, refresh_calls, dispatch_c
     return service
 
 
+@pytest.mark.parametrize("mode", ["dialogue_only", "player_only", "all"])
+def test_hud_auto_rest_stays_local_without_stub_environment(monkeypatch, capsys, mode):
+    from unittest.mock import Mock
+
+    from src.actions import utility
+    from src.utility import config_loader
+
+    monkeypatch.delenv("GM_USE_STUB", raising=False)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.setattr(config_loader, "_CFG", {
+        "llm": {"mode": mode, "allow_actions": ["generate_flavor"]},
+        "datalab": {"emit_scene_graph": False},
+    })
+    api_client = Mock(side_effect=AssertionError("API client constructed by HUD Auto"))
+    monkeypatch.setattr(utility, "_get_client", api_client)
+    _, director, world, callbacks, ctx, _ = _setup_cop_trickster_hud("刑事")
+    director.mode = "FREEZE"
+    actor = ctx.game_state["party"]["刑事"]
+    actor.is_tired = True
+    ctx.game_state.update(active_char=actor, director_world=world, world=world, auto_step_pending=True)
+    dispatch_calls = []
+    _install_gcs_dispatch(director, ctx, callbacks, refresh_calls=[], dispatch_calls=dispatch_calls)
+
+    def select_rest(_world, _mode, candidates, _micro):
+        rest = next(candidate for candidate in candidates if candidate["action"] == "rest")
+        return rest["action"], rest["time_min"], "test"
+
+    callbacks._pick_action = select_rest
+    callbacks.maybe_run_auto()
+
+    assert dispatch_calls == ["rest"]
+    assert ctx.game_state["auto_step_pending"] is False
+    assert "休む。" in capsys.readouterr().out
+    api_client.assert_not_called()
+
+
 def _active_inquiry_operation(actor_id, *, status="active"):
     return {
         "id": f"op_inquiry_{actor_id}",

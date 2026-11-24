@@ -1,26 +1,21 @@
 from .utility import generate_flavor_text  # この行を追加する
 from .combat import engage_combat  # この行を追加する
+from src.utility.llm_guard import can_call_llm
 import random
 #openaiインポートセット
 # import openai
 import sys
 import os
 _OPENAI = None
-from dotenv import load_dotenv
-# .envから環境変数を読み込む
-load_dotenv()
-
-import random
-###
-def _use_stub_llm():
-    return os.getenv("GM_USE_STUB") == "1" or os.getenv("CI") == "true"
 
 
 def _get_client():
     """OpenAIクライアントを遅延初回だけ作成。2回目以降はキャッシュ。"""
     global _CLIENT
     if _CLIENT is None:
+        from dotenv import load_dotenv
         from openai import OpenAI        # ← 遅延importなのでテストでは呼ばれない
+        load_dotenv()
         # APIキーは環境変数 OPENAI_API_KEY を自動利用。手動指定も可:
         _CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     return _CLIENT
@@ -230,8 +225,9 @@ def determine_next_location(game_state):
 
 
 def generate_dynamic_event(player_choice, game_state):
-    if _use_stub_llm():
-        return f"空気がわずかに揺れた。"
+    allowed, _ = can_call_llm("legacy", "generate_dynamic_event")
+    if not allowed:
+        return "空気がわずかに揺れた。"
     client = _get_client() 
     prompt = f"""
     プレイヤーは現在、「{game_state['location']}」という場所にいます。
@@ -256,8 +252,9 @@ def generate_dynamic_event(player_choice, game_state):
     return event_description
 
 def generate_location_event(location, event_type, player_choice, difficulty):
-    if _use_stub_llm():
-        return f"空気がわずかに揺れた。"
+    allowed, _ = can_call_llm("legacy", "generate_location_event")
+    if not allowed:
+        return "空気がわずかに揺れた。"
     client = _get_client()     
     prompt = f"""
     プレイヤーは現在「{location}」におり、目的は「{player_choice}」です。

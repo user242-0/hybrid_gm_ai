@@ -107,7 +107,7 @@ def add_minutes(world: Dict[str, Any] | None, delta_min: int) -> None:
     world["clock"] = minutes_to_clock(world["clock_min"])
 
 CFG = get_cfg()
-SCENE_EMIT_ON = bool(CFG["datalab"].get("emit_scene_graph", True))
+SCENE_EMIT_ON = bool(CFG.get("datalab", {}).get("emit_scene_graph", True))
 SCENE_JOB_DIR = job_root_from_cfg()
 
 def _map_to_choice_key(raw_key: str):
@@ -319,10 +319,11 @@ def execute_player_choice(player, cmd: str, game_state, pipeline=None):
 
 
     signals_doc = emit_emotion_eval(SCENE_JOB_DIR, actor_obj=player, game_state=game_state)
-    thresholds  = CFG["datalab"].get("emit_thresholds", {})
+    datalab_cfg = CFG.get("datalab", {})
+    thresholds  = datalab_cfg.get("emit_thresholds", {})
     decision    = summarize_why_now(signals_doc.get("signals", {}), thresholds)
 
-    policy = CFG["datalab"].get("emit_policy", "always")
+    policy = datalab_cfg.get("emit_policy", "always")
     emit_ok = (policy == "always") or (policy == "threshold" and decision["ok"])
     why_now_text = f'{decision["text"]} | policy={policy} {"emit" if emit_ok else "skip"}'
 

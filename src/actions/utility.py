@@ -1,23 +1,16 @@
 import random
 import os
+from src.utility.llm_guard import can_call_llm, get_fallback_text, log_llm_decision
+
 _CLIENT = None
-from dotenv import load_dotenv
-from src.utility.llm_guard import can_call_llm, record_call, get_fallback_text, log_llm_decision
-
-# .envから環境変数を読み込む
-load_dotenv()
-
-# .env内にあるAPIキーを使う
-#openai.api_key = os.getenv("OPENAI_API_KEY")
-
-def _use_stub_llm():
-    return os.getenv("GM_USE_STUB") == "1" or os.getenv("CI") == "true"
 
 def _get_client():
     """OpenAIクライアントを遅延初回だけ作成。2回目以降はキャッシュ。"""
     global _CLIENT
     if _CLIENT is None:
+        from dotenv import load_dotenv
         from openai import OpenAI        # ← 遅延importなのでテストでは呼ばれない
+        load_dotenv()
         # APIキーは環境変数 OPENAI_API_KEY を自動利用。手動指定も可:
         _CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     return _CLIENT
@@ -28,22 +21,17 @@ def generate_flavor_text(action, talk_situation, location, caller: str = "player
     caller: "player" or "rc" （LLMガードで使用）
     """
     loc = str(location or "どこか")
+    allowed, reason = can_call_llm(caller, "generate_flavor")
+    if reason != "forced_stub":
+        log_llm_decision(allowed, reason, caller, "generate_flavor")
+    if not allowed:
+        return get_fallback_text(action, loc)
+
     if isinstance(talk_situation, dict):
         ts = [f"{k}:{v}" for k, v in talk_situation.items()]
     else:
         ts = list(talk_situation or [])
 
-    # スタブモード（CI/テスト）
-    if _use_stub_llm():
-        return f"{action}。{loc}の空気がわずかに揺れた。"
-
-    # LLMガードチェック
-    allowed, reason = can_call_llm(caller, "generate_flavor")
-    log_llm_decision(allowed, reason, caller, "generate_flavor")
-
-    if not allowed:
-        return get_fallback_text(action, loc) 
-       
     time_description = "深夜（夜間・真夜中）" if "late_night" in talk_situation else "昼間（通常時間帯）"
     client = _get_client()
     prompt = f"""
@@ -74,7 +62,6 @@ def generate_flavor_text(action, talk_situation, location, caller: str = "player
         temperature=0.7,
         max_tokens=120
     )
-    record_call()  # LLM呼び出し成功を記録
     text = (response.choices[0].message.content or "").strip()
     return text or f"{action}。{loc}の空気がわずかに揺れた。"  # ← 空返り禁止
 

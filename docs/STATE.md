@@ -81,6 +81,14 @@ current_target と narrative_targetの違い：
 
 ## 2. いまの状態（3行で）
 
+### Session62-B-1a — LLM Guardの安全性整備（2026-11-24）
+
+- `feature/session62-dialogue` の `58df322` から作業。`config.yml` と未追跡 `AGENTS.md` の既存ローカル変更を保持。実効設定はOFF。commit/pushはユーザー確認待ち。
+- LLM Guardは `GM_USE_STUB=1` / `CI=true` を最優先し、欠落・不正・読込失敗を拒否する。YAMLが `off` を文字列または `False` に解釈してもAPI送信は閉じる。設定ファイル全体を辞書として読めない場合は既定値で起動する。
+- `dialogue_only` は専用送信経路の実装まで拒否。旧 `player_only` / `rc_only` / `all` も現在は拒否する。`allow_actions` と旧頻度制限は許可条件から外し、旧オムニ・旧探索はローカル応答へ。旧ルール生成とキー診断スクリプトは既定無効化。
+- ソケット接続・名前解決を遮断したpytestで904件成功。51件を追加し、設定異常時の初期化、HUD Autoからの `rest`、旧送信経路の定型応答と開発スクリプトの無効化を確認。実API通信・キー操作・SDK変更・実画面操作は未実施。
+- 次の一手は、刑事としてGUIで証人1人に話しかけ、スタブで3〜5往復して通常Actionへ戻れるようにすること。Responses API、予算台帳、Memory・Belief接続は後続工程。
+
 ### Session62-A: GUIレイアウトとDialogue表示の器 — 2026-11-23
 
 - 共通ブランチ `feature/session62-dialogue` 上で実装。準備3文書はユーザーが手動commit/push済み。開始時HEADとローカル追跡originは `f496f82` で一致（今回のfetchは未実施）。以下の準備時点の「未実施」は解消済み。

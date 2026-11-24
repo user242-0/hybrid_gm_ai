@@ -1,11 +1,21 @@
 # src/utility/
 
+import logging
 import os
-import yaml, datetime as dt
+import datetime as dt
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 _CFG = None
+_CONFIG_LOAD_ERRORS = (
+    OSError,
+    ValueError,
+    SyntaxError,
+    RecursionError,
+    getattr(yaml, "YAMLError", ValueError),
+)
 
 
 def load_config(refresh: bool = False):
@@ -19,7 +29,14 @@ def load_config(refresh: bool = False):
 def get_cfg():
     global _CFG
     if _CFG is None:
-        _CFG = yaml.safe_load(Path("config.yml").read_text(encoding="utf-8"))
+        try:
+            cfg = yaml.safe_load(Path("config.yml").read_text(encoding="utf-8"))
+        except _CONFIG_LOAD_ERRORS:
+            cfg = None
+        if not isinstance(cfg, dict):
+            logging.getLogger(__name__).warning("Could not load config.yml as a mapping. Using defaults.")
+            cfg = {}
+        _CFG = cfg
     return _CFG
 
 

@@ -1,6 +1,7 @@
 import time
 import random
 from src.logger import log_action
+from src.utility.llm_guard import can_call_llm
 
 
 # ---------- 会話テンプレート（ネオノワール用）----------
@@ -221,6 +222,9 @@ def generate_omni_controlled_response(choice, desire, name=None):
     if response_template:
         return response_template
     else:
+        allowed, _ = can_call_llm("legacy", "talk_to_statue_cooldown")
+        if not allowed:
+            return "今は語るべきことがない。時を置いて訪れよ。"
         response = openai.chat.completions.create(
             model="gpt-4o",
             messages=[
